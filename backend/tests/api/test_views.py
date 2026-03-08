@@ -523,7 +523,9 @@ class TestSearchView:
         with patch("api.search_service.search_assets") as mock_search_assets:
             from api.asset_adapter import AssetSearchResult
 
-            mock_search_assets.return_value = AssetSearchResult(source_status="degraded")
+            mock_search_assets.return_value = AssetSearchResult(
+                source_status="degraded"
+            )
             response = client.get(
                 f"/api/search?query=pump&image_id={image.image_id}&sources=internal,asset"
             )

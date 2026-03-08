@@ -147,7 +147,9 @@ class TestSearchService:
     def test_asset_source_degraded_on_db_error(self) -> None:
         img, _ = self._setup()
         with patch("api.search_service.search_assets") as mock_search_assets:
-            mock_search_assets.return_value = AssetSearchResult(source_status="degraded")
+            mock_search_assets.return_value = AssetSearchResult(
+                source_status="degraded"
+            )
             result = search(
                 image_id=img.image_id,
                 query="pump",

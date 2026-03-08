@@ -53,9 +53,7 @@ def search_assets(labels: list[str], query: str) -> AssetSearchResult:
     """
     like_query = f"%{query.lower()}%"
     col_list = ", ".join(_SEARCHABLE_COLUMNS)
-    like_clauses = " OR ".join(
-        f"LOWER({col}) LIKE %s" for col in _SEARCHABLE_COLUMNS
-    )
+    like_clauses = " OR ".join(f"LOWER({col}) LIKE %s" for col in _SEARCHABLE_COLUMNS)
     sql = f"""
         SELECT fitting_position, {col_list}
         FROM asset_information

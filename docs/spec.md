@@ -1169,6 +1169,9 @@ The project should be structured as a monorepo containing both the frontend and 
     - Initialize via `npm create vite@latest frontend -- --template react-ts`.
     - Install dependencies using `npm install @mui/material @emotion/react @emotion/styled @mui/icons-material @tanstack/react-query axios zod react-router-dom`.
     - Install development dependencies using `npm install --save-dev @biomejs/biome`.
+    - Run Biome via the npm scripts: `npm run lint` to check for issues, `npm run format` to check and auto-apply fixes.
+        - `npm run lint` runs `biome check src/`
+        - `npm run format` runs `biome check --write src/`
 - **Database Server:** A PostgreSQL instance is already running locally on the native OS (managed via pgAdmin4). DO NOT create a Docker container for the database.
     - The agent should connect to the local postgres instance (e.g., `127.0.0.1:5432`).
     - The user will provide or configure the credentials in a `.env` file. The agent should read configuration from `.env`.
@@ -1177,7 +1180,7 @@ The project should be structured as a monorepo containing both the frontend and 
 #### Agent Execution Rules
 - **Phase Confinement:** Strictly follow the Implementation Plan one Phase at a time. Stop and ask the user for permission before beginning the next Phase.
 - **Verification:** Run terminal commands to test the code continuously (e.g., output of `uv run pytest`, `npm run build`, or using `curl` to verify API endpoints). Ensure code is working before finalizing a phase.
-- **Linting & Formatting:** Always run `uv run ruff check --fix .` and `uv run ruff format .` for the backend, and `npx @biomejs/biome check --write .` for the frontend before finalizing any changes.
+- **Linting & Formatting:** Always run `uv run ruff check --fix .` and `uv run ruff format .` for the backend, and `npm run format` for the frontend before finalizing any changes.
 - **Type Checking:** Always run `uv run mypy .` for the backend before finalizing any changes. All source files must be annotated; `strict = true` is enforced.
 - **Incremental Tests:** Write automated tests (`pytest` for Django, `vitest` for React) as part of each Phase's completion criteria.
 - **Clean Communication:** At the end of every Phase, provide a concise bulleted summary of files created, packages installed, and what test commands were run and passed.
@@ -1235,3 +1238,88 @@ The project should be structured as a monorepo containing both the frontend and 
 -   **Server/Client:** Implement the resumable image upload endpoints and the Admin Mapping Step-by-Step UI.
 -   **Server:** Implement the `SearchService` and `GET /api/search` endpoint.
 -   **Client:** Implement the Search Tab on the LHS panel.
+
+
+### Phase 6: Review Codebase Against Spec & Update
+**Goal:** Close the gaps identified between the prototype codebase and the design principles and requirements defined in this specification. Each item below maps to a concrete shortfall found in the review.
+
+#### 6a: MUI Theme (Typography & Color)
+- Create `src/theme.ts` that exports a MUI `createTheme` configuration applying the full palette and typography scale defined in the `Typography & Color Scheme` section of this spec.
+    - Core palette: `primary`, `secondary`, `background`, `text`, `divider`.
+    - Semantic status palette: `success`, `warning`, `error`, `info`.
+    - Typography: `Public Sans` as the primary font family, `IBM Plex Mono` as the monospace font, correct weights and sizes per the type scale.
+    - Button variant override: `uppercase: false`.
+- Wrap the application root in `main.tsx` with MUI's `ThemeProvider` passing the exported theme.
+- **Verification:** `npm run build` passes; the app visually reflects the correct primary blue and background.
+
+#### 6b: Database Indexes
+- Add a new Django migration that creates the two missing indexes called out in the Search Architecture performance strategy:
+    - `FITTING_POSITIONS (label_text)` — standalone index to accelerate label-text lookups across images.
+    - `IMAGES (component_name)` — index to accelerate component-name search.
+- The existing unique constraint on `(image, label_text)` already covers the composite index; no additional migration is needed for that.
+- **Verification:** `uv run python manage.py migrate` applies cleanly; `uv run pytest` passes with all existing tests.
+
+#### 6c: Drawing Type Filter on Image Selection
+- **Backend:** Update `GET /api/images` to accept an optional `drawing_type_id` query parameter and filter results accordingly. Update the `list_images` view and add a corresponding test in `test_views.py`.
+- **Frontend:** Update `ImageSelectionPage` to:
+    - Fetch the image list without a filter on mount to obtain all available drawing types.
+    - Render a `FormControl` / `Select` / `MenuItem` drawing type dropdown above the tile grid (matching the wireframe in this spec).
+    - Gate the tile grid display on a drawing type being selected — show a prompt until one is chosen.
+    - Re-query `GET /api/images?drawing_type_id=<id>` when a type is selected.
+    - Update `useImages` hook (or add an overload) to accept an optional `drawingTypeId` filter parameter and pass it through `fetchImages`.
+- Update `ImageSelectionPage.test.tsx` to cover: filter dropdown renders, tile grid hidden before selection, tile grid shown after selection, correct `image_id` navigated to on tile click.
+- **Verification:** `npm run test` and `uv run pytest` pass.
+
+#### 6d: Pan & Zoom on Diagram Canvas
+- Install a pan/zoom library: `npm install @panzoom/panzoom`.
+- Refactor the diagram canvas section of `ImageViewerPage` to:
+    - Wrap the SVG `<img>` in a container `<div>` that acts as the pan/zoom host.
+    - Initialise Panzoom on the host element via a `useRef` + `useEffect`, with options: `contain: "outside"`, `minScale: 0.5`, `maxScale: 10`.
+    - Expose zoom in / zoom out icon buttons (`ZoomIn`, `ZoomOut` from `@mui/icons-material`) that call `panzoom.zoomIn()` / `panzoom.zoomOut()`.
+    - Add a reset button that calls `panzoom.reset()`.
+    - Forward pan-to-marker: export a `panToMarker(x, y)` function that calls `panzoom.pan(...)` such that the target coordinate is centred in the viewport — invoke this when a search result is clicked.
+- **Verification:** The user can drag to pan and scroll to zoom; clicking a search result centres the canvas on the target marker.
+
+#### 6e: Search Result Click Pans to Marker
+- Wire the `onSelectFp` callback in `SearchPanel` so that after updating `selectedFpId` and switching the active tab to Information, it also calls the `panToMarker` function exposed by the canvas (introduced in 6d) with the selected fitting position's `x_coordinate` and `y_coordinate`.
+- Coordinates are available in the search result item (`x_coordinate`, `y_coordinate` are returned by the search API and present in `SearchResultItem`); no additional API call is required.
+- Update `ImageViewerPage.test.tsx` to assert that clicking a search result switches the active tab to Information.
+- **Verification:** `npm run test` passes; manually clicking a result pans the canvas to the corresponding marker.
+
+#### 6f: `react-error-boundary` — Screen-Level Error Isolation
+- Install the package: `npm install react-error-boundary`.
+- Create a minimal `ErrorFallback` component (inline or in a shared file) that renders an `Alert` with severity `"error"` and a retry button using the `resetErrorBoundary` prop.
+- Wrap each of the three top-level page components (`ImageSelectionPage`, `ImageViewerPage`, `AdminPage`) in an `ErrorBoundary` from `react-error-boundary` with the `ErrorFallback` as the `fallbackRender` prop. Apply the boundary in `App.tsx` around each `<Route>` element.
+- **Verification:** `npm run build` passes; `npm run test` passes.
+
+#### 6g: TanStack Query Caching Policies
+- Apply `staleTime` and `gcTime` to every hook, matching the values in the `Caching Policy (Client)` section of this spec:
+
+    | Hook | `staleTime` | `gcTime` |
+    |---|---|---|
+    | `useImages` (list) | 5 min | 30 min |
+    | `useImage` (detail) | 15 min | 60 min |
+    | `useFittingPositions` | 5 min | 30 min |
+    | `useSearch` | 30 sec | 10 min |
+    | `useFittingPositionDetails` | 60 sec | 15 min |
+
+- Express all durations in milliseconds (e.g. `5 * 60 * 1000`).
+- **Verification:** `npm run test` passes; no behaviour regressions.
+
+#### 6h: Cache Invalidation — Upload Finalize & Bulk Save
+- In `useCompleteUpload`, add an `onSuccess` handler to:
+    - Invalidate `queryKeys.images.list()` so the image selection grid picks up the new image.
+    - Prefetch `queryKeys.images.detail(result.image_id)` using `queryClient.prefetchQuery`.
+- In `useSaveBulkFittingPositions`, extend the existing `onSuccess` handler to also:
+    - Invalidate `queryKeys.search(variables.imageId, ...)` — use `queryClient.invalidateQueries` with a partial key match on `["search", variables.imageId]` to reset all active search queries for that image.
+    - Invalidate `queryKeys.fittingPositions.detail(...)` — use a partial key match on `["fitting-positions"]` to clear any cached detail panels that may reference stale position data.
+- **Verification:** `npm run test` passes; after an upload completes, the image list updates without a manual page refresh.
+
+#### Completion Criteria for Phase 6
+All of the following must pass before Phase 6 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
