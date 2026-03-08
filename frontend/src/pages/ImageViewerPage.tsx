@@ -26,6 +26,7 @@ import { useTheme } from "@mui/material/styles";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import POITooltipCard from "../components/POITooltipCard";
 import TopAppHeader from "../components/TopAppHeader";
 import ViewerFooterStatusBar from "../components/ViewerFooterStatusBar";
 import { useFittingPositionDetails } from "../services/api/hooks/useFittingPositionDetails";
@@ -568,7 +569,15 @@ function ImageViewerPage() {
 									return (
 										<Tooltip
 											key={pos.fitting_position_id}
-											title={pos.label_text}
+											title={
+												<POITooltipCard
+													labelText={pos.label_text}
+													componentName={image?.component_name ?? ""}
+													fittingPositionId={pos.fitting_position_id}
+												/>
+											}
+											placement="top"
+											enterDelay={300}
 											arrow
 										>
 											<IconButton

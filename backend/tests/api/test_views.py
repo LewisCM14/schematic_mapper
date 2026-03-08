@@ -482,6 +482,62 @@ class TestBulkFittingPositionsView:
         )
         assert response.status_code == 404
 
+    def test_returns_400_for_duplicate_fitting_position_ids(
+        self, client: Client, image: Image
+    ) -> None:
+        payload = {
+            "image_id": str(image.image_id),
+            "fitting_positions": [
+                {
+                    "fitting_position_id": "FP-DUP-01",
+                    "label_text": "first",
+                    "x_coordinate": "10.000",
+                    "y_coordinate": "20.000",
+                },
+                {
+                    "fitting_position_id": "FP-DUP-01",
+                    "label_text": "duplicate",
+                    "x_coordinate": "30.000",
+                    "y_coordinate": "40.000",
+                },
+            ],
+        }
+        response = client.post(
+            "/api/admin/fitting-positions/bulk",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert response.json()["code"] == "bulk_duplicate_ids"
+
+    def test_unique_ids_succeed_as_before(
+        self, client: Client, image: Image
+    ) -> None:
+        payload = {
+            "image_id": str(image.image_id),
+            "fitting_positions": [
+                {
+                    "fitting_position_id": "FP-UNIQ-01",
+                    "label_text": "first",
+                    "x_coordinate": "10.000",
+                    "y_coordinate": "20.000",
+                },
+                {
+                    "fitting_position_id": "FP-UNIQ-02",
+                    "label_text": "second",
+                    "x_coordinate": "30.000",
+                    "y_coordinate": "40.000",
+                },
+            ],
+        }
+        response = client.post(
+            "/api/admin/fitting-positions/bulk",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+        assert response.json()["created"] == 2
+
 
 # ── Search ────────────────────────────────────────────────────────────────────
 

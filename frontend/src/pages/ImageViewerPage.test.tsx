@@ -66,8 +66,9 @@ describe("ImageViewerPage", () => {
 
 	it("shows error when image fails to load", async () => {
 		server.use(
-			http.get("/api/images/:imageId", () =>
-				new HttpResponse(null, { status: 404 }),
+			http.get(
+				"/api/images/:imageId",
+				() => new HttpResponse(null, { status: 404 }),
 			),
 		);
 		renderPage();

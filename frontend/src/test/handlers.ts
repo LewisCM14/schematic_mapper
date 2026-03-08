@@ -108,22 +108,21 @@ export const handlers = [
 		HttpResponse.json(FIXTURES.uploadSession, { status: 201 }),
 	),
 
-	http.put(
-		"/api/admin/uploads/:id/parts/:partNumber",
-		({ params }) =>
-			HttpResponse.json({
-				upload_id: params["id"],
-				part_number: Number(params["partNumber"]),
-				state: "uploading",
-			}),
+	http.put("/api/admin/uploads/:id/parts/:partNumber", ({ params }) =>
+		HttpResponse.json({
+			upload_id: params["id"],
+			part_number: Number(params["partNumber"]),
+			state: "uploading",
+		}),
 	),
 
 	http.post("/api/admin/uploads/:id/complete", () =>
 		HttpResponse.json(FIXTURES.uploadComplete, { status: 201 }),
 	),
 
-	http.delete("/api/admin/uploads/:id", () =>
-		new HttpResponse(null, { status: 204 }),
+	http.delete(
+		"/api/admin/uploads/:id",
+		() => new HttpResponse(null, { status: 204 }),
 	),
 
 	http.post("/api/admin/fitting-positions/bulk", () =>

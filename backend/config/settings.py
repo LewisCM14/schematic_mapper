@@ -115,3 +115,42 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+# Logging
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "config.log_filters.RequestIdFilter",
+        },
+    },
+    "formatters": {
+        "json_like": {
+            "format": (
+                '{"time": "%(asctime)s", "level": "%(levelname)s",'
+                ' "logger": "%(name)s", "request_id": "%(request_id)s",'
+                ' "message": "%(message)s"}'
+            ),
+        },
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "json_like",
+            "filters": ["request_id"],
+        },
+    },
+    "root": {
+        "handlers": ["stdout"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "api": {
+            "handlers": ["stdout"],
+            "level": "DEBUG",
+            "propagate": True,
+        },
+    },
+}

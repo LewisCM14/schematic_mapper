@@ -9,7 +9,10 @@ import AdminPage from "./AdminPage";
 
 function renderPage() {
 	const client = new QueryClient({
-		defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+		defaultOptions: {
+			queries: { retry: false, gcTime: 0 },
+			mutations: { retry: false },
+		},
 	});
 	return render(
 		<ThemeProvider theme={theme}>
@@ -87,5 +90,28 @@ describe("AdminPage", () => {
 
 		await waitFor(() => screen.getByText("Select Type"));
 		expect(screen.getByText("Map Positions")).toBeInTheDocument();
+	});
+
+	it("renders the prototype disclaimer banner", async () => {
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByText(/unprotected in the prototype build/i),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("dismisses the disclaimer banner when closed", async () => {
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByText(/unprotected in the prototype build/i),
+			).toBeInTheDocument();
+		});
+		const closeBtn = screen.getByRole("button", { name: /close/i });
+		await userEvent.click(closeBtn);
+		expect(
+			screen.queryByText(/unprotected in the prototype build/i),
+		).not.toBeInTheDocument();
 	});
 });

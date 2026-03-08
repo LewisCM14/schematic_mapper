@@ -26,10 +26,7 @@ function TopAppHeader({ title, contextLabel }: TopAppHeaderProps) {
 						{title}
 					</Typography>
 					{contextLabel && (
-						<Typography
-							variant="body2"
-							sx={{ opacity: 0.85, lineHeight: 1.2 }}
-						>
+						<Typography variant="body2" sx={{ opacity: 0.85, lineHeight: 1.2 }}>
 							{contextLabel}
 						</Typography>
 					)}

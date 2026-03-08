@@ -18,6 +18,7 @@ import {
 	Typography,
 } from "@mui/material";
 import { useRef, useState } from "react";
+import TopAppHeader from "../components/TopAppHeader";
 import type { BulkFittingPositionItem } from "../services/api/endpoints";
 import {
 	useAbortUpload,
@@ -28,7 +29,6 @@ import {
 } from "../services/api/hooks/useAdminUpload";
 import { useImages } from "../services/api/hooks/useImages";
 import type { DrawingType } from "../services/api/schemas";
-import TopAppHeader from "../components/TopAppHeader";
 
 const STEPS = [
 	"Select Type",
@@ -62,6 +62,7 @@ interface MappedPos {
 }
 
 function AdminPage() {
+	const [showDisclaimer, setShowDisclaimer] = useState(true);
 	const [activeStep, setActiveStep] = useState(0);
 
 	// Step 1
@@ -228,352 +229,365 @@ function AdminPage() {
 	return (
 		<>
 			<TopAppHeader title="Admin Panel" />
-			<Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
-			<Typography variant="h5" gutterBottom>
-				Admin — Upload &amp; Map
-			</Typography>
-
-			<Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-				{STEPS.map((label) => (
-					<Step key={label}>
-						<StepLabel>{label}</StepLabel>
-					</Step>
-				))}
-			</Stepper>
-
-			{/* ── Step 1: Select drawing type ── */}
-			{activeStep === 0 && (
-				<Paper sx={{ p: 3 }}>
-					<Typography variant="h6" gutterBottom>
-						Select Drawing Type
-					</Typography>
-					<Select
-						fullWidth
-						displayEmpty
-						value={selectedDrawingTypeId}
-						onChange={(e) =>
-							setSelectedDrawingTypeId(e.target.value as number | "")
-						}
-						size="small"
-						inputProps={{ "aria-label": "drawing type" }}
-					>
-						<MenuItem value="" disabled>
-							— select drawing type —
-						</MenuItem>
-						{drawingTypes.map((dt) => (
-							<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
-								{dt.type_name}
-							</MenuItem>
-						))}
-					</Select>
-					<Box sx={{ mt: 2 }}>
-						<Button
-							variant="contained"
-							disabled={!selectedDrawingTypeId}
-							onClick={() => setActiveStep(1)}
-						>
-							Next
-						</Button>
-					</Box>
-				</Paper>
+			{showDisclaimer && (
+				<Alert
+					severity="warning"
+					onClose={() => setShowDisclaimer(false)}
+					sx={{ borderRadius: 0 }}
+				>
+					Admin area — this section is unprotected in the prototype build.
+					Authentication will be enforced in the enterprise deployment.
+				</Alert>
 			)}
+			<Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
+				<Typography variant="h5" gutterBottom>
+					Admin — Upload &amp; Map
+				</Typography>
 
-			{/* ── Step 2: Upload ── */}
-			{activeStep === 1 && (
-				<Paper sx={{ p: 3 }}>
-					<Typography variant="h6" gutterBottom>
-						Upload Image
-					</Typography>
-					<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-						<TextField
-							label="Component Name"
-							value={componentName}
-							onChange={(e) => setComponentName(e.target.value)}
-							size="small"
+				<Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+					{STEPS.map((label) => (
+						<Step key={label}>
+							<StepLabel>{label}</StepLabel>
+						</Step>
+					))}
+				</Stepper>
+
+				{/* ── Step 1: Select drawing type ── */}
+				{activeStep === 0 && (
+					<Paper sx={{ p: 3 }}>
+						<Typography variant="h6" gutterBottom>
+							Select Drawing Type
+						</Typography>
+						<Select
 							fullWidth
-							inputProps={{ "aria-label": "component name" }}
-						/>
-						<Button
-							component="label"
-							variant="outlined"
-							startIcon={<CloudUploadIcon />}
+							displayEmpty
+							value={selectedDrawingTypeId}
+							onChange={(e) =>
+								setSelectedDrawingTypeId(e.target.value as number | "")
+							}
+							size="small"
+							inputProps={{ "aria-label": "drawing type" }}
 						>
-							{file ? file.name : "Choose file"}
-							<input
-								type="file"
-								hidden
-								accept=".svg,.png,.jpg,.jpeg"
-								onChange={handleFileChange}
-								aria-label="file input"
-							/>
-						</Button>
-
-						{uploadProgress > 0 && uploadProgress < 100 && (
-							<Box>
-								<Typography variant="caption">
-									Uploading… {uploadProgress}%
-								</Typography>
-								<LinearProgress variant="determinate" value={uploadProgress} />
-							</Box>
-						)}
-
-						{uploadError && <Alert severity="error">{uploadError}</Alert>}
-
-						<Box sx={{ display: "flex", gap: 1 }}>
-							<Button
-								variant="outlined"
-								onClick={() => setActiveStep(0)}
-								disabled={createSession.isPending || uploadChunkMut.isPending}
-							>
-								Back
-							</Button>
-							{uploadId && (
-								<Button
-									variant="outlined"
-									color="warning"
-									onClick={handleAbort}
-									disabled={abortUploadMut.isPending}
-								>
-									Abort
-								</Button>
-							)}
+							<MenuItem value="" disabled>
+								— select drawing type —
+							</MenuItem>
+							{drawingTypes.map((dt) => (
+								<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
+									{dt.type_name}
+								</MenuItem>
+							))}
+						</Select>
+						<Box sx={{ mt: 2 }}>
 							<Button
 								variant="contained"
-								onClick={handleUpload}
-								disabled={
-									!file ||
-									!componentName.trim() ||
-									createSession.isPending ||
-									uploadChunkMut.isPending ||
-									completeUploadMut.isPending
-								}
-								startIcon={
-									(createSession.isPending ||
-										uploadChunkMut.isPending ||
-										completeUploadMut.isPending) && (
-										<CircularProgress size={16} />
-									)
-								}
+								disabled={!selectedDrawingTypeId}
+								onClick={() => setActiveStep(1)}
 							>
-								Upload
+								Next
 							</Button>
 						</Box>
-					</Box>
-				</Paper>
-			)}
+					</Paper>
+				)}
 
-			{/* ── Step 3: Confirm ── */}
-			{activeStep === 2 && (
-				<Paper sx={{ p: 3 }}>
-					<Alert severity="success" sx={{ mb: 2 }}>
-						Upload complete.
-					</Alert>
-					<Typography variant="body2">
-						Image ID: <code>{completedImageId}</code>
-					</Typography>
-					<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-						<Button variant="outlined" onClick={() => setActiveStep(1)}>
-							Back
-						</Button>
-						<Button variant="contained" onClick={() => setActiveStep(3)}>
+				{/* ── Step 2: Upload ── */}
+				{activeStep === 1 && (
+					<Paper sx={{ p: 3 }}>
+						<Typography variant="h6" gutterBottom>
+							Upload Image
+						</Typography>
+						<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+							<TextField
+								label="Component Name"
+								value={componentName}
+								onChange={(e) => setComponentName(e.target.value)}
+								size="small"
+								fullWidth
+								inputProps={{ "aria-label": "component name" }}
+							/>
+							<Button
+								component="label"
+								variant="outlined"
+								startIcon={<CloudUploadIcon />}
+							>
+								{file ? file.name : "Choose file"}
+								<input
+									type="file"
+									hidden
+									accept=".svg,.png,.jpg,.jpeg"
+									onChange={handleFileChange}
+									aria-label="file input"
+								/>
+							</Button>
+
+							{uploadProgress > 0 && uploadProgress < 100 && (
+								<Box>
+									<Typography variant="caption">
+										Uploading… {uploadProgress}%
+									</Typography>
+									<LinearProgress
+										variant="determinate"
+										value={uploadProgress}
+									/>
+								</Box>
+							)}
+
+							{uploadError && <Alert severity="error">{uploadError}</Alert>}
+
+							<Box sx={{ display: "flex", gap: 1 }}>
+								<Button
+									variant="outlined"
+									onClick={() => setActiveStep(0)}
+									disabled={createSession.isPending || uploadChunkMut.isPending}
+								>
+									Back
+								</Button>
+								{uploadId && (
+									<Button
+										variant="outlined"
+										color="warning"
+										onClick={handleAbort}
+										disabled={abortUploadMut.isPending}
+									>
+										Abort
+									</Button>
+								)}
+								<Button
+									variant="contained"
+									onClick={handleUpload}
+									disabled={
+										!file ||
+										!componentName.trim() ||
+										createSession.isPending ||
+										uploadChunkMut.isPending ||
+										completeUploadMut.isPending
+									}
+									startIcon={
+										(createSession.isPending ||
+											uploadChunkMut.isPending ||
+											completeUploadMut.isPending) && (
+											<CircularProgress size={16} />
+										)
+									}
+								>
+									Upload
+								</Button>
+							</Box>
+						</Box>
+					</Paper>
+				)}
+
+				{/* ── Step 3: Confirm ── */}
+				{activeStep === 2 && (
+					<Paper sx={{ p: 3 }}>
+						<Alert severity="success" sx={{ mb: 2 }}>
+							Upload complete.
+						</Alert>
+						<Typography variant="body2">
+							Image ID: <code>{completedImageId}</code>
+						</Typography>
+						<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+							<Button variant="outlined" onClick={() => setActiveStep(1)}>
+								Back
+							</Button>
+							<Button variant="contained" onClick={() => setActiveStep(3)}>
+								Map Fitting Positions
+							</Button>
+						</Box>
+					</Paper>
+				)}
+
+				{/* ── Step 4: Map positions ── */}
+				{activeStep === 3 && (
+					<Paper sx={{ p: 3 }}>
+						<Typography variant="h6" gutterBottom>
 							Map Fitting Positions
-						</Button>
-					</Box>
-				</Paper>
-			)}
+						</Typography>
+						<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+							Click anywhere on the canvas to place a marker, then enter its
+							label.
+						</Typography>
 
-			{/* ── Step 4: Map positions ── */}
-			{activeStep === 3 && (
-				<Paper sx={{ p: 3 }}>
-					<Typography variant="h6" gutterBottom>
-						Map Fitting Positions
-					</Typography>
-					<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-						Click anywhere on the canvas to place a marker, then enter its
-						label.
-					</Typography>
+						<Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+							{/* Canvas area */}
+							<Box
+								ref={canvasRef}
+								onClick={handleCanvasClick}
+								sx={{
+									position: "relative",
+									width: 600,
+									height: 400,
+									border: "1px dashed",
+									borderColor: "divider",
+									borderRadius: 1,
+									cursor: "crosshair",
+									flexShrink: 0,
+									bgcolor: "grey.50",
+								}}
+								role="button"
+								aria-label="mapping canvas"
+							>
+								{mappedPositions.map((pos) => (
+									<Tooltip key={pos.id} title={pos.label} arrow>
+										<IconButton
+											size="small"
+											sx={{
+												position: "absolute",
+												left: pos.x,
+												top: pos.y,
+												transform: "translate(-50%, -100%)",
+												color: "success.main",
+												padding: 0,
+												pointerEvents: "none",
+											}}
+										>
+											<PlaceIcon fontSize="medium" />
+										</IconButton>
+									</Tooltip>
+								))}
 
-					<Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-						{/* Canvas area */}
-						<Box
-							ref={canvasRef}
-							onClick={handleCanvasClick}
-							sx={{
-								position: "relative",
-								width: 600,
-								height: 400,
-								border: "1px dashed",
-								borderColor: "divider",
-								borderRadius: 1,
-								cursor: "crosshair",
-								flexShrink: 0,
-								bgcolor: "grey.50",
-							}}
-							role="button"
-							aria-label="mapping canvas"
-						>
-							{mappedPositions.map((pos) => (
-								<Tooltip key={pos.id} title={pos.label} arrow>
+								{pendingPos && (
 									<IconButton
 										size="small"
 										sx={{
 											position: "absolute",
-											left: pos.x,
-											top: pos.y,
+											left: pendingPos.x,
+											top: pendingPos.y,
 											transform: "translate(-50%, -100%)",
-											color: "success.main",
+											color: "warning.main",
 											padding: 0,
 											pointerEvents: "none",
 										}}
 									>
 										<PlaceIcon fontSize="medium" />
 									</IconButton>
-								</Tooltip>
-							))}
-
-							{pendingPos && (
-								<IconButton
-									size="small"
-									sx={{
-										position: "absolute",
-										left: pendingPos.x,
-										top: pendingPos.y,
-										transform: "translate(-50%, -100%)",
-										color: "warning.main",
-										padding: 0,
-										pointerEvents: "none",
-									}}
-								>
-									<PlaceIcon fontSize="medium" />
-								</IconButton>
-							)}
-						</Box>
-
-						{/* Label entry */}
-						<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-							{pendingPos ? (
-								<>
-									<Typography variant="body2">
-										New marker at ({pendingPos.x}, {pendingPos.y})
-									</Typography>
-									<TextField
-										label="Label (fitting position ID)"
-										size="small"
-										value={editingLabel}
-										onChange={(e) => setEditingLabel(e.target.value)}
-										onKeyDown={(e) => {
-											if (e.key === "Enter") confirmMarker();
-											if (e.key === "Escape") {
-												setPendingPos(null);
-												setEditingLabel("");
-											}
-										}}
-										autoFocus
-										inputProps={{ "aria-label": "marker label" }}
-									/>
-									<Box sx={{ display: "flex", gap: 1 }}>
-										<Button
-											variant="contained"
-											size="small"
-											onClick={confirmMarker}
-											disabled={!editingLabel.trim()}
-										>
-											Confirm
-										</Button>
-										<Button
-											size="small"
-											onClick={() => {
-												setPendingPos(null);
-												setEditingLabel("");
-											}}
-										>
-											Cancel
-										</Button>
-									</Box>
-								</>
-							) : (
-								<Typography variant="body2" color="text.secondary">
-									{mappedPositions.length === 0
-										? "Click the canvas to place the first marker."
-										: `${mappedPositions.length} marker(s) placed.`}
-								</Typography>
-							)}
-
-							{mappedPositions.length > 0 && (
-								<Box sx={{ mt: 1 }}>
-									{mappedPositions.map((p) => (
-										<Typography key={p.id} variant="caption" display="block">
-											{p.label} — ({p.x}, {p.y})
-										</Typography>
-									))}
-								</Box>
-							)}
-						</Box>
-					</Box>
-
-					<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-						<Button variant="outlined" onClick={() => setActiveStep(2)}>
-							Back
-						</Button>
-						<Button
-							variant="contained"
-							disabled={mappedPositions.length === 0}
-							onClick={() => setActiveStep(4)}
-						>
-							Review &amp; Save
-						</Button>
-					</Box>
-				</Paper>
-			)}
-
-			{/* ── Step 5: Save ── */}
-			{activeStep === 4 && (
-				<Paper sx={{ p: 3 }}>
-					<Typography variant="h6" gutterBottom>
-						Validate &amp; Save
-					</Typography>
-
-					{saveResult ? (
-						<Alert severity="success">
-							Saved — {saveResult.created} created, {saveResult.updated}{" "}
-							updated.
-						</Alert>
-					) : (
-						<>
-							<Typography variant="body2" sx={{ mb: 2 }}>
-								{mappedPositions.length} fitting position(s) ready to save for
-								image <code>{completedImageId}</code>.
-							</Typography>
-							{mappedPositions.map((p) => (
-								<Typography key={p.id} variant="caption" display="block">
-									{p.label} — ({p.x}, {p.y})
-								</Typography>
-							))}
-							<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-								<Button variant="outlined" onClick={() => setActiveStep(3)}>
-									Back
-								</Button>
-								<Button
-									variant="contained"
-									onClick={handleSave}
-									disabled={saveBulk.isPending}
-									startIcon={
-										saveBulk.isPending && <CircularProgress size={16} />
-									}
-								>
-									Save
-								</Button>
+								)}
 							</Box>
-							{saveBulk.isError && (
-								<Alert severity="error" sx={{ mt: 2 }}>
-									Save failed. Please try again.
-								</Alert>
-							)}
-						</>
-					)}
-				</Paper>
-			)}
-		</Box>
+
+							{/* Label entry */}
+							<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+								{pendingPos ? (
+									<>
+										<Typography variant="body2">
+											New marker at ({pendingPos.x}, {pendingPos.y})
+										</Typography>
+										<TextField
+											label="Label (fitting position ID)"
+											size="small"
+											value={editingLabel}
+											onChange={(e) => setEditingLabel(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") confirmMarker();
+												if (e.key === "Escape") {
+													setPendingPos(null);
+													setEditingLabel("");
+												}
+											}}
+											autoFocus
+											inputProps={{ "aria-label": "marker label" }}
+										/>
+										<Box sx={{ display: "flex", gap: 1 }}>
+											<Button
+												variant="contained"
+												size="small"
+												onClick={confirmMarker}
+												disabled={!editingLabel.trim()}
+											>
+												Confirm
+											</Button>
+											<Button
+												size="small"
+												onClick={() => {
+													setPendingPos(null);
+													setEditingLabel("");
+												}}
+											>
+												Cancel
+											</Button>
+										</Box>
+									</>
+								) : (
+									<Typography variant="body2" color="text.secondary">
+										{mappedPositions.length === 0
+											? "Click the canvas to place the first marker."
+											: `${mappedPositions.length} marker(s) placed.`}
+									</Typography>
+								)}
+
+								{mappedPositions.length > 0 && (
+									<Box sx={{ mt: 1 }}>
+										{mappedPositions.map((p) => (
+											<Typography key={p.id} variant="caption" display="block">
+												{p.label} — ({p.x}, {p.y})
+											</Typography>
+										))}
+									</Box>
+								)}
+							</Box>
+						</Box>
+
+						<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+							<Button variant="outlined" onClick={() => setActiveStep(2)}>
+								Back
+							</Button>
+							<Button
+								variant="contained"
+								disabled={mappedPositions.length === 0}
+								onClick={() => setActiveStep(4)}
+							>
+								Review &amp; Save
+							</Button>
+						</Box>
+					</Paper>
+				)}
+
+				{/* ── Step 5: Save ── */}
+				{activeStep === 4 && (
+					<Paper sx={{ p: 3 }}>
+						<Typography variant="h6" gutterBottom>
+							Validate &amp; Save
+						</Typography>
+
+						{saveResult ? (
+							<Alert severity="success">
+								Saved — {saveResult.created} created, {saveResult.updated}{" "}
+								updated.
+							</Alert>
+						) : (
+							<>
+								<Typography variant="body2" sx={{ mb: 2 }}>
+									{mappedPositions.length} fitting position(s) ready to save for
+									image <code>{completedImageId}</code>.
+								</Typography>
+								{mappedPositions.map((p) => (
+									<Typography key={p.id} variant="caption" display="block">
+										{p.label} — ({p.x}, {p.y})
+									</Typography>
+								))}
+								<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+									<Button variant="outlined" onClick={() => setActiveStep(3)}>
+										Back
+									</Button>
+									<Button
+										variant="contained"
+										onClick={handleSave}
+										disabled={saveBulk.isPending}
+										startIcon={
+											saveBulk.isPending && <CircularProgress size={16} />
+										}
+									>
+										Save
+									</Button>
+								</Box>
+								{saveBulk.isError && (
+									<Alert severity="error" sx={{ mt: 2 }}>
+										Save failed. Please try again.
+									</Alert>
+								)}
+							</>
+						)}
+					</Paper>
+				)}
+			</Box>
 		</>
 	);
 }

@@ -279,6 +279,17 @@ def bulk_fitting_positions(request: Request) -> Response:
     data = serializer.validated_data
     image = get_object_or_404(Image, pk=data["image_id"])
 
+    fp_ids = [item["fitting_position_id"] for item in data["fitting_positions"]]
+    if len(fp_ids) != len(set(fp_ids)):
+        return Response(
+            {
+                "error": "Duplicate fitting_position_id values in payload",
+                "code": "bulk_duplicate_ids",
+                "status": 400,
+            },
+            status=400,
+        )
+
     created = 0
     updated = 0
     for item in data["fitting_positions"]:

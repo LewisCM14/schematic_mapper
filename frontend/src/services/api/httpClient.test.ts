@@ -23,9 +23,7 @@ describe("httpClient", () => {
 			const calledConfig = adapter.mock.calls[0][0];
 			expect(calledConfig.headers["X-Request-ID"]).toBeDefined();
 			expect(typeof calledConfig.headers["X-Request-ID"]).toBe("string");
-			expect(calledConfig.headers["X-Request-ID"]).toMatch(
-				/^[0-9a-f-]{36}$/,
-			);
+			expect(calledConfig.headers["X-Request-ID"]).toMatch(/^[0-9a-f-]{36}$/);
 		});
 	});
 
@@ -52,11 +50,10 @@ describe("httpClient", () => {
 			client.interceptors.response.use(
 				(r) => r,
 				(err) => {
-					if (
-						err.response?.status === 401 ||
-						err.response?.status === 403
-					) {
-						console.warn(`Auth error ${err.response.status}: ${err.config?.url}`);
+					if (err.response?.status === 401 || err.response?.status === 403) {
+						console.warn(
+							`Auth error ${err.response.status}: ${err.config?.url}`,
+						);
 						return Promise.resolve(err.response);
 					}
 					return Promise.reject(err);
@@ -66,9 +63,7 @@ describe("httpClient", () => {
 
 			const response = await client.get("/protected");
 			expect(response.status).toBe(401);
-			expect(warnSpy).toHaveBeenCalledWith(
-				"Auth error 401: /api/protected",
-			);
+			expect(warnSpy).toHaveBeenCalledWith("Auth error 401: /api/protected");
 		});
 
 		it("propagates error unchanged on non-auth errors", async () => {
@@ -83,11 +78,10 @@ describe("httpClient", () => {
 			client.interceptors.response.use(
 				(r) => r,
 				(err) => {
-					if (
-						err.response?.status === 401 ||
-						err.response?.status === 403
-					) {
-						console.warn(`Auth error ${err.response.status}: ${err.config?.url}`);
+					if (err.response?.status === 401 || err.response?.status === 403) {
+						console.warn(
+							`Auth error ${err.response.status}: ${err.config?.url}`,
+						);
 						return Promise.resolve(err.response);
 					}
 					return Promise.reject(err);
