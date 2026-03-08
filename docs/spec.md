@@ -1673,3 +1673,102 @@ All of the following must pass before Phase 8 is considered complete:
 - `npm run test` — all frontend tests pass.
 - `npm run build` — production build succeeds.
 - `npm run lint` — no Biome errors.
+
+### Phase 9: Review Codebase Against Spec & Update
+**Goal:** Close all conformance gaps identified in the Phase 8 review — grouped by severity (High → Medium). Each sub-item maps directly to a specific shortfall found during the audit.
+
+---
+
+#### 9a: Theme Token Violations *(High)*
+*Addresses: `POITooltipCard` hardcodes `fontFamily: "IBM Plex Mono, monospace"` instead of using the theme; `ViewerFooterStatusBar` uses raw MUI `Chip` instead of the existing `StatusChip` atom.*
+
+- In `src/components/POITooltipCard.tsx`, replace the hardcoded `sx={{ fontFamily: "IBM Plex Mono, monospace" }}` on the `fittingPositionId` `Typography` with `useTheme()` and `sx={{ fontFamily: theme.typography.monoFontFamily }}`.
+- In `src/components/ViewerFooterStatusBar.tsx`, replace all inline `<Chip>` usages for source status with the existing `<StatusChip>` atom imported from `src/components/atoms/StatusChip.tsx`.
+- Update `ViewerFooterStatusBar.test.tsx` assertions to reference `StatusChip` rendering (e.g. assert the correct `status` prop values are passed).
+- **Verification:** `npm run test` passes; `npm run lint` passes; `npm run build` succeeds.
+
+---
+
+#### 9b: `HealthDot` Atom & `SourceHealthGroup` Molecule *(High)*
+*Addresses: `HealthDot` atom is absent; `SourceHealthGroup` molecule is absent; `ViewerFooterStatusBar` has no composed source health group.*
+
+- Create `src/components/atoms/HealthDot.tsx`. Props: `status: "ok" | "degraded" | "error"`. Renders a small filled `Box` circle (e.g. `width: 10, height: 10, borderRadius: "50%"`) using `theme.palette.success.main`, `theme.palette.warning.main`, or `theme.palette.error.main` according to `status`. Pairs with an `aria-label` so status is not conveyed by colour alone.
+- Create `src/components/molecules/SourceHealthGroup.tsx`. Props: `sourceName: string`, `status: "ok" | "degraded" | "error"`. Renders a `Box` row containing `<HealthDot status={status} />` and a `Typography caption` label showing `sourceName`. Import and compose the `HealthDot` atom — do not duplicate its colour logic.
+- Update `src/components/ViewerFooterStatusBar.tsx` to replace per-source chip rendering with `<SourceHealthGroup>` components iterated over the `sourceStatus` entries.
+- Add unit tests: `HealthDot.test.tsx` asserting the correct `aria-label` and colour class per status; `SourceHealthGroup.test.tsx` asserting `sourceName` label text and `HealthDot` presence.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 9c: `FilterBar` Text Search + Backend `?search=` Support *(High)*
+*Addresses: `FilterBar` renders only the drawing type select; the spec requires "drawing type select + optional text filter"; the wireframe shows `[Drawing Type Dropdown] [Search Images]`; `GET /api/images` has no `search` query parameter.*
+
+- **Backend:** In `api/views.py`, extend `list_images` to accept an optional `search` query parameter and apply `component_name__icontains` filtering when present. Add a test in `TestListImagesView` covering: `?search=pump` returns only matching images; `?search=` (empty) returns all images.
+- **Frontend `FilterBar.tsx`:** Add two new optional props: `searchValue: string` and `onSearchChange: (value: string) => void`. Render a `TextField` (size `"small"`) labelled `"Search images"` alongside the existing type `Select`. Both controls sit in a `Box` with `display: flex` and `gap`.
+- **`useImages.ts`:** Accept an optional `search?: string` parameter alongside the existing `drawingTypeId`. Pass it to `fetchImages` as a query param. Include `search` in the query key so cache entries are scoped per search term.
+- **`queryKeys.ts`:** Update `images.list(filters)` to accept and include `search` in the key tuple.
+- **`ImageSelectionPage.tsx`:** Add a `searchText` state string (initial `""`). Pass `searchValue={searchText}` and `onSearchChange={setSearchText}` to `FilterBar`. Pass `searchText` to `useImages`.
+- Update `FilterBar.test.tsx`: assert the search `TextField` renders; assert `onSearchChange` is called with the new value on input change.
+- Update `ImageSelectionPage.test.tsx`: assert that typing in the search field updates the rendered tile list (use MSW handler that filters by search).
+- **Verification:** `uv run pytest` passes; `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### 9d: `SearchResultItem` — Remove Incorrect `TypeBadge` Usage *(Medium)*
+*Addresses: `SearchResultItem` uses `TypeBadge` (designed for drawing types) to render `match_type` and `matched_source` — these are metadata fields, not drawing type labels.*
+
+- In `src/components/molecules/SearchResultItem.tsx`, replace both `<TypeBadge drawingType={result.match_type} />` and `<TypeBadge drawingType={result.matched_source} />` with semantically appropriate elements:
+    - `match_type`: render a small MUI `Chip` with `size="small"` coloured by match quality — `"exact"` → `color="success"`, `"prefix"` → `color="info"`, `"partial"` → default (no `color` prop). Show the `match_type` string as the chip label.
+    - `matched_source`: render a `Typography variant="caption"` showing the source label, prefixed with `"via "` (e.g. `"via internal"`). No chip — plain metadata text.
+- Update `SearchResultItem.test.tsx` to assert: `exact` match renders a success-coloured chip; `prefix` renders an info chip; `matched_source` text appears with the `"via "` prefix.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 9e: Missing Hook Test Files *(Medium)*
+*Addresses: `useFittingPositions.ts` and `useFittingPositionDetails.ts` have no co-located test files; the spec requires test files to be co-located with their source.*
+
+- Create `src/services/api/hooks/useFittingPositions.test.ts`:
+    - Assert the hook is **disabled** when `imageId` is `null` or `undefined` (`enabled: !!imageId`).
+    - Assert that a valid `imageId` fires `GET /api/images/:imageId/fitting-positions` and returns the fixture array via MSW.
+    - Assert `staleTime: 5 * 60 * 1000` and `gcTime: 30 * 60 * 1000` applied to the query.
+- Create `src/services/api/hooks/useFittingPositionDetails.test.ts`:
+    - Assert the hook is **disabled** when `fittingPositionId` is `null` or `undefined`.
+    - Assert that a valid `fittingPositionId` fires `GET /api/fitting-positions/:id/details` and returns the fixture asset/sensor data.
+    - Assert `staleTime: 60 * 1000` and `gcTime: 15 * 60 * 1000`.
+- Both test files must use `renderHook` from `@testing-library/react`, an isolated `QueryClient` per test with `retry: false` and `gcTime: 0`, and MSW handlers from `src/test/handlers.ts`.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 9f: Backend Test Completions & Dev Dependencies *(Medium)*
+*Addresses: `pytest-mock` and `pytest-cov` are absent from dev dependencies; upload reliability test assertions are incomplete.*
+
+- **Dependencies:** Run `uv add --dev pytest-mock pytest-cov` to add both to `[dependency-groups] dev` in `pyproject.toml`.
+- **Upload reliability tests** in `tests/api/test_views.py`:
+    - In `TestCompleteUploadView`: extend `test_returns_422_on_checksum_mismatch` to also assert `session.state == "failed"` after refreshing from the database (the view already sets this state; the test does not currently assert it).
+    - In `TestCompleteUploadView`: add `test_aborted_upload_cannot_be_finalized` — create a session in `"uploading"` state, call `DELETE /api/admin/uploads/:id` to abort it, then call `POST /api/admin/uploads/:id/complete` and assert `409` is returned.
+    - In `TestUploadChunkView`: add `test_chunk_retry_updates_without_creating_duplicate` — `PUT` the same `part_number` twice with different `chunk_data`; assert `UploadChunk.objects.filter(upload=session).count() == 1` and the stored data matches the second upload (backend already uses `update_or_create`; this test proves it).
+- **Verification:** `uv run pytest` passes; `uv run ruff check .` passes.
+
+---
+
+#### 9g: Frontend Test Gaps *(Medium)*
+*Addresses: error boundary fallback rendering is untested; upload finalize failure and abort UI state clearing are untested.*
+
+- **`App.test.tsx`:** Add an error boundary test — render a `<Route>` child that throws synchronously; assert the `ErrorFallback` component renders with an error `Alert` and a retry / reload button is present in the DOM.
+- **`AdminPage.test.tsx`:**
+    - Add `test_finalize_failure_shows_error` — override the MSW `POST /api/admin/uploads/:id/complete` handler to return `422` with `{ code: "checksum_mismatch" }`; trigger the complete action in the UI; assert an error message is displayed to the user.
+    - Add `test_abort_clears_upload_session_state` — complete a partial upload flow up to the uploading state, trigger the abort action (`DELETE /api/admin/uploads/:id`); assert the upload session UI returns to the initial / start-new-upload state.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### Completion Criteria for Phase 9
+All of the following must pass before Phase 9 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
