@@ -1323,3 +1323,198 @@ All of the following must pass before Phase 6 is considered complete:
 - `npm run test` — all frontend tests pass.
 - `npm run build` — production build succeeds.
 - `npm run lint` — no Biome errors.
+
+### Phase 7: Review Codebase Against Spec & Update
+**Goal:** Close all conformance gaps identified in the Phase 6 review — grouped by severity (Critical → Major → Minor). Each sub-item maps directly to a specific shortfall found during the audit.
+
+---
+
+#### 7a: Complete MUI Theme Tokens — IBM Plex Mono & Map/Panel Colours *(Critical)*
+*Addresses: IBM Plex Mono absent from theme; map-specific and panel/chrome colour tokens missing; hardcoded inline colours in `ImageViewerPage`.*
+
+- Extend `src/theme.ts`:
+    - Add `IBM Plex Mono` as the monospace font family. Register it in the MUI typography object alongside `Public Sans` so that request IDs, fitting-position IDs, and technical metadata rendered with `fontFamily: "monospace"` resolve to the correct face.
+    - Add the full `map` token group as a custom theme palette extension:
+        - `map.canvas.bg`: `#EEF3F8`
+        - `map.grid.line`: `#D7E2EE`
+        - `map.poi.default`: `#0B6BCB`
+        - `map.poi.selected`: `#C53030`
+        - `map.poi.cluster`: `#0F766E`
+        - `map.poi.unmapped`: `#B7791F`
+    - Add the full `panel` and `footer` token group:
+        - `panel.drawer.bg`: `#FFFFFF`
+        - `panel.drawer.tab.active`: `#E7F1FB`
+        - `panel.drawer.tab.text.active`: `#0B6BCB`
+        - `footer.bg`: `#102A43`
+        - `footer.text`: `#F8FAFC`
+    - Extend the MUI `Palette` and `PaletteOptions` TypeScript interfaces (via module augmentation in `theme.ts`) so the custom token groups are typed and accessible via `theme.palette.*`.
+- Remove hardcoded ad-hoc colour strings from `ImageViewerPage.tsx` (e.g. `background: "#EEF3F8"`, marker fill values) and replace with `theme.palette.map.*` and `theme.palette.footer.*` via `useTheme()` or `sx` prop references.
+- **Verification:** `npm run build` and `npm run lint` pass; MUI TypeScript compiler emits no errors on palette access; canvas background and footer background pull from the theme.
+
+---
+
+#### 7b: Viewer Footer Status Bar *(Critical)*
+*Addresses: `ViewerFooterStatusBar` component absent from `ImageViewerPage`; `source_status`, `request_id`, zoom level, and last-refresh time are not surfaced in the UI.*
+
+- Create `src/components/ViewerFooterStatusBar.tsx`. Props:
+    - `sourceStatus: Record<string, string>` — one chip per source key, coloured by status (`ok` → success, `degraded` → warning, `error` → error). Use `StatusChip` styling consistent with the `map.poi` palette.
+    - `requestId: string | null` — render with `IBM Plex Mono` (`fontFamily: "monospace"`) in a `MetricText`-style `Typography caption`.
+    - `lastRefreshed: Date | null` — human-readable relative timestamp (e.g. `"just now"`, `"2 min ago"`).
+    - `zoomLevel: number` — current panzoom scale formatted to one decimal place (e.g. `1.0×`).
+- Style the footer bar as a full-width `Paper` strip using `footer.bg` / `footer.text` tokens, matching the wireframe in this spec (`Box` with `display: flex`, `alignItems: center`, `gap`).
+- In `ImageViewerPage.tsx`:
+    - Lift `source_status` and `request_id` out of the last successful search response and store in component state. Pass as props to `ViewerFooterStatusBar`.
+    - Read the current zoom level from `panzoom.getScale()` on each zoom/pan event (listen to the `"panzoomchange"` event emitted by `@panzoom/panzoom`) and store in state. Pass as prop.
+    - Record `lastRefreshed` as a `Date` whenever the search query settles. Pass as prop.
+    - Render `<ViewerFooterStatusBar>` below the main canvas/drawer layout row, so it spans the full width of the screen.
+- Add a unit test for `ViewerFooterStatusBar` that asserts: source chips render with correct labels, request ID is displayed, zoom level is formatted correctly, and an `ok` status chip has the success colour role.
+- **Verification:** `npm run test` passes; the footer is visible in `ImageViewerPage` with all four data points populated after a search completes.
+
+---
+
+#### 7c: AppBar Header on All Screens *(Major)*
+*Addresses: no `AppBar` / `Toolbar` present on `ImageSelectionPage` or `ImageViewerPage`; wireframe requires a `TopAppHeader` organism on every screen.*
+
+- Create `src/components/TopAppHeader.tsx`. Props:
+    - `title: string` — primary text rendered in `Toolbar` `Typography`.
+    - `contextLabel?: string` — optional secondary label (e.g. image name + drawing type) shown in `Typography variant="body2"`.
+- Use MUI `AppBar` (`position="static"`) + `Toolbar`. Apply `primary.main` background via `color="primary"` on `AppBar`.
+- Include an `AppLogo` placeholder text (`"SM"` in a small `Avatar`) on the left.
+- Place `TopAppHeader` at the top of `ImageSelectionPage`, `ImageViewerPage`, and `AdminPage`.
+    - `ImageSelectionPage`: `title="Schematic Mapper"`.
+    - `ImageViewerPage`: `title="Schematic Mapper"`, `contextLabel` = loaded image's `component_name` + drawing type (from the `useImage` query result).
+    - `AdminPage`: `title="Admin Panel"`.
+- Update `ImageSelectionPage.test.tsx` to assert the heading text is present.
+- Update `ImageViewerPage.test.tsx` to assert the heading text is present.
+- **Verification:** `npm run test` passes; all three screens display the header bar.
+
+---
+
+#### 7d: `httpClient` Request & Response Interceptors *(Major)*
+*Addresses: `httpClient.ts` has no interceptors; the spec requires auth header injection, request ID propagation, and global 401/403 handling.*
+
+- In `services/api/httpClient.ts`, add a **request interceptor** that:
+    - Injects a `X-Request-ID` header with a newly generated `crypto.randomUUID()` value on every outgoing request (prototype stand-in for correlation ID propagation — no auth token in the prototype build).
+- Add a **response interceptor** that:
+    - On `401` or `403` response status, `console.warn` with the request URL and status (sign-in redirect is a no-op in the prototype; the interceptor must exist and be wired so it can be replaced when auth is added).
+    - On any other error, re-throws the `AxiosError` unchanged so TanStack Query handles it normally.
+- Export the `httpClient` instance as the default export (no change to callers required).
+- Add a unit test (`services/api/httpClient.test.ts`) covering: `X-Request-ID` header is present on outgoing requests; a mocked 401 response triggers the warn path without throwing; a mocked 500 response propagates the error.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 7e: MSW API Mocking in Tests *(Major)*
+*Addresses: tests currently mock Axios directly; the spec requires `msw` for deterministic API mocking at the network boundary.*
+
+- Install `msw`: `npm install --save-dev msw`.
+- Create `src/test/handlers.ts` defining MSW request handlers for every endpoint used by existing tests:
+    - `GET /api/health` → `{ status: "ok", db: "connected" }`
+    - `GET /api/images` → fixture list response
+    - `GET /api/images/:imageId` → fixture detail response
+    - `GET /api/images/:imageId/fitting-positions` → fixture positions response
+    - `GET /api/search` → fixture search response (including `source_status`, `request_id`, `has_more: false`)
+    - `GET /api/fitting-positions/:id/details` → fixture detail response
+    - `POST /api/admin/uploads` → fixture session response
+    - `POST /api/admin/uploads/:id/complete` → fixture complete response
+    - `POST /api/admin/fitting-positions/bulk` → `204 No Content`
+- Update `src/test/setup.ts` to:
+    - Import `setupServer` from `msw/node`.
+    - Call `server.listen({ onUnhandledRequest: "error" })` before all tests (strict mode — fail on unhandled requests per the spec).
+    - Call `server.resetHandlers()` after each test.
+    - Call `server.close()` after all tests.
+- Refactor existing test files to remove direct `vi.mock("axios")` / `vi.spyOn` Axios calls and instead rely on the MSW handlers. Inject a `QueryClient` with `retry: false` and `gcTime: 0` per test to prevent cache leakage.
+- **Verification:** `npm run test` passes with all existing tests green and no unhandled-request warnings.
+
+---
+
+#### 7f: `sources` Query Parameter Validation *(Major)*
+*Addresses: the `sources` parameter in `GET /api/search` is not validated; unknown source names pass through silently.*
+
+- Define an allowlist of valid source names at the top of `api/views.py` (or in `api/search_service.py`): `VALID_SEARCH_SOURCES = {"internal", "asset", "sensor"}`.
+- In the search view, after parsing the `sources` query parameter, validate that every supplied value is in `VALID_SEARCH_SOURCES`. If any unknown value is present, return `400 Bad Request` with:
+    ```json
+    { "error": "Invalid source: \"<value>\"", "code": "search_invalid_source", "status": 400 }
+    ```
+- Add tests in `test_views.py` under `TestSearchView` covering: valid sources pass through; a single unknown source returns 400 with the correct error code; mixed valid + invalid also returns 400.
+- **Verification:** `uv run pytest` passes.
+
+---
+
+#### 7g: `SearchConfigService` & `SearchIndexService` *(Major)*
+*Addresses: searchable fields are hardcoded in `search_service.py`; the spec requires configuration-driven field lists with a dedicated `SearchConfigService` and `SearchIndexService`.*
+
+- Create `api/search_config_service.py` implementing `SearchConfigService`:
+    - Holds a Python dataclass or `TypedDict` per source entry: `source_name`, `enabled`, `searchable_columns` (list of column names), `field_weights` (dict of column → priority integer).
+    - Provides a `get_config(source_name: str) -> SourceSearchConfig` method and `get_enabled_sources() -> list[SourceSearchConfig]`.
+    - For the prototype, seed the configuration in-process (no YAML file or DB table required yet) with the internal source columns (`label_text`, `component_name`) and asset source columns (`sub_component_name`, `high_level_component`).
+- Create `api/search_index_service.py` implementing `SearchIndexService`:
+    - Exposes a `get_searchable_fields(image_id: str) -> list[SearchProjectionRow]` method that builds the reduced unified projection for a given image by joining `FittingPosition` rows with the configured searchable columns from each enabled source.
+    - `SearchProjectionRow` contains: `fitting_position_id`, `label_text`, `x_coordinate`, `y_coordinate`, `component_name`, and any configured external columns present on the mock asset data.
+- Refactor `SearchService` in `search_service.py` to delegate column discovery to `SearchConfigService` and projection building to `SearchIndexService` rather than hardcoding column names.
+- Add `TestSearchConfigService` and `TestSearchIndexService` test classes in `tests/api/test_search_service.py` covering: known source returns correct column list; unknown source raises; disabled source is excluded from enabled list; projection includes only configured columns.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 7h: Structured Django Logging Configuration *(Minor)*
+*Addresses: `settings.py` has no structured `LOGGING` configuration; the spec requires structured logs and correlation ID propagation across adapters.*
+
+- Add a `LOGGING` dict to `config/settings.py` using Django's standard `dictConfig` format:
+    - Root logger: `WARNING`.
+    - `api` logger: `DEBUG`, propagate to root.
+    - Use `logging.StreamHandler` writing to `stdout` (IIS-compatible; log aggregation comes from stdout in the target deployment).
+    - Formatter: structured JSON-like format including `asctime`, `levelname`, `name`, `message`, and `request_id` (populated via a `logging.Filter` that reads from a thread-local set by the request interceptor — stub the filter for the prototype).
+    - Keep the formatter simple enough to pass `mypy strict` without third-party log packages.
+- Add a test in `tests/api/test_views.py` (or a dedicated `tests/config/test_logging.py`) asserting that the `api` logger is configured and that a log record from the `api` namespace is captured at `DEBUG` level.
+- **Verification:** `uv run pytest` passes; `uv run ruff check .` passes.
+
+---
+
+#### 7i: POI Hover Tooltip Card *(Minor)*
+*Addresses: POI marker hover currently shows no tooltip; the spec requires a `POITooltipCard` molecule with quick-summary data.*
+
+- Create `src/components/POITooltipCard.tsx`. Props:
+    - `labelText: string`
+    - `componentName: string`
+    - `fittingPositionId: string`
+- Render a compact MUI `Paper` (or use MUI `Tooltip`'s `title` prop with a custom node) showing:
+    - `TypeBadge` with the drawing type.
+    - `labelText` in `body2`.
+    - `fittingPositionId` in `caption` with `fontFamily: "monospace"` (IBM Plex Mono).
+- In `ImageViewerPage.tsx`, wrap each POI `<Box>` marker in a MUI `Tooltip` with `title={<POITooltipCard ... />}` and `placement="top"`. The tooltip should open on hover (`enterDelay={300}`) and not interfere with click-to-select behaviour.
+- Add a unit test for `POITooltipCard` asserting the label text, component name, and fitting position ID are rendered.
+- **Verification:** `npm run test` passes; hovering a POI marker in the viewer shows the tooltip card.
+
+---
+
+#### 7j: Bulk Save Uniqueness Validation *(Minor)*
+*Addresses: `POST /api/admin/fitting-positions/bulk` accepts duplicate `fitting_position_id` values in a single payload without rejecting them.*
+
+- In `api/views.py` (or the serializer for bulk fitting positions), validate that the submitted list contains no duplicate `fitting_position_id` values before attempting any DB writes.
+- If duplicates are found, return `400 Bad Request` with:
+    ```json
+    { "error": "Duplicate fitting_position_id values in payload", "code": "bulk_duplicate_ids", "status": 400 }
+    ```
+- Add a test in `test_views.py` under `TestBulkFittingPositionsView` (or equivalent) covering: payload with duplicate IDs returns 400 with `bulk_duplicate_ids`; payload with all-unique IDs succeeds as before.
+- **Verification:** `uv run pytest` passes.
+
+---
+
+#### 7k: Admin Screen Prototype Disclaimer *(Minor)*
+*Addresses: the admin route has no access guard or disclaimer; in the prototype (no auth) an unaware user could navigate directly to `/admin` without context.*
+
+- In `AdminPage.tsx` (or `App.tsx`), render a dismissable `Alert severity="warning"` banner at the top of the admin page with the text: `"Admin area — this section is unprotected in the prototype build. Authentication will be enforced in the enterprise deployment."`. 
+- The banner dismisses on click (controlled `open` state) and does not reappear within the same session.
+- **Verification:** `npm run test` passes; the banner renders on `/admin` and can be dismissed.
+
+---
+
+#### Completion Criteria for Phase 7
+All of the following must pass before Phase 7 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
