@@ -47,6 +47,9 @@ class Image(models.Model):
 
     class Meta:
         db_table = "images"
+        indexes = [
+            models.Index(fields=["component_name"], name="idx_images_component_name"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.component_name} ({self.image_id})"
@@ -70,6 +73,9 @@ class FittingPosition(models.Model):
             models.UniqueConstraint(
                 fields=["image", "label_text"], name="uq_image_label_text"
             )
+        ]
+        indexes = [
+            models.Index(fields=["label_text"], name="idx_fp_label_text"),
         ]
 
     def __str__(self) -> str:
