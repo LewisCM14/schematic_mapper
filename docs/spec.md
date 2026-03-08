@@ -1183,7 +1183,8 @@ The project should be structured as a monorepo containing both the frontend and 
 - **Linting & Formatting:** Always run `uv run ruff check --fix .` and `uv run ruff format .` for the backend, and `npm run format` for the frontend before finalizing any changes.
 - **Type Checking:** Always run `uv run mypy .` for the backend before finalizing any changes. All source files must be annotated; `strict = true` is enforced.
 - **Incremental Tests:** Write automated tests (`pytest` for Django, `vitest` for React) as part of each Phase's completion criteria.
-- **Clean Communication:** At the end of every Phase, provide a concise bulleted summary of files created, packages installed, and what test commands were run and passed.
+- **Spec Conformance Review:** Before marking a Phase complete, review all files changed or created during that Phase against the relevant sections of this specification (excluding the Implementation Plan section). Identify any gaps between the implementation and the spec requirements, and either resolve them within the current Phase or record them explicitly as named items for the next review Phase. A Phase is not complete if any change introduced a regression against a previously conformant spec requirement.
+- **Clean Communication:** At the end of every Phase, provide a concise bulleted summary of files created, packages installed, what test commands were run and passed, and any spec conformance gaps deferred to a future phase.
 
 ---
 
@@ -1512,6 +1513,160 @@ All of the following must pass before Phase 6 is considered complete:
 
 #### Completion Criteria for Phase 7
 All of the following must pass before Phase 7 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
+
+### Phase 8: Review Codebase Against Spec & Update
+**Goal:** Close all conformance gaps identified in the Phase 7 review — grouped by severity (Medium → Minor). Each sub-item maps directly to a specific shortfall found during the audit.
+
+---
+
+#### 8a: Correlation ID Middleware *(Medium)*
+*Addresses: `log_filters.set_request_id()` is never called; backend logs always show `request_id: "-"`; `search_view` generates its own UUID instead of echoing the client's `X-Request-ID`.*
+
+- Create `backend/api/middleware.py` implementing `RequestIdMiddleware`:
+    - `__init__(self, get_response)` + standard `__call__(self, request)` pattern.
+    - Read the incoming correlation ID with `request.META.get("HTTP_X_REQUEST_ID") or str(uuid.uuid4())` so the middleware generates one when the client omits it.
+    - Call `log_filters.set_request_id(request_id)` before delegating to `get_response`.
+    - Wrap the downstream call in a `try/finally` block and call `log_filters.clear_request_id()` in the `finally` clause to prevent thread-local leakage between requests.
+    - Attach the resolved ID to the response header: `response["X-Request-ID"] = request_id`.
+- Register `"api.middleware.RequestIdMiddleware"` in the `MIDDLEWARE` list in `config/settings.py`.
+- Remove the standalone `str(uuid.uuid4())` call inside `search_view` — it should now read `request.META.get("HTTP_X_REQUEST_ID", "-")` (the middleware will always have set it by this point).
+- Add tests in `tests/api/test_views.py` under a new `TestRequestIdMiddleware` class covering:
+    - A request without `X-Request-ID` results in a generated UUID present in the response header.
+    - A request with a supplied `X-Request-ID` echoes the same value back in the response header.
+    - The `api` logger captures `request_id` from the thread-local during an active request.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors; structured log output shows a non-`"-"` `request_id` for all requests.
+
+---
+
+#### 8b: Field Weights Applied to Search Ranking *(Medium)*
+*Addresses: `SearchConfigService` defines `field_weights` per column but `search_service.py` never consults them; tiebreaking falls back to alphabetical `label_text` order instead of weight-based ordering as the spec requires.*
+
+- Extend `SearchConfigService` (in `api/search_config_service.py`) to expose a `get_field_weight(source_name: str, column: str) -> int` accessor that returns the configured priority integer for a given source/column pair.
+- In `search_service.py`, update the result accumulation so each hit records the weight of the field that produced the match alongside its match-type rank.
+- Update the sort key: `(match_type_rank, -field_weight, label_text)` — lower match-type rank wins first, then higher `field_weight` wins (higher weight = higher priority field), then `label_text` alphabetically as the final stable tiebreaker.
+- Add a test in `TestSearchService` (in `tests/api/test_search_service.py`) that constructs two fitting positions with the same `label_text` and produces hits on different-weight fields, then asserts the higher-weight field's result ranks first.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 8c: Hook-Level Tests *(Medium)*
+*Addresses: `useImages`, `useFittingPositions`, `useFittingPositionDetails`, `useSearch`, and `useAdminUpload` have zero direct test coverage; the spec requires hook tests with mocked responses via MSW.*
+
+- Create `src/services/api/hooks/useImages.test.ts`:
+    - Assert that a successful `GET /api/images` response populates the query data.
+    - Assert that the hook is enabled unconditionally (image list loads without preconditions).
+    - Assert `staleTime: 5 * 60 * 1000` and `gcTime: 30 * 60 * 1000` applied to the list query.
+    - Assert that a successful `GET /api/images/:imageId` response (detail) populates query data with `staleTime: 15 * 60 * 1000`.
+- Create `src/services/api/hooks/useSearch.test.ts`:
+    - Assert that the hook is **disabled** when `imageId` is absent or the query string is shorter than 2 characters (`enabled: Boolean(imageId) && query.length >= 2`).
+    - Assert that a valid query with `imageId` present fires the request and returns page 1 data.
+    - Assert that `getNextPageParam` returns `next_cursor` when `has_more` is `true` and `undefined` when `has_more` is `false`.
+    - Assert `staleTime: 30 * 1000` and `gcTime: 10 * 60 * 1000`.
+- Create `src/services/api/hooks/useAdminUpload.test.ts`:
+    - Assert that calling `useCompleteUpload`'s mutate function invokes `POST /api/admin/uploads/:id/complete` and returns the fixture response.
+    - Assert that on success, `queryKeys.images.list()` is invalidated (use `queryClient.isFetching` or `queryClient.getQueryState`).
+    - Assert that calling `useSaveBulkFittingPositions`'s mutate function invokes `POST /api/admin/fitting-positions/bulk` and on success invalidates fitting-position and search queries for the current `imageId`.
+- All hook test files should use `renderHook` from `@testing-library/react`, an isolated `QueryClient` per test with `retry: false` and `gcTime: 0`, and MSW handlers from `src/test/handlers.ts`.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 8d: Zod Schema Parse Tests *(Medium)*
+*Addresses: `schemas.ts` has no dedicated test file; Zod parse pass and failure cases are untested.*
+
+- Create `src/services/api/schemas.test.ts`:
+    - **`ImageSchema`**: valid full payload parses without error; payload missing `image_id` throws; payload with a non-UUID `image_id` throws; payload with an invalid `drawing_type` value throws.
+    - **`SearchResponseSchema`**: valid full payload (with `results`, `has_more`, `next_cursor`, `source_status`, `request_id`) parses; `match_type` value `"fuzzy"` (not in enum) throws; missing `source_status` map throws.
+    - **`UploadSessionSchema`**: valid payload parses; missing `upload_id` throws; missing `error_message` field (if required by schema) throws.
+    - **`FittingPositionSchema`**: valid payload parses; `x_coordinate` as a string instead of number throws.
+- Use `expect(() => schema.parse(payload)).toThrow()` for failure cases and `expect(schema.parse(payload)).toEqual(expected)` for success cases.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 8e: `uploader_identity` Field on `ImageUpload` *(Minor)*
+*Addresses: the spec lists `uploader_identity` as a required field on the upload session model; it is absent from the current `ImageUpload` Django model.*
+
+- Add a nullable `CharField(max_length=255, blank=True, null=True)` field named `uploader_identity` to the `ImageUpload` model in `api/models.py`.
+    - Nullable to remain backward-compatible with existing upload rows and to avoid requiring a default value in the prototype where no auth context is available.
+- Generate and apply the migration: `uv run python manage.py makemigrations api` then `uv run python manage.py migrate`.
+- Update the `ImageUploadSerializer` (if present) to include `uploader_identity` as an optional field.
+- Add a test in `tests/api/test_models.py` (or existing model tests) asserting that an `ImageUpload` instance can be saved with `uploader_identity=None` and with a non-null string value.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 8f: `useInfiniteQuery` for Image List *(Minor)*
+*Addresses: `useImages` uses `useQuery`; the spec specifies `useInfiniteQuery` for the image list as the tile grid grows.*
+
+- Add cursor-based pagination support to the `GET /api/images` backend endpoint:
+    - Accept an optional `cursor` query parameter (base64-encoded offset, same pattern as `GET /api/search`).
+    - Return `has_more: bool` and `next_cursor: str | null` alongside the `results` array.
+    - Existing callers that omit `cursor` receive the first page (maintains backward compatibility).
+- Update the `ImagesListSchema` in `schemas.ts` to match the paginated response shape: `{ results: ImageSchema[], has_more: boolean, next_cursor: string | null }`.
+- Refactor `useImages` (list) in `src/services/api/hooks/useImages.ts` to use `useInfiniteQuery`:
+    - `getNextPageParam`: return `next_cursor` when `has_more` is `true`, otherwise `undefined`.
+    - Preserve existing `staleTime: 5 * 60 * 1000` and `gcTime: 30 * 60 * 1000`.
+- Update `ImageSelectionPage.tsx` to consume `data.pages` (flattened via `.flatMap(p => p.results)`) instead of `data` directly; add a "Load more" trigger or `IntersectionObserver`-based infinite scroll when `hasNextPage` is `true`.
+- Update `ImageSelectionPage.test.tsx` and the `useImages.test.ts` created in 8c to cover the paginated response shape and `getNextPageParam` behaviour.
+- Update the backend `TestImagesView` in `tests/api/test_views.py` to cover: default first page returns `has_more` and `next_cursor`; providing a valid cursor returns the correct offset page.
+- **Verification:** `uv run pytest` passes; `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### 8g: Atomic Design Component Extraction *(Minor)*
+*Addresses: `StatusChip`, `TypeBadge`, `ImageTileCard`, `SearchResultItem`, `FilterBar`, and `POIMarkerPin` are all inline in page/organism components; the spec defines them as discrete Atom and Molecule components.*
+
+- Create the following Atom components in `src/components/atoms/`:
+    - `StatusChip.tsx` — props: `status: "ok" | "degraded" | "error"`; renders a small MUI `Chip` coloured by `success`, `warning`, or `error` palette respectively; label is the `status` string.
+    - `TypeBadge.tsx` — props: `drawingType: string`; renders a small MUI `Chip` variant `outlined` showing the drawing type label.
+    - `POIMarkerPin.tsx` — props: `selected: boolean`; renders the SVG circle/pin glyph; fill uses `theme.palette.map.poi.default` when unselected and `theme.palette.map.poi.selected` when selected.
+- Create the following Molecule components in `src/components/molecules/`:
+    - `ImageTileCard.tsx` — props: `image: ImageSummary`; renders the MUI `Card` + `CardActionArea` + `CardContent` tile used in the image selection grid; includes image name, `TypeBadge`, and component name.
+    - `SearchResultItem.tsx` — props: `result: SearchResult`, `onSelect: (result: SearchResult) => void`; renders a single `ListItemButton` with label text, match-type metadata, and `TypeBadge`.
+    - `FilterBar.tsx` — props: `drawingTypes: DrawingType[]`, `selectedTypeId: string | null`, `onTypeChange: (id: string) => void`; renders the drawing type `FormControl` / `Select` / `MenuItem` filter row.
+- Replace the inline implementations in `ImageSelectionPage.tsx`, `ImageViewerPage.tsx`, and any other pages/organisms with imports of the new components.
+- Add a unit test file per extracted component asserting core render behaviour (use the same patterns as `POITooltipCard.test.tsx`).
+- **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
+
+---
+
+#### 8h: Image Tile Thumbnail *(Minor)*
+*Addresses: image tiles in the selection grid show text metadata only; the spec wireframe requires a preview thumbnail (`CardMedia`) on each tile.*
+
+- Add a `thumbnail_url` field to the `ImageSerializer` response: derive it from an existing SVG/image path field on the `Image` model (or return `null` if unavailable).
+    - If no thumbnail asset exists, return `null` and render a `Skeleton` placeholder in the tile.
+- Update `ImageSchema` in `schemas.ts` to include `thumbnail_url: z.string().url().nullable()`.
+- In `ImageTileCard.tsx` (created in 8g), add a `CardMedia` section above the `CardContent`:
+    - When `thumbnail_url` is non-null, render `<CardMedia component="img" image={thumbnail_url} height={120} alt={image.image_name} />`.
+    - When `thumbnail_url` is null, render a `<Skeleton variant="rectangular" height={120} />`.
+- Update `ImageTileCard.test.tsx` to cover: thumbnail renders when URL is provided; `Skeleton` renders when URL is null.
+- Update the backend `TestImagesView` test fixtures to include a `thumbnail_url` field (can be `null` initially).
+- **Verification:** `npm run test` passes; `uv run pytest` passes; `npm run build` succeeds.
+
+---
+
+#### 8i: `test_serializers.py` *(Minor)*
+*Addresses: `api/serializers.py` has no dedicated test file; the spec requires unit test coverage of serializer behaviour.*
+
+- Create `backend/tests/api/test_serializers.py`:
+    - Group tests into classes named after each serializer (e.g. `TestImageSerializer`, `TestFittingPositionSerializer`, `TestImageUploadSerializer`).
+    - **`TestImageSerializer`**: valid model instance serializes to expected dict shape (all required fields present, correct types); read-only fields are not writable.
+    - **`TestFittingPositionSerializer`**: coordinates serialize as numbers; `fitting_position_id` serializes as a string UUID.
+    - **`TestImageUploadSerializer`**: `status` field serializes to the correct string choice; `uploader_identity` serializes as `null` when not set (after 8e is applied).
+    - **`TestBulkFittingPositionItemSerializer`** (if applicable): validates that a missing `fitting_position_id` raises a validation error.
+- **Verification:** `uv run pytest` passes; `uv run ruff check .` passes.
+
+---
+
+#### Completion Criteria for Phase 8
+All of the following must pass before Phase 8 is considered complete:
 - `uv run pytest` — all backend tests pass.
 - `uv run mypy .` — no type errors.
 - `uv run ruff check .` — no lint errors.
