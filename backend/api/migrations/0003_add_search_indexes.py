@@ -12,9 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="fittingposition",
-            index=models.Index(
-                fields=["label_text"], name="idx_fp_label_text"
-            ),
+            index=models.Index(fields=["label_text"], name="idx_fp_label_text"),
         ),
         migrations.AddIndex(
             model_name="image",

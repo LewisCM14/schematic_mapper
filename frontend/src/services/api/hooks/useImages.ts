@@ -2,10 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchImage, fetchImages } from "../endpoints";
 import { queryKeys } from "../queryKeys";
 
-export function useImages() {
+export function useImages(drawingTypeId?: number) {
+	const params: Record<string, string> = {};
+	if (drawingTypeId !== undefined) {
+		params.drawing_type_id = String(drawingTypeId);
+	}
 	return useQuery({
-		queryKey: queryKeys.images.list(),
-		queryFn: () => fetchImages(),
+		queryKey: queryKeys.images.list(
+			drawingTypeId !== undefined ? { drawingTypeId } : undefined,
+		),
+		queryFn: () => fetchImages(Object.keys(params).length ? params : undefined),
 	});
 }
 

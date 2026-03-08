@@ -50,6 +50,28 @@ class TestListImagesView:
         response = client.get("/api/images")
         assert response.json() == []
 
+    def test_filters_by_drawing_type_id(self, client: Client, image: Image) -> None:
+        # Create a second drawing type and image that should be excluded
+        other_dt = DrawingType.objects.create(type_name="system")
+        Image.objects.create(
+            drawing_type=other_dt,
+            component_name="Other Assembly",
+            image_binary=b"<svg/>",
+            content_hash="other",
+            width_px=800,
+            height_px=600,
+        )
+        response = client.get(
+            f"/api/images?drawing_type_id={image.drawing_type.drawing_type_id}"
+        )
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["image_id"] == str(image.image_id)
+
+    def test_returns_400_for_invalid_drawing_type_id(self, client: Client) -> None:
+        response = client.get("/api/images?drawing_type_id=notanint")
+        assert response.status_code == 400
+
 
 @pytest.mark.django_db
 class TestGetImageView:

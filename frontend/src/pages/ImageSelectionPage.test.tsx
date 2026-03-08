@@ -40,43 +40,104 @@ describe("ImageSelectionPage", () => {
 		expect(screen.getByText("Schematic Mapper")).toBeInTheDocument();
 	});
 
-	it("shows image cards when data loads", async () => {
+	it("renders drawing type dropdown", async () => {
 		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([mockImage]);
 		renderPage();
 		await waitFor(() => {
-			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
-		});
-		expect(screen.getByText("composite")).toBeInTheDocument();
-		expect(screen.getByText("800 × 600 px")).toBeInTheDocument();
-	});
-
-	it("shows empty state when no images exist", async () => {
-		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([]);
-		renderPage();
-		await waitFor(() => {
 			expect(
-				screen.getByText(/No schematic drawings found/),
+				screen.getByRole("combobox", { name: /drawing type/i }),
 			).toBeInTheDocument();
 		});
 	});
 
-	it("shows error when fetch fails", async () => {
-		vi.spyOn(endpointsApi, "fetchImages").mockRejectedValue(
-			new Error("Network Error"),
+	it("tile grid is hidden before a drawing type is selected", async () => {
+		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([mockImage]);
+		renderPage();
+		await waitFor(() =>
+			expect(
+				screen.getByRole("combobox", { name: /drawing type/i }),
+			).toBeInTheDocument(),
 		);
+		expect(
+			screen.queryByText("Cooling System Assembly"),
+		).not.toBeInTheDocument();
+	});
+
+	it("shows prompt to select a type when no type chosen", async () => {
+		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([]);
 		renderPage();
 		await waitFor(() => {
-			expect(screen.getByText(/Failed to load images/)).toBeInTheDocument();
+			expect(
+				screen.getByText(
+					/Select a drawing type above to view available schematics/,
+				),
+			).toBeInTheDocument();
 		});
+	});
+
+	it("shows image cards after selecting a drawing type", async () => {
+		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([mockImage]);
+		const user = userEvent.setup();
+		renderPage();
+
+		await waitFor(() =>
+			expect(
+				screen.getByRole("combobox", { name: /drawing type/i }),
+			).toBeInTheDocument(),
+		);
+
+		await user.click(screen.getByRole("combobox", { name: /drawing type/i }));
+		const option = await screen.findByRole("option", { name: "composite" });
+		await user.click(option);
+
+		await waitFor(() => {
+			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
+		});
+		expect(screen.getAllByText("composite").length).toBeGreaterThan(0);
+		expect(screen.getByText("800 × 600 px")).toBeInTheDocument();
 	});
 
 	it("navigates to viewer on card click", async () => {
 		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([mockImage]);
 		const user = userEvent.setup();
 		renderPage();
+
+		await waitFor(() =>
+			expect(
+				screen.getByRole("combobox", { name: /drawing type/i }),
+			).toBeInTheDocument(),
+		);
+		await user.click(screen.getByRole("combobox", { name: /drawing type/i }));
+		const option = await screen.findByRole("option", { name: "composite" });
+		await user.click(option);
+
 		await waitFor(() =>
 			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument(),
 		);
 		await user.click(screen.getByText("Cooling System Assembly"));
+	});
+
+	it("shows error when fetch fails", async () => {
+		vi.spyOn(endpointsApi, "fetchImages")
+			.mockResolvedValueOnce([mockImage]) // unfiltered call → populates dropdown
+			.mockRejectedValueOnce(new Error("Network Error")); // filtered call → error
+		const user = userEvent.setup();
+		renderPage();
+
+		// Wait for dropdown to populate
+		await waitFor(() =>
+			expect(
+				screen.getByRole("combobox", { name: /drawing type/i }),
+			).toBeInTheDocument(),
+		);
+
+		// Select a type to trigger the filtered query
+		await user.click(screen.getByRole("combobox", { name: /drawing type/i }));
+		const option = await screen.findByRole("option", { name: "composite" });
+		await user.click(option);
+
+		await waitFor(() => {
+			expect(screen.getByText(/Failed to load images/)).toBeInTheDocument();
+		});
 	});
 });

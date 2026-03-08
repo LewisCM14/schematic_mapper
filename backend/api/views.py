@@ -50,8 +50,14 @@ def health(request: Request) -> Response:
 
 @api_view(["GET"])
 def list_images(request: Request) -> Response:
-    images = Image.objects.select_related("drawing_type").all()
-    serializer = ImageSerializer(images, many=True)
+    qs = Image.objects.select_related("drawing_type").all()
+    drawing_type_id = request.query_params.get("drawing_type_id")
+    if drawing_type_id is not None:
+        try:
+            qs = qs.filter(drawing_type_id=int(drawing_type_id))
+        except ValueError:
+            return Response({"error": "drawing_type_id must be an integer"}, status=400)
+    serializer = ImageSerializer(qs, many=True)
     return Response(serializer.data)
 
 
