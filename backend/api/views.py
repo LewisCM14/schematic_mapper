@@ -60,6 +60,10 @@ def list_images(request: Request) -> Response:
         except ValueError:
             return Response({"error": "drawing_type_id must be an integer"}, status=400)
 
+    search = request.query_params.get("search")
+    if search:
+        qs = qs.filter(component_name__icontains=search)
+
     try:
         limit = max(1, min(100, int(request.query_params.get("limit", "25"))))
     except ValueError:

@@ -2,15 +2,23 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { fetchImage, fetchImages } from "../endpoints";
 import { queryKeys } from "../queryKeys";
 
-export function useImages(drawingTypeId?: number) {
+export function useImages(drawingTypeId?: number, search?: string) {
 	const baseParams: Record<string, string> = {};
 	if (drawingTypeId !== undefined) {
 		baseParams.drawing_type_id = String(drawingTypeId);
 	}
+	if (search) {
+		baseParams.search = search;
+	}
+	const hasFilters = drawingTypeId !== undefined || Boolean(search);
+	const filters = hasFilters
+		? {
+				...(drawingTypeId !== undefined ? { drawingTypeId } : {}),
+				...(search ? { search } : {}),
+			}
+		: undefined;
 	return useInfiniteQuery({
-		queryKey: queryKeys.images.list(
-			drawingTypeId !== undefined ? { drawingTypeId } : undefined,
-		),
+		queryKey: queryKeys.images.list(filters),
 		queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
 			const params = { ...baseParams };
 			if (pageParam) params.cursor = pageParam;

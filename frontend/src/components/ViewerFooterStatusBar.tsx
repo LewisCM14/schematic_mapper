@@ -1,5 +1,6 @@
-import { Box, Chip, Paper, Typography } from "@mui/material";
+import { Box, Paper, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import SourceHealthGroup from "./molecules/SourceHealthGroup";
 
 interface ViewerFooterStatusBarProps {
 	sourceStatus: Record<string, string>;
@@ -16,15 +17,6 @@ function formatRelativeTime(date: Date): string {
 	if (diffMin < 60) return `${diffMin} min ago`;
 	const diffHr = Math.floor(diffMin / 60);
 	return `${diffHr} hr ago`;
-}
-
-function statusChipColor(
-	status: string,
-): "success" | "warning" | "error" | "default" {
-	if (status === "ok") return "success";
-	if (status === "degraded") return "warning";
-	if (status === "error") return "error";
-	return "default";
 }
 
 export default function ViewerFooterStatusBar({
@@ -52,12 +44,10 @@ export default function ViewerFooterStatusBar({
 		>
 			<Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
 				{Object.entries(sourceStatus).map(([source, status]) => (
-					<Chip
+					<SourceHealthGroup
 						key={source}
-						label={`${source}: ${status}`}
-						size="small"
-						color={statusChipColor(status)}
-						sx={{ height: 20, fontSize: "0.65rem" }}
+						sourceName={source}
+						status={status as "ok" | "degraded" | "error"}
 					/>
 				))}
 			</Box>

@@ -1,4 +1,5 @@
 import { Chip, Paper, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
 interface POITooltipCardProps {
 	labelText: string;
@@ -11,6 +12,7 @@ function POITooltipCard({
 	componentName,
 	fittingPositionId,
 }: POITooltipCardProps) {
+	const theme = useTheme();
 	return (
 		<Paper
 			elevation={0}
@@ -23,7 +25,7 @@ function POITooltipCard({
 			<Typography
 				variant="caption"
 				display="block"
-				sx={{ mt: 0.25, fontFamily: "IBM Plex Mono, monospace" }}
+				sx={{ mt: 0.25, fontFamily: theme.typography.monoFontFamily }}
 			>
 				{fittingPositionId}
 			</Typography>

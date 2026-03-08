@@ -153,6 +153,34 @@ class TestListImagesView:
         response = client.get("/api/images?drawing_type_id=notanint")
         assert response.status_code == 400
 
+    def test_filters_by_search(self, client: Client, image: Image) -> None:
+        Image.objects.create(
+            drawing_type=image.drawing_type,
+            component_name="Valve Block Unit",
+            image_binary=b"<svg/>",
+            content_hash="valve",
+            width_px=800,
+            height_px=600,
+        )
+        response = client.get("/api/images?search=cooling")
+        data = response.json()
+        names = [r["component_name"] for r in data["results"]]
+        assert "Cooling Assembly" in names
+        assert "Valve Block Unit" not in names
+
+    def test_empty_search_returns_all(self, client: Client, image: Image) -> None:
+        Image.objects.create(
+            drawing_type=image.drawing_type,
+            component_name="Valve Block Unit",
+            image_binary=b"<svg/>",
+            content_hash="valve2",
+            width_px=800,
+            height_px=600,
+        )
+        response = client.get("/api/images?search=")
+        data = response.json()
+        assert len(data["results"]) == 2
+
 
 @pytest.mark.django_db
 class TestGetImageView:

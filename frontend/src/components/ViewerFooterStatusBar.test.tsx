@@ -25,10 +25,16 @@ function renderFooter(
 }
 
 describe("ViewerFooterStatusBar", () => {
-	it("renders source status chips with correct labels", () => {
+	it("renders source name labels", () => {
 		renderFooter({ sourceStatus: { internal: "ok", asset: "degraded" } });
-		expect(screen.getByText("internal: ok")).toBeInTheDocument();
-		expect(screen.getByText("asset: degraded")).toBeInTheDocument();
+		expect(screen.getByText("internal")).toBeInTheDocument();
+		expect(screen.getByText("asset")).toBeInTheDocument();
+	});
+
+	it("renders a HealthDot for each source", () => {
+		renderFooter({ sourceStatus: { internal: "ok", asset: "degraded" } });
+		expect(screen.getByLabelText("status: ok")).toBeInTheDocument();
+		expect(screen.getByLabelText("status: degraded")).toBeInTheDocument();
 	});
 
 	it("displays request ID when provided", () => {
@@ -51,21 +57,18 @@ describe("ViewerFooterStatusBar", () => {
 		expect(screen.getByText("1.0×")).toBeInTheDocument();
 	});
 
-	it("ok source chip has success color class", () => {
+	it("ok source has a HealthDot with ok aria-label", () => {
 		renderFooter({ sourceStatus: { internal: "ok" } });
-		const chip = screen.getByText("internal: ok").closest(".MuiChip-root");
-		expect(chip).toHaveClass("MuiChip-colorSuccess");
+		expect(screen.getByLabelText("status: ok")).toBeInTheDocument();
 	});
 
-	it("degraded source chip has warning color class", () => {
+	it("degraded source has a HealthDot with degraded aria-label", () => {
 		renderFooter({ sourceStatus: { asset: "degraded" } });
-		const chip = screen.getByText("asset: degraded").closest(".MuiChip-root");
-		expect(chip).toHaveClass("MuiChip-colorWarning");
+		expect(screen.getByLabelText("status: degraded")).toBeInTheDocument();
 	});
 
-	it("error source chip has error color class", () => {
+	it("error source has a HealthDot with error aria-label", () => {
 		renderFooter({ sourceStatus: { sensor: "error" } });
-		const chip = screen.getByText("sensor: error").closest(".MuiChip-root");
-		expect(chip).toHaveClass("MuiChip-colorError");
+		expect(screen.getByLabelText("status: error")).toBeInTheDocument();
 	});
 });

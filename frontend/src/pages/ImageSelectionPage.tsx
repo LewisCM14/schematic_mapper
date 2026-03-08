@@ -16,6 +16,7 @@ import { useImages } from "../services/api/hooks/useImages";
 function ImageSelectionPage() {
 	const navigate = useNavigate();
 	const [selectedTypeId, setSelectedTypeId] = useState<number | "">("");
+	const [searchText, setSearchText] = useState("");
 
 	// Fetch all images unfiltered to derive available drawing types
 	const { data: allData, isLoading: typesLoading } = useImages();
@@ -31,7 +32,7 @@ function ImageSelectionPage() {
 		).values(),
 	);
 
-	// Fetch images filtered by selected drawing type
+	// Fetch images filtered by selected drawing type and optional search text
 	const {
 		data: filteredData,
 		isLoading: imagesLoading,
@@ -39,7 +40,10 @@ function ImageSelectionPage() {
 		hasNextPage,
 		fetchNextPage,
 		isFetchingNextPage,
-	} = useImages(selectedTypeId !== "" ? selectedTypeId : undefined);
+	} = useImages(
+		selectedTypeId !== "" ? selectedTypeId : undefined,
+		searchText || undefined,
+	);
 	const filteredImages = filteredData?.pages.flatMap((p) => p.results) ?? [];
 
 	// Only show tile grid after a type has been selected and data is ready
@@ -55,13 +59,15 @@ function ImageSelectionPage() {
 					Select a drawing type to browse available schematics.
 				</Typography>
 
-				<Box sx={{ mt: 3, maxWidth: 320 }}>
+				<Box sx={{ mt: 3 }}>
 					<FilterBar
 						drawingTypes={drawingTypes}
 						selectedTypeId={
 							selectedTypeId !== "" ? String(selectedTypeId) : null
 						}
 						onTypeChange={(id) => setSelectedTypeId(Number(id))}
+						searchValue={searchText}
+						onSearchChange={setSearchText}
 					/>
 				</Box>
 

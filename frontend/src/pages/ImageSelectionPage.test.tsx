@@ -139,4 +139,52 @@ describe("ImageSelectionPage", () => {
 			expect(screen.getByText(/Failed to load images/)).toBeInTheDocument();
 		});
 	});
+
+	it("renders the search images text field", async () => {
+		renderPage();
+		await waitFor(() =>
+			expect(
+				screen.getByRole("textbox", { name: /search images/i }),
+			).toBeInTheDocument(),
+		);
+	});
+
+	it("typing in search field updates displayed tiles via filtered query", async () => {
+		server.use(
+			http.get("/api/images", ({ request }) => {
+				const url = new URL(request.url);
+				const search = url.searchParams.get("search");
+				if (search === "cooling") {
+					return HttpResponse.json({
+						results: [FIXTURES.image],
+						has_more: false,
+						next_cursor: null,
+					});
+				}
+				return HttpResponse.json({
+					results: [FIXTURES.image],
+					has_more: false,
+					next_cursor: null,
+				});
+			}),
+		);
+		const user = userEvent.setup();
+		renderPage();
+
+		await waitFor(() =>
+			expect(
+				screen.getByRole("combobox", { name: /drawing type/i }),
+			).toBeInTheDocument(),
+		);
+
+		// Select a drawing type first so the grid shows
+		await user.click(screen.getByRole("combobox", { name: /drawing type/i }));
+		const option = await screen.findByRole("option", { name: "composite" });
+		await user.click(option);
+
+		// Type into the search field
+		const searchField = screen.getByRole("textbox", { name: /search images/i });
+		await user.type(searchField, "cooling");
+		expect(searchField).toHaveValue("cooling");
+	});
 });

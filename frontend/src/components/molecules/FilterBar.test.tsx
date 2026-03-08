@@ -23,6 +23,8 @@ const DRAWING_TYPES = [
 function renderBar(
 	selectedTypeId: string | null = null,
 	onTypeChange = vi.fn(),
+	searchValue = "",
+	onSearchChange = vi.fn(),
 ) {
 	return render(
 		<ThemeProvider theme={theme}>
@@ -30,6 +32,8 @@ function renderBar(
 				drawingTypes={DRAWING_TYPES}
 				selectedTypeId={selectedTypeId}
 				onTypeChange={onTypeChange}
+				searchValue={searchValue}
+				onSearchChange={onSearchChange}
 			/>
 		</ThemeProvider>,
 	);
@@ -65,5 +69,28 @@ describe("FilterBar", () => {
 	it("shows selected type when selectedTypeId is set", () => {
 		renderBar("1");
 		expect(screen.getByText("composite")).toBeInTheDocument();
+	});
+
+	it("renders the search images text field when onSearchChange is provided", () => {
+		renderBar();
+		expect(
+			screen.getByRole("textbox", { name: /search images/i }),
+		).toBeInTheDocument();
+	});
+
+	it("calls onSearchChange when search input value changes", async () => {
+		const onSearchChange = vi.fn();
+		const user = userEvent.setup();
+		renderBar(null, vi.fn(), "", onSearchChange);
+		await user.type(
+			screen.getByRole("textbox", { name: /search images/i }),
+			"pump",
+		);
+		expect(onSearchChange).toHaveBeenCalled();
+	});
+
+	it("reflects provided searchValue in the text field", () => {
+		renderBar(null, vi.fn(), "cooling");
+		expect(screen.getByDisplayValue("cooling")).toBeInTheDocument();
 	});
 });
