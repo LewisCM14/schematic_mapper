@@ -1,6 +1,8 @@
 import pytest
 from django.test import Client
+from unittest.mock import patch
 
+from api.asset_adapter import AssetRecord, AssetResult
 from api.models import FittingPosition, Image
 
 
@@ -90,3 +92,64 @@ class TestListFittingPositionsView:
     def test_empty_list_when_no_positions(self, client: Client, image: Image) -> None:
         response = client.get(f"/api/images/{image.image_id}/fitting-positions")
         assert response.json() == []
+
+
+@pytest.mark.django_db
+class TestGetFittingPositionDetailsView:
+    def _make_fp(self, image: Image) -> FittingPosition:
+        return FittingPosition.objects.create(
+            fitting_position_id="FP-PUMP-01-INLET",
+            image=image,
+            x_coordinate="300.000",
+            y_coordinate="250.000",
+            label_text="FP-PUMP-01-INLET",
+        )
+
+    def test_returns_404_for_unknown_fp(self, client: Client) -> None:
+        response = client.get("/api/fitting-positions/DOES-NOT-EXIST/details")
+        assert response.status_code == 404
+
+    def test_returns_200_with_asset_found(self, client: Client, image: Image) -> None:
+        self._make_fp(image)
+        mock_result = AssetResult(
+            source_status="ok",
+            record=AssetRecord(
+                asset_record_id="ASSET-001",
+                fitting_position="FP-PUMP-01-INLET",
+                high_level_component="Cooling System",
+                sub_system_name="Primary Cooling Loop",
+                sub_component_name="Inlet Pump Assembly",
+            ),
+        )
+        with patch("api.views.fetch_asset_details", return_value=mock_result):
+            response = client.get("/api/fitting-positions/FP-PUMP-01-INLET/details")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["fitting_position_id"] == "FP-PUMP-01-INLET"
+        assert data["asset"]["asset_record_id"] == "ASSET-001"
+        assert data["asset"]["high_level_component"] == "Cooling System"
+        assert data["source_status"]["asset"] == "ok"
+
+    def test_returns_200_with_no_asset_match(
+        self, client: Client, image: Image
+    ) -> None:
+        self._make_fp(image)
+        mock_result = AssetResult(source_status="ok", record=None)
+        with patch("api.views.fetch_asset_details", return_value=mock_result):
+            response = client.get("/api/fitting-positions/FP-PUMP-01-INLET/details")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["asset"] is None
+        assert data["source_status"]["asset"] == "ok"
+
+    def test_returns_degraded_when_asset_db_unavailable(
+        self, client: Client, image: Image
+    ) -> None:
+        self._make_fp(image)
+        mock_result = AssetResult(source_status="degraded", record=None)
+        with patch("api.views.fetch_asset_details", return_value=mock_result):
+            response = client.get("/api/fitting-positions/FP-PUMP-01-INLET/details")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["asset"] is None
+        assert data["source_status"]["asset"] == "degraded"

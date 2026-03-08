@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import * as endpointsApi from "../services/api/endpoints";
@@ -32,6 +33,20 @@ const mockPositions = [
 		is_active: true,
 	},
 ];
+
+const mockDetail = {
+	fitting_position_id: "FP-PUMP-01-INLET",
+	label_text: "FP-PUMP-01-INLET",
+	x_coordinate: 300,
+	y_coordinate: 250,
+	asset: {
+		asset_record_id: "AR-001",
+		high_level_component: "Cooling Pump",
+		sub_system_name: "Primary Loop",
+		sub_component_name: "Inlet Valve",
+	},
+	source_status: { asset: "ok" },
+};
 
 function renderPage(imageId = IMAGE_ID) {
 	const client = new QueryClient({
@@ -98,6 +113,87 @@ describe("ImageViewerPage", () => {
 		await waitFor(() => {
 			expect(
 				screen.getByText("Failed to load schematic image."),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("shows default drawer instruction text before any marker is clicked", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByText("Click a marker on the diagram to view details."),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("fetches and displays asset details after clicking a POI marker", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
+			mockPositions,
+		);
+		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue(
+			mockDetail,
+		);
+		renderPage();
+
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		await userEvent.click(marker);
+
+		await waitFor(() => {
+			expect(screen.getByText("Cooling Pump")).toBeInTheDocument();
+			expect(screen.getByText("Primary Loop")).toBeInTheDocument();
+			expect(screen.getByText("Inlet Valve")).toBeInTheDocument();
+		});
+	});
+
+	it("shows degraded warning when asset source is unavailable", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
+			mockPositions,
+		);
+		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue({
+			...mockDetail,
+			asset: null,
+			source_status: { asset: "degraded" },
+		});
+		renderPage();
+
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		await userEvent.click(marker);
+
+		await waitFor(() => {
+			expect(
+				screen.getByText("Asset source unavailable — partial data shown."),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("shows no-asset message when source is ok but record is null", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
+			mockPositions,
+		);
+		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue({
+			...mockDetail,
+			asset: null,
+			source_status: { asset: "ok" },
+		});
+		renderPage();
+
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		await userEvent.click(marker);
+
+		await waitFor(() => {
+			expect(
+				screen.getByText("No asset record linked to this fitting position."),
 			).toBeInTheDocument();
 		});
 	});

@@ -1,3 +1,5 @@
+from typing import Any
+
 from rest_framework import serializers
 
 from .models import DrawingType, FittingPosition, Image
@@ -54,3 +56,19 @@ class FittingPositionSerializer(serializers.ModelSerializer[FittingPosition]):
             "label_text",
             "is_active",
         ]
+
+
+class AssetInfoSerializer(serializers.Serializer[Any]):
+    asset_record_id = serializers.CharField()
+    high_level_component = serializers.CharField()
+    sub_system_name = serializers.CharField()
+    sub_component_name = serializers.CharField()
+
+
+class FittingPositionDetailSerializer(serializers.Serializer[Any]):
+    fitting_position_id = serializers.CharField()
+    label_text = serializers.CharField()
+    x_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    y_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    asset = AssetInfoSerializer(allow_null=True)
+    source_status = serializers.DictField(child=serializers.CharField())

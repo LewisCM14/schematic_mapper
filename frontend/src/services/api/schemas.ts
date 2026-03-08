@@ -33,6 +33,22 @@ export const FittingPositionSchema = z.object({
 	is_active: z.boolean(),
 });
 
+export const AssetInfoSchema = z.object({
+	asset_record_id: z.string(),
+	high_level_component: z.string(),
+	sub_system_name: z.string(),
+	sub_component_name: z.string(),
+});
+
+export const FittingPositionDetailSchema = z.object({
+	fitting_position_id: z.string(),
+	label_text: z.string(),
+	x_coordinate: z.coerce.number(),
+	y_coordinate: z.coerce.number(),
+	asset: AssetInfoSchema.nullable(),
+	source_status: z.record(z.string(), z.string()),
+});
+
 export const ImageListSchema = z.array(ImageSchema);
 export const FittingPositionListSchema = z.array(FittingPositionSchema);
 
@@ -41,3 +57,5 @@ export type DrawingType = z.infer<typeof DrawingTypeSchema>;
 export type Image = z.infer<typeof ImageSchema>;
 export type ImageDetail = z.infer<typeof ImageDetailSchema>;
 export type FittingPosition = z.infer<typeof FittingPositionSchema>;
+export type AssetInfo = z.infer<typeof AssetInfoSchema>;
+export type FittingPositionDetail = z.infer<typeof FittingPositionDetailSchema>;

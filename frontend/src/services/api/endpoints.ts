@@ -1,5 +1,6 @@
 import httpClient from "./httpClient";
 import {
+	FittingPositionDetailSchema,
 	FittingPositionListSchema,
 	HealthSchema,
 	ImageDetailSchema,
@@ -24,4 +25,11 @@ export async function fetchImage(imageId: string) {
 export async function fetchFittingPositions(imageId: string) {
 	const response = await httpClient.get(`/images/${imageId}/fitting-positions`);
 	return FittingPositionListSchema.parse(response.data);
+}
+
+export async function fetchFittingPositionDetails(fittingPositionId: string) {
+	const response = await httpClient.get(
+		`/fitting-positions/${fittingPositionId}/details`,
+	);
+	return FittingPositionDetailSchema.parse(response.data);
 }
