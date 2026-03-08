@@ -22,9 +22,11 @@ import {
 	Tooltip,
 	Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import ViewerFooterStatusBar from "../components/ViewerFooterStatusBar";
 import { useFittingPositionDetails } from "../services/api/hooks/useFittingPositionDetails";
 import { useFittingPositions } from "../services/api/hooks/useFittingPositions";
 import { useImage } from "../services/api/hooks/useImages";
@@ -147,9 +149,15 @@ function InfoPanel({
 function SearchPanel({
 	imageId,
 	onSelectFp,
+	onSearchMetadata,
 }: {
 	imageId: string;
 	onSelectFp: (fittingPositionId: string, x: number, y: number) => void;
+	onSearchMetadata?: (
+		sourceStatus: Record<string, string>,
+		requestId: string,
+		refreshedAt: Date,
+	) => void;
 }) {
 	const [query, setQuery] = useState("");
 	const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -178,6 +186,13 @@ function SearchPanel({
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+	useEffect(() => {
+		if (!data || !onSearchMetadata) return;
+		const lastPage = data.pages[data.pages.length - 1];
+		if (!lastPage) return;
+		onSearchMetadata(lastPage.source_status, lastPage.request_id, new Date());
+	}, [data, onSearchMetadata]);
 
 	const allResults = data?.pages.flatMap((p) => p.results) ?? [];
 	const isDegraded = data?.pages[0]?.source_status.asset === "degraded";
@@ -310,9 +325,14 @@ function SearchPanel({
 function ImageViewerPage() {
 	const { imageId } = useParams<{ imageId: string }>();
 	const navigate = useNavigate();
+	const theme = useTheme();
 
 	const [selectedFpId, setSelectedFpId] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState(0);
+	const [zoomLevel, setZoomLevel] = useState(1);
+	const [sourceStatus, setSourceStatus] = useState<Record<string, string>>({});
+	const [requestId, setRequestId] = useState<string | null>(null);
+	const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [panZoomHost, setPanZoomHost] = useState<HTMLDivElement | null>(null);
@@ -336,6 +356,15 @@ function ImageViewerPage() {
 		pz.pan(panX, panY);
 	}, []);
 
+	const handleSearchMetadata = useCallback(
+		(status: Record<string, string>, reqId: string, refreshedAt: Date) => {
+			setSourceStatus(status);
+			setRequestId(reqId);
+			setLastRefreshed(refreshedAt);
+		},
+		[],
+	);
+
 	useEffect(() => {
 		if (!panZoomHost) return;
 		const pz = Panzoom(panZoomHost, {
@@ -346,9 +375,14 @@ function ImageViewerPage() {
 		panzoomRef.current = pz;
 		const container = containerRef.current;
 		container?.addEventListener("wheel", pz.zoomWithWheel);
+		const onPanzoomChange = () => {
+			setZoomLevel(pz.getScale());
+		};
+		panZoomHost.addEventListener("panzoomchange", onPanzoomChange);
 		return () => {
 			pz.destroy();
 			container?.removeEventListener("wheel", pz.zoomWithWheel);
+			panZoomHost.removeEventListener("panzoomchange", onPanzoomChange);
 			panzoomRef.current = null;
 		};
 	}, [panZoomHost]);
@@ -362,189 +396,204 @@ function ImageViewerPage() {
 	if (!imageId) return null;
 
 	return (
-		<Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
-			{/* LHS Drawer */}
-			<Drawer
-				variant="permanent"
-				sx={{
-					width: DRAWER_WIDTH,
-					flexShrink: 0,
-					"& .MuiDrawer-paper": {
-						width: DRAWER_WIDTH,
-						boxSizing: "border-box",
-						top: 0,
-						position: "relative",
-						height: "100%",
-					},
-				}}
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+			<Box
+				sx={{ display: "flex", flexGrow: 1, overflow: "hidden", minHeight: 0 }}
 			>
-				<Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-					<Tabs
-						value={activeTab}
-						onChange={(_e, v: number) => setActiveTab(v)}
-						variant="fullWidth"
-					>
-						<Tab
-							icon={<InfoOutlinedIcon fontSize="small" />}
-							iconPosition="start"
-							label="Information"
-							aria-label="information tab"
+				{/* LHS Drawer */}
+				<Drawer
+					variant="permanent"
+					sx={{
+						width: DRAWER_WIDTH,
+						flexShrink: 0,
+						"& .MuiDrawer-paper": {
+							width: DRAWER_WIDTH,
+							boxSizing: "border-box",
+							top: 0,
+							position: "relative",
+							height: "100%",
+						},
+					}}
+				>
+					<Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+						<Tabs
+							value={activeTab}
+							onChange={(_e, v: number) => setActiveTab(v)}
+							variant="fullWidth"
+						>
+							<Tab
+								icon={<InfoOutlinedIcon fontSize="small" />}
+								iconPosition="start"
+								label="Information"
+								aria-label="information tab"
+							/>
+							<Tab
+								icon={<SearchOutlinedIcon fontSize="small" />}
+								iconPosition="start"
+								label="Search"
+								aria-label="search tab"
+							/>
+						</Tabs>
+					</Box>
+					{activeTab === 0 && <InfoPanel fittingPositionId={selectedFpId} />}
+					{activeTab === 1 && (
+						<SearchPanel
+							imageId={imageId}
+							onSelectFp={(fpId, x, y) => {
+								setSelectedFpId(fpId);
+								setActiveTab(0);
+								panToMarker(x, y);
+							}}
+							onSearchMetadata={handleSearchMetadata}
 						/>
-						<Tab
-							icon={<SearchOutlinedIcon fontSize="small" />}
-							iconPosition="start"
-							label="Search"
-							aria-label="search tab"
-						/>
-					</Tabs>
-				</Box>
-				{activeTab === 0 && <InfoPanel fittingPositionId={selectedFpId} />}
-				{activeTab === 1 && (
-					<SearchPanel
-						imageId={imageId}
-						onSelectFp={(fpId, x, y) => {
-							setSelectedFpId(fpId);
-							setActiveTab(0);
-							panToMarker(x, y);
-						}}
-					/>
-				)}
-			</Drawer>
+					)}
+				</Drawer>
 
-			{/* Main canvas area */}
-			<Box component="main" sx={{ flexGrow: 1, overflow: "auto", p: 3 }}>
-				<Box sx={{ mb: 2 }}>
-					<Typography variant="h5">
-						{image ? image.component_name : "Image Viewer"}
-					</Typography>
-					{image && (
-						<Typography variant="body2" color="text.secondary">
-							{image.drawing_type.type_name} — {image.width_px} ×{" "}
-							{image.height_px} px
+				{/* Main canvas area */}
+				<Box component="main" sx={{ flexGrow: 1, overflow: "auto", p: 3 }}>
+					<Box sx={{ mb: 2 }}>
+						<Typography variant="h5">
+							{image ? image.component_name : "Image Viewer"}
+						</Typography>
+						{image && (
+							<Typography variant="body2" color="text.secondary">
+								{image.drawing_type.type_name} — {image.width_px} ×{" "}
+								{image.height_px} px
+							</Typography>
+						)}
+					</Box>
+
+					{isLoading && (
+						<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
+							<CircularProgress />
+						</Box>
+					)}
+
+					{isError && (
+						<Typography color="error">
+							Failed to load schematic image.
 						</Typography>
 					)}
-				</Box>
 
-				{isLoading && (
-					<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
-						<CircularProgress />
-					</Box>
-				)}
-
-				{isError && (
-					<Typography color="error">Failed to load schematic image.</Typography>
-				)}
-
-				{image && (
-					<Box
-						ref={containerRef}
-						sx={{
-							position: "relative",
-							overflow: "hidden",
-							border: "1px solid",
-							borderColor: "divider",
-							borderRadius: 1,
-							width: "100%",
-							height: "70vh",
-							background: "#EEF3F8",
-						}}
-					>
-						{/* Zoom controls overlay */}
+					{image && (
 						<Box
-							sx={{
-								position: "absolute",
-								top: 8,
-								right: 8,
-								zIndex: 10,
-								display: "flex",
-								flexDirection: "column",
-								gap: 0.5,
-								background: "rgba(255,255,255,0.85)",
-								borderRadius: 1,
-								p: 0.5,
-							}}
-						>
-							<Tooltip title="Zoom in">
-								<IconButton
-									size="small"
-									onClick={() => panzoomRef.current?.zoomIn()}
-									aria-label="zoom in"
-								>
-									<ZoomInIcon fontSize="small" />
-								</IconButton>
-							</Tooltip>
-							<Tooltip title="Zoom out">
-								<IconButton
-									size="small"
-									onClick={() => panzoomRef.current?.zoomOut()}
-									aria-label="zoom out"
-								>
-									<ZoomOutIcon fontSize="small" />
-								</IconButton>
-							</Tooltip>
-							<Tooltip title="Reset view">
-								<IconButton
-									size="small"
-									onClick={() => panzoomRef.current?.reset()}
-									aria-label="reset view"
-								>
-									<RestartAltIcon fontSize="small" />
-								</IconButton>
-							</Tooltip>
-						</Box>
-
-						{/* Panzoom host — wraps SVG image and POI markers together */}
-						<Box
-							ref={setPanZoomHost}
+							ref={containerRef}
 							sx={{
 								position: "relative",
-								display: "inline-block",
-								cursor: "grab",
-								"&:active": { cursor: "grabbing" },
-								userSelect: "none",
+								overflow: "hidden",
+								border: "1px solid",
+								borderColor: "divider",
+								borderRadius: 1,
+								width: "100%",
+								height: "70vh",
+								background: theme.palette.map.canvas.bg,
 							}}
 						>
-							{/* SVG schematic */}
+							{/* Zoom controls overlay */}
 							<Box
-								component="img"
-								src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.image_svg)}`}
-								alt={image.component_name}
-								sx={{ display: "block" }}
-								draggable={false}
-							/>
-
-							{/* POI marker pins */}
-							{positions?.map((pos) => {
-								const isSelected = pos.fitting_position_id === selectedFpId;
-								return (
-									<Tooltip
-										key={pos.fitting_position_id}
-										title={pos.label_text}
-										arrow
+								sx={{
+									position: "absolute",
+									top: 8,
+									right: 8,
+									zIndex: 10,
+									display: "flex",
+									flexDirection: "column",
+									gap: 0.5,
+									background: "rgba(255,255,255,0.85)",
+									borderRadius: 1,
+									p: 0.5,
+								}}
+							>
+								<Tooltip title="Zoom in">
+									<IconButton
+										size="small"
+										onClick={() => panzoomRef.current?.zoomIn()}
+										aria-label="zoom in"
 									>
-										<IconButton
-											size="small"
-											onClick={() => handleMarkerClick(pos.fitting_position_id)}
-											sx={{
-												position: "absolute",
-												left: pos.x_coordinate,
-												top: pos.y_coordinate,
-												transform: "translate(-50%, -100%)",
-												color: isSelected ? "error.main" : "primary.main",
-												padding: 0,
-												"&:hover": { color: "primary.dark" },
-											}}
-											aria-label={pos.label_text}
+										<ZoomInIcon fontSize="small" />
+									</IconButton>
+								</Tooltip>
+								<Tooltip title="Zoom out">
+									<IconButton
+										size="small"
+										onClick={() => panzoomRef.current?.zoomOut()}
+										aria-label="zoom out"
+									>
+										<ZoomOutIcon fontSize="small" />
+									</IconButton>
+								</Tooltip>
+								<Tooltip title="Reset view">
+									<IconButton
+										size="small"
+										onClick={() => panzoomRef.current?.reset()}
+										aria-label="reset view"
+									>
+										<RestartAltIcon fontSize="small" />
+									</IconButton>
+								</Tooltip>
+							</Box>
+
+							{/* Panzoom host — wraps SVG image and POI markers together */}
+							<Box
+								ref={setPanZoomHost}
+								sx={{
+									position: "relative",
+									display: "inline-block",
+									cursor: "grab",
+									"&:active": { cursor: "grabbing" },
+									userSelect: "none",
+								}}
+							>
+								{/* SVG schematic */}
+								<Box
+									component="img"
+									src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.image_svg)}`}
+									alt={image.component_name}
+									sx={{ display: "block" }}
+									draggable={false}
+								/>
+
+								{/* POI marker pins */}
+								{positions?.map((pos) => {
+									const isSelected = pos.fitting_position_id === selectedFpId;
+									return (
+										<Tooltip
+											key={pos.fitting_position_id}
+											title={pos.label_text}
+											arrow
 										>
-											<PlaceIcon fontSize="medium" />
-										</IconButton>
-									</Tooltip>
-								);
-							})}
+											<IconButton
+												size="small"
+												onClick={() =>
+													handleMarkerClick(pos.fitting_position_id)
+												}
+												sx={{
+													position: "absolute",
+													left: pos.x_coordinate,
+													top: pos.y_coordinate,
+													transform: "translate(-50%, -100%)",
+													color: isSelected ? "error.main" : "primary.main",
+													padding: 0,
+													"&:hover": { color: "primary.dark" },
+												}}
+												aria-label={pos.label_text}
+											>
+												<PlaceIcon fontSize="medium" />
+											</IconButton>
+										</Tooltip>
+									);
+								})}
+							</Box>
 						</Box>
-					</Box>
-				)}
+					)}
+				</Box>
 			</Box>
+			<ViewerFooterStatusBar
+				sourceStatus={sourceStatus}
+				requestId={requestId}
+				lastRefreshed={lastRefreshed}
+				zoomLevel={zoomLevel}
+			/>
 		</Box>
 	);
 }

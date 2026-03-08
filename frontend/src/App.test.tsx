@@ -1,18 +1,22 @@
+import { ThemeProvider } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 import * as endpointsApi from "./services/api/endpoints";
+import theme from "./theme";
 
 function renderWithClient(ui: React.ReactElement, initialPath = "/") {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
 	return render(
-		<MemoryRouter initialEntries={[initialPath]}>
-			<QueryClientProvider client={client}>{ui}</QueryClientProvider>
-		</MemoryRouter>,
+		<ThemeProvider theme={theme}>
+			<MemoryRouter initialEntries={[initialPath]}>
+				<QueryClientProvider client={client}>{ui}</QueryClientProvider>
+			</MemoryRouter>
+		</ThemeProvider>,
 	);
 }
 
