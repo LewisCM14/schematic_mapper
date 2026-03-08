@@ -14,19 +14,21 @@ export const DrawingTypeSchema = z.object({
 
 export const ImageSchema = z.object({
 	image_id: z.string().uuid(),
-	drawing_type_id: z.number(),
+	drawing_type: DrawingTypeSchema,
 	component_name: z.string(),
-	content_hash: z.string(),
 	width_px: z.number(),
 	height_px: z.number(),
 	uploaded_at: z.string(),
 });
 
+export const ImageDetailSchema = ImageSchema.extend({
+	image_svg: z.string(),
+});
+
 export const FittingPositionSchema = z.object({
 	fitting_position_id: z.string(),
-	image_id: z.string().uuid(),
-	x_coordinate: z.number(),
-	y_coordinate: z.number(),
+	x_coordinate: z.coerce.number(),
+	y_coordinate: z.coerce.number(),
 	label_text: z.string(),
 	is_active: z.boolean(),
 });
@@ -37,4 +39,5 @@ export const FittingPositionListSchema = z.array(FittingPositionSchema);
 export type Health = z.infer<typeof HealthSchema>;
 export type DrawingType = z.infer<typeof DrawingTypeSchema>;
 export type Image = z.infer<typeof ImageSchema>;
+export type ImageDetail = z.infer<typeof ImageDetailSchema>;
 export type FittingPosition = z.infer<typeof FittingPositionSchema>;

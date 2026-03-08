@@ -81,6 +81,7 @@ The API will be available at `http://127.0.0.1:8000`.
 |---|---|
 | `uv run python manage.py runserver` | Start the development server |
 | `uv run pytest` | Run tests |
+| `uv run mypy .` | Type check |
 | `uv run ruff check --fix .` | Lint and auto-fix |
 | `uv run ruff format .` | Format code |
 

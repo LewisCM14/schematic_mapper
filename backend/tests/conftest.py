@@ -4,12 +4,12 @@ from api.models import DrawingType, Image
 
 
 @pytest.fixture
-def drawing_type(db):
+def drawing_type(db: None) -> DrawingType:
     return DrawingType.objects.create(type_name="composite")
 
 
 @pytest.fixture
-def image(drawing_type):
+def image(drawing_type: DrawingType) -> Image:
     return Image.objects.create(
         drawing_type=drawing_type,
         component_name="Cooling Assembly",

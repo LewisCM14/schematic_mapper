@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from django.core.management.base import BaseCommand
 from django.db import connections
@@ -7,7 +8,7 @@ from django.db import connections
 class Command(BaseCommand):
     help = "Apply mock asset database schema and seed data"
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         sql_path = Path(__file__).resolve().parents[3] / "scripts" / "mock_asset_db.sql"
         sql = sql_path.read_text()
 

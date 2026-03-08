@@ -6,25 +6,25 @@ from api.models import DrawingType, FittingPosition, Image
 
 @pytest.mark.django_db
 class TestDrawingTypeModel:
-    def test_create(self):
+    def test_create(self) -> None:
         dt = DrawingType.objects.create(type_name="composite")
         assert dt.drawing_type_id is not None
         assert dt.type_name == "composite"
         assert dt.is_active is True
 
-    def test_type_name_unique(self):
+    def test_type_name_unique(self) -> None:
         DrawingType.objects.create(type_name="system")
         with pytest.raises(IntegrityError):
             DrawingType.objects.create(type_name="system")
 
-    def test_str(self):
+    def test_str(self) -> None:
         dt = DrawingType.objects.create(type_name="composite")
         assert str(dt) == "composite"
 
 
 @pytest.mark.django_db
 class TestImageModel:
-    def test_create(self, drawing_type):
+    def test_create(self, drawing_type: DrawingType) -> None:
         image = Image.objects.create(
             drawing_type=drawing_type,
             component_name="Cooling Assembly",
@@ -37,7 +37,7 @@ class TestImageModel:
         assert image.component_name == "Cooling Assembly"
         assert image.drawing_type == drawing_type
 
-    def test_str(self, drawing_type):
+    def test_str(self, drawing_type: DrawingType) -> None:
         image = Image.objects.create(
             drawing_type=drawing_type,
             component_name="Cooling Assembly",
@@ -51,7 +51,7 @@ class TestImageModel:
 
 @pytest.mark.django_db
 class TestFittingPositionModel:
-    def test_create(self, image):
+    def test_create(self, image: Image) -> None:
         fp = FittingPosition.objects.create(
             fitting_position_id="FP-001",
             image=image,
@@ -63,7 +63,7 @@ class TestFittingPositionModel:
         assert fp.label_text == "PUMP-01-INLET"
         assert fp.is_active is True
 
-    def test_str(self, image):
+    def test_str(self, image: Image) -> None:
         fp = FittingPosition.objects.create(
             fitting_position_id="FP-002",
             image=image,
@@ -73,7 +73,7 @@ class TestFittingPositionModel:
         )
         assert str(fp) == "VALVE-01-A"
 
-    def test_label_text_unique_per_image(self, image):
+    def test_label_text_unique_per_image(self, image: Image) -> None:
         FittingPosition.objects.create(
             fitting_position_id="FP-003",
             image=image,
@@ -90,7 +90,9 @@ class TestFittingPositionModel:
                 label_text="SENSOR-01",
             )
 
-    def test_same_label_text_allowed_on_different_images(self, drawing_type, image):
+    def test_same_label_text_allowed_on_different_images(
+        self, drawing_type: DrawingType, image: Image
+    ) -> None:
         second_image = Image.objects.create(
             drawing_type=drawing_type,
             component_name="Other Assembly",

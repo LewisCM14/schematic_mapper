@@ -13,7 +13,23 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "django-stubs>=5.2.9",
+    "djangorestframework-stubs>=3.16.8",
+    "mypy>=1.19.1",
     "pytest>=9.0.2",
     "pytest-django>=4.12.0",
     "ruff>=0.15.5",
 ]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "environ"
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings"

@@ -80,7 +80,7 @@ The requirements above inform the selection of the tech stack detailed below.
 Layer | Technologies |
 --|--|
 Database| MSSQL & Oracle
-Server Side| Python & Django & Pytest with Ruff (Linting/Formatting)
+Server Side| Python & Django & Pytest with Ruff (Linting/Formatting) & Mypy (Type Checking)
 Client Side| TypeScript & React with MaterialUI components on Vite & Vitest, Biome (Linting/Formatting)
 Authorization| *Existing ADFS & Active Directory Service*
 
@@ -587,6 +587,7 @@ Sensor mapping notes:
     - `pytest-mock`
     - `responses` or `respx` for external API mocking (use in CI pipelines for integration tests)
     - `pytest-cov` for coverage reporting, targeting 100% unit test coverage
+    - `mypy` with `django-stubs` and `djangorestframework-stubs` for static type checking; configured via `[tool.mypy]` in `pyproject.toml` with `strict = true`
 
 1. Test organisation
     - The `tests/` directory lives at the root of the backend and mirrors the source code folder structure (for example `tests/api/` covers `api/`, `tests/config/` covers `config/`).
@@ -1162,8 +1163,8 @@ The project should be structured as a monorepo containing both the frontend and 
 - **Python Management:** Use `uv` for all backend environment and dependency management.
     - Initialize the backend using `uv init`.
     - Add dependencies using `uv add django djangorestframework psycopg2-binary pytest pytest-django django-cors-headers django-environ`.
-    - Add development dependencies using `uv add --dev ruff`.
-    - Run commands using `uv run python manage.py ...`, `uv run pytest`, `uv run ruff check .`, or `uv run ruff format .`.
+    - Add development dependencies using `uv add --dev ruff mypy django-stubs djangorestframework-stubs`.
+    - Run commands using `uv run python manage.py ...`, `uv run pytest`, `uv run mypy .`, `uv run ruff check .`, or `uv run ruff format .`.
 - **Frontend Management:** Use `npm` for all frontend package management.
     - Initialize via `npm create vite@latest frontend -- --template react-ts`.
     - Install dependencies using `npm install @mui/material @emotion/react @emotion/styled @mui/icons-material @tanstack/react-query axios zod react-router-dom`.
@@ -1177,6 +1178,7 @@ The project should be structured as a monorepo containing both the frontend and 
 - **Phase Confinement:** Strictly follow the Implementation Plan one Phase at a time. Stop and ask the user for permission before beginning the next Phase.
 - **Verification:** Run terminal commands to test the code continuously (e.g., output of `uv run pytest`, `npm run build`, or using `curl` to verify API endpoints). Ensure code is working before finalizing a phase.
 - **Linting & Formatting:** Always run `uv run ruff check --fix .` and `uv run ruff format .` for the backend, and `npx @biomejs/biome check --write .` for the frontend before finalizing any changes.
+- **Type Checking:** Always run `uv run mypy .` for the backend before finalizing any changes. All source files must be annotated; `strict = true` is enforced.
 - **Incremental Tests:** Write automated tests (`pytest` for Django, `vitest` for React) as part of each Phase's completion criteria.
 - **Clean Communication:** At the end of every Phase, provide a concise bulleted summary of files created, packages installed, and what test commands were run and passed.
 

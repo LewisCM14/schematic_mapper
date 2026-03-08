@@ -13,8 +13,8 @@ class DrawingType(models.Model):
     class Meta:
         db_table = "drawing_types"
 
-    def __str__(self):
-        return self.type_name
+    def __str__(self) -> str:
+        return str(self.type_name)
 
 
 class Image(models.Model):
@@ -32,7 +32,7 @@ class Image(models.Model):
     class Meta:
         db_table = "images"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.component_name} ({self.image_id})"
 
 
@@ -56,5 +56,5 @@ class FittingPosition(models.Model):
             )
         ]
 
-    def __str__(self):
-        return self.label_text
+    def __str__(self) -> str:
+        return str(self.label_text)

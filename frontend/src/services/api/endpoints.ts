@@ -2,8 +2,8 @@ import httpClient from "./httpClient";
 import {
 	FittingPositionListSchema,
 	HealthSchema,
+	ImageDetailSchema,
 	ImageListSchema,
-	ImageSchema,
 } from "./schemas";
 
 export async function fetchHealth() {
@@ -18,7 +18,7 @@ export async function fetchImages(params?: Record<string, string>) {
 
 export async function fetchImage(imageId: string) {
 	const response = await httpClient.get(`/images/${imageId}`);
-	return ImageSchema.parse(response.data);
+	return ImageDetailSchema.parse(response.data);
 }
 
 export async function fetchFittingPositions(imageId: string) {

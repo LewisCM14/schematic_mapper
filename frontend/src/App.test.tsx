@@ -1,49 +1,46 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it, vi } from "vitest";
 import App from "./App";
-import * as healthApi from "./services/api/health";
+import * as endpointsApi from "./services/api/endpoints";
 
-function renderWithClient(ui: React.ReactElement) {
+function renderWithClient(ui: React.ReactElement, initialPath = "/") {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
 	return render(
-		<MemoryRouter initialEntries={["/"]}>
+		<MemoryRouter initialEntries={[initialPath]}>
 			<QueryClientProvider client={client}>{ui}</QueryClientProvider>
 		</MemoryRouter>,
 	);
 }
 
 describe("App", () => {
-	beforeEach(() => {
-		vi.restoreAllMocks();
+	it("renders the image selection page at /", () => {
+		vi.spyOn(endpointsApi, "fetchImages").mockResolvedValue([]);
+		renderWithClient(<App />);
+		expect(screen.getByText("Schematic Mapper")).toBeInTheDocument();
 	});
 
-	it("shows success chips when API returns ok", async () => {
-		vi.spyOn(healthApi, "fetchHealth").mockResolvedValue({
-			status: "ok",
-			database: "ok",
+	it("renders the image viewer page at /viewer/:imageId", () => {
+		const imageId = "00000000-0000-0000-0000-000000000001";
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue({
+			image_id: imageId,
+			component_name: "Cooling System",
+			drawing_type: {
+				drawing_type_id: 1,
+				type_name: "composite",
+				description: "",
+				is_active: true,
+			},
+			width_px: 800,
+			height_px: 600,
+			uploaded_at: "2024-01-01T00:00:00Z",
+			image_svg: "<svg/>",
 		});
-
-		renderWithClient(<App />);
-
-		await waitFor(() => {
-			expect(screen.getByText("API: ok")).toBeInTheDocument();
-			expect(screen.getByText("Database: ok")).toBeInTheDocument();
-		});
-	});
-
-	it("shows error chip when API is unreachable", async () => {
-		vi.spyOn(healthApi, "fetchHealth").mockRejectedValue(
-			new Error("Network Error"),
-		);
-
-		renderWithClient(<App />);
-
-		await waitFor(() => {
-			expect(screen.getByText("API Unreachable")).toBeInTheDocument();
-		});
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
+		renderWithClient(<App />, `/viewer/${imageId}`);
+		expect(screen.getByText("Image Viewer")).toBeInTheDocument();
 	});
 });
