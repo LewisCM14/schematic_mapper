@@ -1772,3 +1772,250 @@ All of the following must pass before Phase 9 is considered complete:
 - `npm run test` — all frontend tests pass.
 - `npm run build` — production build succeeds.
 - `npm run lint` — no Biome errors.
+
+### Phase 10: Review Codebase Against Spec & Update
+**Goal:** Close all conformance gaps identified in the Phase 9 review — grouped by severity (Critical → High → Medium → Minor). Each sub-item maps directly to a specific shortfall found during the audit. Items excluded by prototype scope (authentication, sensor integration, CI/CD) are not included.
+
+---
+
+#### 10a: Admin Step 3 — Select Uploaded Image *(Critical)*
+*Addresses: Admin Step 3 is "Confirm Upload" (a static alert) instead of "Select Uploaded Image"; the spec wireframe says Step 3 is "Select" and requires reusing Image Selection Screen filter/tile components for admin image selection.*
+
+- Refactor Step 3 in `AdminPage.tsx` from a confirmation alert into an image selection sub-view:
+    - After upload completes, fetch the image list (reuse `useImages` hook, filtered to the selected drawing type).
+    - Render the image tile grid (reuse `ImageTileCard` molecule) so the admin can pick the newly uploaded image or any existing image of that drawing type.
+    - On tile click, set the selected `imageId` for Step 4 and advance the stepper.
+- This replaces the current hard-wired transition that automatically uses the `image_id` returned by the upload-complete response.
+- Update `AdminPage.test.tsx` to assert: Step 3 renders at least one image tile after upload completes; clicking a tile advances to Step 4 with the correct `imageId`.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### 10b: Admin Step 4 — Mapping Canvas with Viewer Reuse *(Critical)*
+*Addresses: Step 4 mapping canvas is a plain 600×400 grey `Box` — it does not load the uploaded image, has no pan/zoom, no Unmapped/Mapped tabs, no drag-to-adjust markers, and does not reuse the viewer canvas. The spec says: "Mapping Canvas (reuses Screen 1 map canvas)", "Tabs: [Unmapped] [Mapped]", "click to add marker", "drag marker to adjust", "marker color by mapped/unmapped".*
+
+- Extract the pan/zoom canvas logic from `ImageViewerPage` into a shared `DiagramCanvasViewport` organism component (`src/components/organisms/DiagramCanvasViewport.tsx`). Props:
+    - `imageSvgUrl: string` — the SVG image source.
+    - `markers: Array<{ id: string; x: number; y: number; status: "mapped" | "unmapped" }>` — marker positions to render.
+    - `onMarkerClick?: (id: string) => void` — click handler for existing markers.
+    - `onCanvasClick?: (x: number, y: number) => void` — click handler for placing new markers (admin only).
+    - `onMarkerDrag?: (id: string, x: number, y: number) => void` — drag handler for repositioning markers (admin only).
+    - `panToTarget?: { x: number; y: number } | null` — programmatic pan target.
+- Refactor `ImageViewerPage.tsx` to use `<DiagramCanvasViewport>` instead of its inline canvas implementation.
+- In `AdminPage.tsx` Step 4:
+    - Replace the plain `Box` with `<DiagramCanvasViewport>` loading the uploaded image's SVG via `useImage(selectedImageId)`.
+    - Render markers coloured by mapped/unmapped status using `theme.palette.map.poi.default` for mapped and `theme.palette.map.poi.unmapped` for unmapped.
+    - Enable `onCanvasClick` for adding new markers and `onMarkerDrag` for repositioning via pointer events.
+    - Add a tabbed LHS panel with `[Unmapped]` and `[Mapped]` tabs listing fitting positions, matching the spec wireframe.
+- Add unit tests for `DiagramCanvasViewport` asserting: image renders, markers render at specified positions, `onCanvasClick` fires with coordinates, `onMarkerClick` fires with marker ID.
+- Update `AdminPage.test.tsx` to assert: Step 4 renders the uploaded image in the canvas; markers can be placed; the Unmapped/Mapped tabs render.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### 10c: Upload MIME Type & File Size Validation *(Critical)*
+*Addresses: no MIME type, file extension, or max file size enforcement exists in the upload flow. The spec says: "Enforce max size and allowed MIME/type list for supported diagram formats. Reject malformed or unsupported files before final commit."*
+
+- Define constants in `api/views.py` (or a dedicated `api/upload_config.py`):
+    - `ALLOWED_MIME_TYPES`: `{"image/svg+xml"}` (extensible for future formats).
+    - `MAX_UPLOAD_SIZE_BYTES`: `50 * 1024 * 1024` (50 MB — covers the 15 MB SVG requirement with headroom).
+- In `create_upload_session`, validate the declared `file_size` against `MAX_UPLOAD_SIZE_BYTES`. Return `400` with `code: "file_too_large"` if exceeded.
+- In `complete_upload`, after assembling the full file bytes from chunks:
+    - Detect the MIME type of the assembled content (e.g. check for `<?xml` / `<svg` prefix for SVG).
+    - Reject with `422` and `code: "unsupported_file_type"` if the content does not match `ALLOWED_MIME_TYPES`.
+- Add tests in `TestCreateUploadSessionView`: file_size exceeding max returns 400.
+- Add tests in `TestCompleteUploadView`: assembled content with invalid MIME type returns 422; valid SVG content passes.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 10d: Upload Session Resume — Missing Chunks Query *(Critical)*
+*Addresses: no endpoint exists to query which chunk part numbers have been received vs missing for a given `upload_id`. The spec says: "Support resume by querying missing chunk numbers for an upload_id."*
+
+- Add a new endpoint: `GET /api/admin/uploads/{upload_id}`.
+- Register the URL pattern in `api/urls.py`.
+- Implement a `get_upload_session` view in `api/views.py`:
+    - Return the upload session metadata (state, file_name, file_size, total expected parts).
+    - Include a `received_parts` array listing the `part_number` values of all `UploadChunk` rows for this session.
+    - Clients can diff against expected parts to determine which chunks need re-uploading.
+- Add a serializer for the response shape.
+- Add tests in a new `TestGetUploadSessionView` class: returns session metadata with received parts; returns 404 for unknown upload_id.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 10e: Asset Adapter Timeout & Retry Budgets *(High)*
+*Addresses: `asset_adapter.py` makes raw database queries with no timeout, retry limit, or circuit breaker. The spec says: "Per-source timeout budgets and retry limits", "Circuit breaker behavior for repeatedly failing sources."*
+
+- In `asset_adapter.py`, set a query-level timeout on database cursor operations:
+    - Use `SET statement_timeout` (PostgreSQL) or a connection-level timeout parameter when acquiring the cursor from `connections["asset"]`.
+    - Default timeout: 5 seconds per query.
+- Implement a simple in-process circuit breaker for the asset adapter:
+    - Track consecutive failure count in a module-level variable (thread-safe via `threading.Lock`).
+    - After N consecutive failures (e.g. 3), short-circuit subsequent calls for a cooldown period (e.g. 30 seconds) returning `source_status="degraded"` without attempting the query.
+    - Reset the failure count on a successful query.
+- Add tests: timeout triggers degraded status; after N failures, next call is short-circuited; after cooldown, query is attempted again.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 10f: Atomic Design — Remaining Atom Extraction *(High)*
+*Addresses: 6 of 10 spec-defined atoms do not exist as standalone components: `AppLogo`, `IconButtonAction`, `SearchInput`, `SectionLabel`, `MetricText`, `POIMarkerCluster`. Logic is either inline in pages or absent entirely.*
+
+- Create the following in `src/components/atoms/`:
+    - `AppLogo.tsx` — brand mark `Avatar` with "SM" text; used in `TopAppHeader`.
+    - `IconButtonAction.tsx` — props: `icon: ReactNode`, `onClick`, `ariaLabel`; wraps MUI `IconButton` with consistent sizing. Replace inline zoom/reset `IconButton` instances in `ImageViewerPage`.
+    - `SearchInput.tsx` — props: `value`, `onChange`, `loading`, `onClear`; standardized `TextField` with `InputAdornment` for search icon and conditional clear button. Replace inline search `TextField` in `SearchPanel` and `FilterBar`.
+    - `SectionLabel.tsx` — props: `children: string`; renders `Typography variant="overline"` for drawer/panel section headings.
+    - `MetricText.tsx` — props: `label: string`, `value: string`; compact label/value pair for footer/status bars. Use in `ViewerFooterStatusBar` for request ID and zoom level.
+    - `POIMarkerCluster.tsx` — props: `count: number`, `onClick`; cluster badge for dense marker areas using `theme.palette.map.poi.cluster`. Wire into `DiagramCanvasViewport` when marker density exceeds a threshold.
+- Add a unit test file per atom asserting core render behaviour.
+- **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
+
+---
+
+#### 10g: Atomic Design — Remaining Molecule & Organism Extraction *(High)*
+*Addresses: 5 of 10 spec-defined molecules and 9 of 11 organisms do not exist as standalone components. All logic is inline in page components, violating "Reuse template-level layouts across pages to reduce UI drift."*
+
+- Create the following **molecules** in `src/components/molecules/`:
+    - `HeaderIdentity.tsx` — composes `AppLogo` + title + optional context label. Replace inline header content in `TopAppHeader`.
+    - `DetailFieldRow.tsx` — props: `label: string`, `value: string | null`; label/value row for asset details. Replace inline `Box` rows in `InfoPanel`.
+    - `UploadProgressRow.tsx` — props: `fileName`, `progress`, `onRetry`; filename + `LinearProgress` + retry action. Replace inline upload UI in `AdminPage` Step 2.
+    - `ValidationSummaryRow.tsx` — props: `totalCount`, `warningCount`, `errorCount`; mapping validation summary with severity badges. Use in `AdminPage` Step 4 footer.
+- Create the following **organisms** in `src/components/organisms/`:
+    - `ViewerLeftDrawer.tsx` — persistent `Drawer` with tabbed `Search` and `Information` views. Extract from `ImageViewerPage` inline drawer.
+    - `SearchResultsPanel.tsx` — infinite-scroll search result list with loading/empty/error states. Extract from inline `SearchPanel` in `ImageViewerPage`.
+    - `POIDetailPanel.tsx` — selected fitting position details with asset source section. Extract from inline `InfoPanel` in `ImageViewerPage`.
+    - `ImageSelectionGrid.tsx` — responsive `Grid` of `ImageTileCard` components. Extract from `ImageSelectionPage` inline grid.
+    - `ImageSelectionFilters.tsx` — top filter region composing `FilterBar` + any additional filters. Extract from `ImageSelectionPage` inline filter section.
+    - `AdminWorkflowStepper.tsx` — MUI `Stepper` + step labels + navigation logic. Extract from `AdminPage` inline stepper.
+    - `UploadSessionPanel.tsx` — upload session interaction with progress, retry, and status. Extract from `AdminPage` Step 2 inline UI.
+    - `MappingWorkbench.tsx` — composes `DiagramCanvasViewport` + Unmapped/Mapped lists + validation panel. Extract from `AdminPage` Step 4 inline UI.
+- Refactor `ImageSelectionPage`, `ImageViewerPage`, and `AdminPage` to import and compose the extracted organisms instead of holding inline implementations.
+- Add a unit test file per new molecule and organism.
+- **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
+
+---
+
+#### 10h: Template Layer Introduction *(High)*
+*Addresses: no template components exist; the spec defines `ImageSelectionTemplate`, `ImageViewerTemplate`, and `AdminMappingTemplate` as a separate Atomic Design layer. The cross-cutting rule states: "Reuse template-level layouts across pages to reduce UI drift."*
+
+- Create `src/components/templates/`:
+    - `ImageSelectionTemplate.tsx` — composes `TopAppHeader` + `ImageSelectionFilters` + `ImageSelectionGrid` + empty/loading/error state slots. Props accept children or render-prop slots for state variants.
+    - `ImageViewerTemplate.tsx` — composes `TopAppHeader` + `ViewerLeftDrawer` + `DiagramCanvasViewport` + `ViewerFooterStatusBar`. Props accept organism instances and state.
+    - `AdminMappingTemplate.tsx` — composes `TopAppHeader` + `AdminWorkflowStepper` + step-content slot + action footer.
+- Refactor each page component to delegate layout to its template, keeping only route-level data fetching and state orchestration in the page.
+- Add a unit test per template asserting child slot rendering.
+- **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
+
+---
+
+#### 10i: Keyboard Navigation & Accessibility Tests *(High)*
+*Addresses: no keyboard navigation tests exist. The spec requires: "Keyboard navigation for tabs, search list items, and primary actions", "Focus management on route change, dialog open/close, and error fallback states", "All interactive controls must be keyboard accessible."*
+
+- Add keyboard navigation tests in `ImageViewerPage.test.tsx`:
+    - Tab key cycles between Search/Information tabs, search input, and result list items.
+    - Enter/Space on a search result item triggers selection (same as click).
+    - Enter/Space on a POI marker triggers selection.
+- Add focus management tests:
+    - After navigating from Image Selection to Image Viewer, focus moves to the main content area.
+    - After error boundary fallback renders, focus moves to the retry button.
+    - After admin dialog open/close, focus returns to the triggering element.
+- Add accessibility assertion tests:
+    - POI markers have `aria-label` attributes with fitting position IDs (not colour alone).
+    - All `IconButton` instances have `aria-label` props.
+    - Source status chips and health dots have text labels (verified via existing `HealthDot` `aria-label` tests — extend to cover `StatusChip`).
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 10j: Upload Structured Logging & Session Cleanup *(Medium)*
+*Addresses: upload views contain zero logging statements; no cleanup for expired/abandoned sessions. The spec says: "Emit structured logs and metrics for upload success rate, failure rate, mean upload time, and checksum failures", "Schedule cleanup for abandoned/expired upload sessions and orphaned chunks."*
+
+- In `api/views.py`, add structured logging to upload lifecycle views using the `api` logger:
+    - `create_upload_session`: log session creation with `upload_id`, `file_name`, `request_id`.
+    - `upload_chunk`: log chunk received with `upload_id`, `part_number`, `request_id`.
+    - `complete_upload`: log success or failure with `upload_id`, `duration_ms`, `checksum_match`, `request_id`.
+    - `abort_upload`: log abort with `upload_id`, `chunks_deleted_count`, `request_id`.
+- Create a Django management command `backend/api/management/commands/cleanup_uploads.py`:
+    - Find all `ImageUpload` records in `initiated` or `uploading` state with `updated_at` older than a configurable TTL (default 24 hours).
+    - Delete associated `UploadChunk` rows and set session state to `aborted`.
+    - Log the number of sessions cleaned up.
+- Add a model test asserting the cleanup command aborts stale sessions and deletes their chunks.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 10k: ImageViewerPage Tab Order & Header Conformance *(Medium)*
+*Addresses: tabs render as [Information, Search] but the spec wireframe shows [Search, Information]; header is missing source status chips per the wireframe: "[Menu] [Image Name + Type] [Source Chips] [User] [Help]".*
+
+- In `ImageViewerPage.tsx`, swap the tab order so `Search` is index 0 and `Information` is index 1. Update `activeTab` default to `0` (Search). Adjust all conditional renders that reference tab indices.
+- Extend `TopAppHeader.tsx` to accept an optional `sourceStatus?: Record<string, string>` prop. When provided, render `StatusChip` atoms inline in the `Toolbar` for each source entry.
+- In `ImageViewerPage.tsx`, pass `sourceStatus` from the last successful search response to `TopAppHeader`.
+- Update `ImageViewerPage.test.tsx`: assert Search tab is rendered first; assert source status chips appear in the header after a search completes.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### 10l: Search Sources UI Control & Query Normalization *(Medium)*
+*Addresses: no UI exists for users to select which search sources to query — `sources` is hardcoded to `["internal", "asset"]`. The spec says the search supports `sources=internal,asset,sensor` filtering and the wireframe shows an optional source filter. Query key uses raw text instead of normalized text.*
+
+- Add a `SourceFilterChips` component (or extend `SearchResultsPanel`) that renders `Chip` toggles for each available source (`internal`, `asset`). `sensor` chip is rendered as disabled with a tooltip explaining it is unavailable in the prototype.
+- Wire selected sources into the `useSearch` hook's `sources` parameter and include them in the query key.
+- Normalize the search query text before passing to the query key: `query.trim().toLowerCase()`. This prevents cache misses for `"Pump"` vs `"pump"` vs `" pump "`.
+- Update `useSearch.test.ts` to assert: `sources` is included in the query key; toggling a source re-triggers the query; query normalization does not affect the displayed text.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### 10m: Backend Test Gaps *(Medium)*
+*Addresses: no contract tests for external source response shapes; no "both sources unavailable" test; no "upload resume after connection drop" test; `query_too_short` error body inconsistency.*
+
+- **Contract test:** Add `TestAssetAdapterContract` in `tests/api/test_asset_adapter.py` — assert that the expected column order and count returned from the raw SQL query match the `AssetRecord` and `AssetSearchRow` dataclass field order. This validates the mapping between cursor columns and dataclass fields.
+- **Both sources degraded test:** Add a test in `TestSearchService` that mocks `SearchIndexService.get_searchable_fields` to raise an exception and `search_assets` to return degraded status. Assert the search response returns an empty result set with both `internal` and `asset` in `source_status` as `"degraded"`.
+- **Upload resume test:** Add a test in `TestUploadChunkView` that uploads parts 1 and 2, then calls the new `GET /api/admin/uploads/{upload_id}` endpoint (from 10d) to verify `received_parts` is `[1, 2]`, then uploads part 3 and completes successfully.
+- **Error body consistency:** In `api/views.py`, add `"status": 400` to the `query_too_short` error response body to match the pattern used by `search_image_required` and `search_invalid_source`.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
+
+---
+
+#### 10n: Frontend Integration Test Gaps *(Medium)*
+*Addresses: no integration test verifying Zod parse failures surface as controlled client errors; admin Step 1 drawing type dropdown has no loading/empty/error states; `httpClient` 401/403 interceptor resolves the promise instead of rejecting.*
+
+- **Zod parse failure test:** Add a test in `schemas.test.ts` (or a new integration test file) that mocks an endpoint (via MSW) to return a malformed response body. Assert that the `useQuery` hook surfaces the Zod parse error as a controlled error state (not an unhandled exception) and that the page renders an error fallback.
+- **Admin Step 1 loading/error states:** In `AdminPage.tsx`, add loading (`CircularProgress`), empty ("No drawing types available"), and error (`Alert`) states to the drawing type dropdown in Step 1, derived from the `useImages` query status. Add test assertions in `AdminPage.test.tsx`.
+- **httpClient interceptor fix:** In `services/api/httpClient.ts`, change the 401/403 branch from `return Promise.resolve(error.response)` to `return Promise.reject(error)`. The `console.warn` logging should remain. This ensures 401/403 errors propagate to TanStack Query as failures instead of being silently swallowed and passed to Zod parsing (which would produce confusing parse errors).
+- Add a test in `httpClient.test.ts` asserting: a 401 response triggers `console.warn` AND rejects the promise (not resolves).
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+---
+
+#### 10o: Invalid `imageId` Redirect with User Notice *(Minor)*
+*Addresses: `ImageViewerPage` only redirects when `imageId` is missing from the route. If a user navigates to `/viewer/not-a-real-uuid`, the image query fails but no notice is shown and no redirect occurs. The spec says: "If image_id is missing/invalid, show notice and redirect to Image Selection."*
+
+- In `ImageViewerPage.tsx`, detect when `useImage(imageId)` returns an error (e.g. 404 from the API). On error, display a `Snackbar` or `Alert` with a message ("Image not found — returning to selection") and navigate to `/` after a short delay or on dismiss.
+- Add a test in `ImageViewerPage.test.tsx`: override MSW handler for `GET /api/images/:imageId` to return 404; assert the notice is displayed and navigation to `/` is triggered.
+- **Verification:** `npm run test` passes.
+
+---
+
+#### 10p: Admin Action Footer *(Minor)*
+*Addresses: the spec wireframe shows a footer bar on the admin page: "Footer: [Validation summary] [Save] [Publish] [Cancel]". No such footer exists — save/back buttons are inline in Step 5.*
+
+- Add a persistent action footer `Paper` bar at the bottom of `AdminPage.tsx` visible during Steps 4 and 5:
+    - Show a `ValidationSummaryRow` (from 10g) with the count of mapped/unmapped positions.
+    - Show `Save`, `Cancel` buttons. `Publish` renders as disabled with a tooltip ("Available in enterprise deployment").
+    - `Cancel` returns to Step 3 (image selection) and clears mapping state.
+- Update `AdminPage.test.tsx` to assert: footer renders during Step 4 with validation summary; Cancel returns to Step 3.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+---
+
+#### Completion Criteria for Phase 10
+All of the following must pass before Phase 10 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
