@@ -361,6 +361,18 @@ class TestCreateUploadSessionView:
         )
         assert response.status_code == 404
 
+    def test_returns_400_for_file_too_large(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        payload = _upload_payload(drawing_type, key="large-key")
+        payload["file_size"] = 50 * 1024 * 1024 + 1  # 1 byte over limit
+        response = client.post(
+            "/api/admin/uploads",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
 
 @pytest.mark.django_db
 class TestUploadChunkView:
@@ -517,6 +529,35 @@ class TestCompleteUploadView:
         )
         assert response.status_code == 200
 
+    def test_returns_422_for_unsupported_file_type(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        # Upload non-SVG content (plain text)
+        data = b"This is just plain text, not SVG"
+        session = self._create_session_with_chunk(drawing_type, data)
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "unsupported_file_type"
+        session.refresh_from_db()
+        assert session.state == "failed"
+
+    def test_accepts_valid_svg_content(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>'
+        session = self._create_session_with_chunk(drawing_type, svg)
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        assert response.json()["state"] == "completed"
+
 
 @pytest.mark.django_db
 class TestAbortUploadView:
@@ -573,6 +614,40 @@ class TestAbortUploadView:
             content_type="application/json",
         )
         assert complete_response.status_code == 409
+
+
+@pytest.mark.django_db
+class TestGetUploadSessionView:
+    def test_returns_session_with_received_parts(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        session = ImageUpload.objects.create(
+            drawing_type=drawing_type,
+            component_name="Test",
+            file_name="test.svg",
+            file_size=100,
+            expected_checksum="a" * 64,
+            idempotency_key=str(uuid.uuid4()),
+            state="uploading",
+        )
+        from api.models import UploadChunk
+
+        UploadChunk.objects.create(upload=session, part_number=1, data=b"aaa")
+        UploadChunk.objects.create(upload=session, part_number=3, data=b"ccc")
+
+        response = client.get(f"/api/admin/uploads/{session.upload_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["upload_id"] == str(session.upload_id)
+        assert data["state"] == "uploading"
+        assert data["file_size"] == 100
+        assert data["received_parts"] == [1, 3]
+
+    def test_returns_404_for_unknown_upload(self, client: Client) -> None:
+        response = client.get(
+            f"/api/admin/uploads/{uuid.uuid4()}"
+        )
+        assert response.status_code == 404
 
 
 # ── Admin bulk fitting positions ──────────────────────────────────────────────

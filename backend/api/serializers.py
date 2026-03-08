@@ -86,7 +86,7 @@ class UploadSessionCreateSerializer(serializers.Serializer[Any]):
     drawing_type_id = serializers.IntegerField()
     component_name = serializers.CharField(max_length=200)
     file_name = serializers.CharField(max_length=255)
-    file_size = serializers.IntegerField(min_value=1)
+    file_size = serializers.IntegerField(min_value=1, max_value=50 * 1024 * 1024)
     expected_checksum = serializers.CharField(max_length=64)
     idempotency_key = serializers.CharField(max_length=128)
 

@@ -1,16 +1,12 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import ZoomInIcon from "@mui/icons-material/ZoomIn";
-import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
 	Alert,
 	Box,
 	CircularProgress,
 	Divider,
 	Drawer,
-	IconButton,
 	List,
 	Tab,
 	Tabs,
@@ -18,12 +14,11 @@ import {
 	Tooltip,
 	Typography,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import POIMarkerPin from "../components/atoms/POIMarkerPin";
 import SearchResultItemComponent from "../components/molecules/SearchResultItem";
+import type { CanvasMarker } from "../components/organisms/DiagramCanvasViewport";
+import DiagramCanvasViewport from "../components/organisms/DiagramCanvasViewport";
 import POITooltipCard from "../components/POITooltipCard";
 import TopAppHeader from "../components/TopAppHeader";
 import ViewerFooterStatusBar from "../components/ViewerFooterStatusBar";
@@ -288,7 +283,6 @@ function SearchPanel({
 function ImageViewerPage() {
 	const { imageId } = useParams<{ imageId: string }>();
 	const navigate = useNavigate();
-	const theme = useTheme();
 
 	const [selectedFpId, setSelectedFpId] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState(0);
@@ -296,10 +290,10 @@ function ImageViewerPage() {
 	const [sourceStatus, setSourceStatus] = useState<Record<string, string>>({});
 	const [requestId, setRequestId] = useState<string | null>(null);
 	const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-
-	const containerRef = useRef<HTMLDivElement>(null);
-	const [panZoomHost, setPanZoomHost] = useState<HTMLDivElement | null>(null);
-	const panzoomRef = useRef<PanzoomObject | null>(null);
+	const [panToTarget, setPanToTarget] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
 
 	const { data: image, isLoading, isError } = useImage(imageId ?? "");
 	const { data: positions } = useFittingPositions(imageId ?? "");
@@ -307,16 +301,6 @@ function ImageViewerPage() {
 	const handleMarkerClick = useCallback((fittingPositionId: string) => {
 		setSelectedFpId(fittingPositionId);
 		setActiveTab(0);
-	}, []);
-
-	const panToMarker = useCallback((x: number, y: number) => {
-		const pz = panzoomRef.current;
-		const container = containerRef.current;
-		if (!pz || !container) return;
-		const scale = pz.getScale();
-		const panX = container.clientWidth / 2 - x * scale;
-		const panY = container.clientHeight / 2 - y * scale;
-		pz.pan(panX, panY);
 	}, []);
 
 	const handleSearchMetadata = useCallback(
@@ -328,27 +312,39 @@ function ImageViewerPage() {
 		[],
 	);
 
-	useEffect(() => {
-		if (!panZoomHost) return;
-		const pz = Panzoom(panZoomHost, {
-			contain: "outside",
-			minScale: 0.5,
-			maxScale: 10,
-		});
-		panzoomRef.current = pz;
-		const container = containerRef.current;
-		container?.addEventListener("wheel", pz.zoomWithWheel);
-		const onPanzoomChange = () => {
-			setZoomLevel(pz.getScale());
-		};
-		panZoomHost.addEventListener("panzoomchange", onPanzoomChange);
-		return () => {
-			pz.destroy();
-			container?.removeEventListener("wheel", pz.zoomWithWheel);
-			panZoomHost.removeEventListener("panzoomchange", onPanzoomChange);
-			panzoomRef.current = null;
-		};
-	}, [panZoomHost]);
+	// Build markers for DiagramCanvasViewport
+	const canvasMarkers: CanvasMarker[] =
+		positions?.map((pos) => ({
+			id: pos.fitting_position_id,
+			x: pos.x_coordinate,
+			y: pos.y_coordinate,
+			status: "mapped" as const,
+		})) ?? [];
+
+	// Tooltip wrapper for markers in the viewer
+	const renderMarkerTooltip = useCallback(
+		(markerId: string, children: React.ReactElement) => {
+			const pos = positions?.find((p) => p.fitting_position_id === markerId);
+			return (
+				<Tooltip
+					key={markerId}
+					title={
+						<POITooltipCard
+							labelText={pos?.label_text ?? markerId}
+							componentName={image?.component_name ?? ""}
+							fittingPositionId={markerId}
+						/>
+					}
+					placement="top"
+					enterDelay={300}
+					arrow
+				>
+					{children}
+				</Tooltip>
+			);
+		},
+		[positions, image],
+	);
 
 	useEffect(() => {
 		if (!imageId) {
@@ -413,7 +409,7 @@ function ImageViewerPage() {
 							onSelectFp={(fpId, x, y) => {
 								setSelectedFpId(fpId);
 								setActiveTab(0);
-								panToMarker(x, y);
+								setPanToTarget({ x, y });
 							}}
 							onSearchMetadata={handleSearchMetadata}
 						/>
@@ -447,122 +443,15 @@ function ImageViewerPage() {
 					)}
 
 					{image && (
-						<Box
-							ref={containerRef}
-							sx={{
-								position: "relative",
-								overflow: "hidden",
-								border: "1px solid",
-								borderColor: "divider",
-								borderRadius: 1,
-								width: "100%",
-								height: "70vh",
-								background: theme.palette.map.canvas.bg,
-							}}
-						>
-							{/* Zoom controls overlay */}
-							<Box
-								sx={{
-									position: "absolute",
-									top: 8,
-									right: 8,
-									zIndex: 10,
-									display: "flex",
-									flexDirection: "column",
-									gap: 0.5,
-									background: "rgba(255,255,255,0.85)",
-									borderRadius: 1,
-									p: 0.5,
-								}}
-							>
-								<Tooltip title="Zoom in">
-									<IconButton
-										size="small"
-										onClick={() => panzoomRef.current?.zoomIn()}
-										aria-label="zoom in"
-									>
-										<ZoomInIcon fontSize="small" />
-									</IconButton>
-								</Tooltip>
-								<Tooltip title="Zoom out">
-									<IconButton
-										size="small"
-										onClick={() => panzoomRef.current?.zoomOut()}
-										aria-label="zoom out"
-									>
-										<ZoomOutIcon fontSize="small" />
-									</IconButton>
-								</Tooltip>
-								<Tooltip title="Reset view">
-									<IconButton
-										size="small"
-										onClick={() => panzoomRef.current?.reset()}
-										aria-label="reset view"
-									>
-										<RestartAltIcon fontSize="small" />
-									</IconButton>
-								</Tooltip>
-							</Box>
-
-							{/* Panzoom host — wraps SVG image and POI markers together */}
-							<Box
-								ref={setPanZoomHost}
-								sx={{
-									position: "relative",
-									display: "inline-block",
-									cursor: "grab",
-									"&:active": { cursor: "grabbing" },
-									userSelect: "none",
-								}}
-							>
-								{/* SVG schematic */}
-								<Box
-									component="img"
-									src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.image_svg)}`}
-									alt={image.component_name}
-									sx={{ display: "block" }}
-									draggable={false}
-								/>
-
-								{/* POI marker pins */}
-								{positions?.map((pos) => {
-									const isSelected = pos.fitting_position_id === selectedFpId;
-									return (
-										<Tooltip
-											key={pos.fitting_position_id}
-											title={
-												<POITooltipCard
-													labelText={pos.label_text}
-													componentName={image?.component_name ?? ""}
-													fittingPositionId={pos.fitting_position_id}
-												/>
-											}
-											placement="top"
-											enterDelay={300}
-											arrow
-										>
-											<IconButton
-												size="small"
-												onClick={() =>
-													handleMarkerClick(pos.fitting_position_id)
-												}
-												sx={{
-													position: "absolute",
-													left: pos.x_coordinate,
-													top: pos.y_coordinate,
-													transform: "translate(-50%, -100%)",
-													padding: 0,
-													"&:hover": { opacity: 0.8 },
-												}}
-												aria-label={pos.label_text}
-											>
-												<POIMarkerPin selected={isSelected} />
-											</IconButton>
-										</Tooltip>
-									);
-								})}
-							</Box>
-						</Box>
+						<DiagramCanvasViewport
+							imageSvgUrl={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.image_svg)}`}
+							markers={canvasMarkers}
+							onMarkerClick={handleMarkerClick}
+							onZoomChange={setZoomLevel}
+							panToTarget={panToTarget}
+							selectedMarkerId={selectedFpId}
+							renderMarkerWrapper={renderMarkerTooltip}
+						/>
 					)}
 				</Box>
 			</Box>

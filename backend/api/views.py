@@ -35,6 +35,9 @@ from .serializers import (
     UploadSessionSerializer,
 )
 
+ALLOWED_MIME_TYPES: frozenset[str] = frozenset({"image/svg+xml"})
+MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
+
 VALID_SEARCH_SOURCES: frozenset[str] = frozenset({"internal", "asset", "sensor"})
 
 
@@ -144,6 +147,13 @@ def create_upload_session(request: Request) -> Response:
         return Response(serializer.errors, status=400)
 
     data = serializer.validated_data
+
+    if data["file_size"] > MAX_UPLOAD_SIZE_BYTES:
+        return Response(
+            {"error": "File size exceeds maximum allowed", "code": "file_too_large"},
+            status=400,
+        )
+
     idempotency_key: str = data["idempotency_key"]
 
     # Idempotency: return existing session if key already used
@@ -253,6 +263,18 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
             {"error": "Checksum mismatch", "code": "checksum_mismatch"}, status=422
         )
 
+    # MIME type validation: check for SVG content markers
+    content_lower = assembled[:512].lower()
+    is_svg = b"<svg" in content_lower or b"<?xml" in content_lower
+    if not is_svg:
+        session.state = UPLOAD_STATE_FAILED
+        session.error_message = "Unsupported file type"
+        session.save(update_fields=["state", "error_message", "updated_at"])
+        return Response(
+            {"error": "Unsupported file type", "code": "unsupported_file_type"},
+            status=422,
+        )
+
     # Detect image dimensions (SVG: use fixed 800×600 for prototype)
     width_px = 800
     height_px = 600
@@ -283,9 +305,20 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
     )
 
 
-@api_view(["DELETE"])
-def abort_upload(request: Request, upload_id: uuid.UUID) -> Response:
+@api_view(["GET", "DELETE"])
+def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
     session = get_object_or_404(ImageUpload, pk=upload_id)
+
+    if request.method == "GET":
+        received_parts = list(
+            session.chunks.order_by("part_number").values_list("part_number", flat=True)
+        )
+        data = UploadSessionSerializer(session).data
+        data["file_size"] = session.file_size
+        data["received_parts"] = received_parts
+        return Response(data)
+
+    # DELETE — abort
     if session.state == UPLOAD_STATE_COMPLETED:
         return Response({"error": "Cannot abort a completed upload"}, status=409)
 

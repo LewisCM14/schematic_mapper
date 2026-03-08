@@ -35,9 +35,68 @@ describe("AdminPage", () => {
 		await waitFor(() => {
 			expect(screen.getByText("Select Type")).toBeInTheDocument();
 			expect(screen.getByText("Upload Image")).toBeInTheDocument();
-			expect(screen.getByText("Confirm Upload")).toBeInTheDocument();
+			expect(screen.getByText("Select Image")).toBeInTheDocument();
 			expect(screen.getByText("Map Positions")).toBeInTheDocument();
 			expect(screen.getByText("Save")).toBeInTheDocument();
+		});
+	});
+
+	it("Step 3 renders image tiles after upload and clicking a tile advances to Step 4", async () => {
+		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
+
+		renderPage();
+
+		// Step 1 — select drawing type
+		await waitFor(() => screen.getByText("Select Type"));
+		const select = screen.getByRole("combobox", { name: /drawing type/i });
+		await userEvent.click(select);
+		const option = await screen.findByRole("option", { name: "composite" });
+		await userEvent.click(option);
+		await userEvent.click(screen.getByRole("button", { name: /next/i }));
+
+		// Step 2 — upload
+		await waitFor(() =>
+			screen.getByRole("textbox", { name: /component name/i }),
+		);
+		await userEvent.type(
+			screen.getByRole("textbox", { name: /component name/i }),
+			"Pump Assembly",
+		);
+
+		const file = new File(["<svg/>"], "test.svg", { type: "image/svg+xml" });
+		const fileInput =
+			document.querySelector<HTMLInputElement>('input[type="file"]');
+		fireEvent.change(fileInput as HTMLInputElement, {
+			target: { files: [file] },
+		});
+
+		await waitFor(() =>
+			expect(
+				screen.getByRole("button", { name: /^upload$/i }),
+			).not.toBeDisabled(),
+		);
+		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+
+		// Step 3 — select image: should show an image tile
+		await waitFor(() => {
+			expect(
+				screen.getByRole("heading", { name: "Select Image" }),
+			).toBeInTheDocument();
+			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
+		});
+
+		// Click the tile to advance to Step 4
+		await userEvent.click(screen.getByText("Cooling System Assembly"));
+
+		await waitFor(() => {
+			expect(screen.getByText("Map Fitting Positions")).toBeInTheDocument();
+			expect(screen.getByTestId("diagram-canvas")).toBeInTheDocument();
+			expect(
+				screen.getByRole("tab", { name: "unmapped tab" }),
+			).toBeInTheDocument();
+			expect(
+				screen.getByRole("tab", { name: "mapped tab" }),
+			).toBeInTheDocument();
 		});
 	});
 

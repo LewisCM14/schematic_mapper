@@ -1,11 +1,10 @@
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import PlaceIcon from "@mui/icons-material/Place";
 import {
 	Alert,
 	Box,
 	Button,
 	CircularProgress,
-	IconButton,
+	Grid,
 	LinearProgress,
 	MenuItem,
 	Paper,
@@ -13,11 +12,15 @@ import {
 	Step,
 	StepLabel,
 	Stepper,
+	Tab,
+	Tabs,
 	TextField,
-	Tooltip,
 	Typography,
 } from "@mui/material";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import ImageTileCard from "../components/molecules/ImageTileCard";
+import type { CanvasMarker } from "../components/organisms/DiagramCanvasViewport";
+import DiagramCanvasViewport from "../components/organisms/DiagramCanvasViewport";
 import TopAppHeader from "../components/TopAppHeader";
 import type { BulkFittingPositionItem } from "../services/api/endpoints";
 import {
@@ -27,13 +30,13 @@ import {
 	useSaveBulkFittingPositions,
 	useUploadChunk,
 } from "../services/api/hooks/useAdminUpload";
-import { useImages } from "../services/api/hooks/useImages";
+import { useImage, useImages } from "../services/api/hooks/useImages";
 import type { DrawingType } from "../services/api/schemas";
 
 const STEPS = [
 	"Select Type",
 	"Upload Image",
-	"Confirm Upload",
+	"Select Image",
 	"Map Positions",
 	"Save",
 ];
@@ -95,8 +98,14 @@ function AdminPage() {
 	const completeUploadMut = useCompleteUpload();
 	const abortUploadMut = useAbortUpload();
 
-	// Step 3 — completed upload image_id
+	// Step 3 — select uploaded image
 	const [completedImageId, setCompletedImageId] = useState<string | null>(null);
+	const { data: selectableImagesData, isLoading: selectableImagesLoading } =
+		useImages(
+			typeof selectedDrawingTypeId === "number"
+				? selectedDrawingTypeId
+				: undefined,
+		);
 
 	// Step 4 — mapping
 	const [mappedPositions, setMappedPositions] = useState<MappedPos[]>([]);
@@ -104,7 +113,8 @@ function AdminPage() {
 		null,
 	);
 	const [editingLabel, setEditingLabel] = useState("");
-	const canvasRef = useRef<HTMLDivElement | null>(null);
+	const [mappingTab, setMappingTab] = useState(0); // 0 = Unmapped, 1 = Mapped
+	const { data: selectedImage } = useImage(completedImageId ?? "");
 
 	// Step 5 — save
 	const saveBulk = useSaveBulkFittingPositions();
@@ -183,15 +193,6 @@ function AdminPage() {
 		setUploadProgress(0);
 		setUploadError(null);
 		setFile(null);
-	}
-
-	function handleCanvasClick(e: React.MouseEvent<HTMLDivElement>) {
-		if (!canvasRef.current) return;
-		const rect = canvasRef.current.getBoundingClientRect();
-		const x = Math.round(e.clientX - rect.left);
-		const y = Math.round(e.clientY - rect.top);
-		setPendingPos({ x, y });
-		setEditingLabel("");
 	}
 
 	function confirmMarker() {
@@ -377,21 +378,60 @@ function AdminPage() {
 					</Paper>
 				)}
 
-				{/* ── Step 3: Confirm ── */}
+				{/* ── Step 3: Select image ── */}
 				{activeStep === 2 && (
 					<Paper sx={{ p: 3 }}>
-						<Alert severity="success" sx={{ mb: 2 }}>
-							Upload complete.
-						</Alert>
-						<Typography variant="body2">
-							Image ID: <code>{completedImageId}</code>
+						{completedImageId && (
+							<Alert severity="success" sx={{ mb: 2 }}>
+								Upload complete — select an image to map.
+							</Alert>
+						)}
+						<Typography variant="h6" gutterBottom>
+							Select Image
 						</Typography>
-						<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+						<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+							Choose an image from the available schematics for this drawing
+							type.
+						</Typography>
+
+						{selectableImagesLoading && (
+							<Box
+								sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}
+							>
+								<CircularProgress size={28} />
+							</Box>
+						)}
+
+						{(() => {
+							const selectableImages =
+								selectableImagesData?.pages.flatMap((p) => p.results) ?? [];
+							if (!selectableImagesLoading && selectableImages.length === 0) {
+								return (
+									<Typography color="text.secondary">
+										No images available for this drawing type.
+									</Typography>
+								);
+							}
+							return (
+								<Grid container spacing={2}>
+									{selectableImages.map((img) => (
+										<Grid key={img.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
+											<ImageTileCard
+												image={img}
+												onClick={(imageId) => {
+													setCompletedImageId(imageId);
+													setActiveStep(3);
+												}}
+											/>
+										</Grid>
+									))}
+								</Grid>
+							);
+						})()}
+
+						<Box sx={{ mt: 2 }}>
 							<Button variant="outlined" onClick={() => setActiveStep(1)}>
 								Back
-							</Button>
-							<Button variant="contained" onClick={() => setActiveStep(3)}>
-								Map Fitting Positions
 							</Button>
 						</Box>
 					</Paper>
@@ -409,121 +449,143 @@ function AdminPage() {
 						</Typography>
 
 						<Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-							{/* Canvas area */}
+							{/* LHS tabs for Unmapped / Mapped */}
 							<Box
-								ref={canvasRef}
-								onClick={handleCanvasClick}
 								sx={{
-									position: "relative",
-									width: 600,
-									height: 400,
-									border: "1px dashed",
+									width: 260,
+									flexShrink: 0,
+									border: "1px solid",
 									borderColor: "divider",
 									borderRadius: 1,
-									cursor: "crosshair",
-									flexShrink: 0,
-									bgcolor: "grey.50",
+									overflow: "hidden",
 								}}
-								role="button"
-								aria-label="mapping canvas"
 							>
-								{mappedPositions.map((pos) => (
-									<Tooltip key={pos.id} title={pos.label} arrow>
-										<IconButton
-											size="small"
-											sx={{
-												position: "absolute",
-												left: pos.x,
-												top: pos.y,
-												transform: "translate(-50%, -100%)",
-												color: "success.main",
-												padding: 0,
-												pointerEvents: "none",
-											}}
-										>
-											<PlaceIcon fontSize="medium" />
-										</IconButton>
-									</Tooltip>
-								))}
-
-								{pendingPos && (
-									<IconButton
-										size="small"
-										sx={{
-											position: "absolute",
-											left: pendingPos.x,
-											top: pendingPos.y,
-											transform: "translate(-50%, -100%)",
-											color: "warning.main",
-											padding: 0,
-											pointerEvents: "none",
-										}}
-									>
-										<PlaceIcon fontSize="medium" />
-									</IconButton>
-								)}
-							</Box>
-
-							{/* Label entry */}
-							<Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-								{pendingPos ? (
-									<>
-										<Typography variant="body2">
-											New marker at ({pendingPos.x}, {pendingPos.y})
-										</Typography>
-										<TextField
-											label="Label (fitting position ID)"
-											size="small"
-											value={editingLabel}
-											onChange={(e) => setEditingLabel(e.target.value)}
-											onKeyDown={(e) => {
-												if (e.key === "Enter") confirmMarker();
-												if (e.key === "Escape") {
-													setPendingPos(null);
-													setEditingLabel("");
-												}
-											}}
-											autoFocus
-											inputProps={{ "aria-label": "marker label" }}
-										/>
-										<Box sx={{ display: "flex", gap: 1 }}>
-											<Button
-												variant="contained"
-												size="small"
-												onClick={confirmMarker}
-												disabled={!editingLabel.trim()}
-											>
-												Confirm
-											</Button>
-											<Button
-												size="small"
-												onClick={() => {
-													setPendingPos(null);
-													setEditingLabel("");
+								<Tabs
+									value={mappingTab}
+									onChange={(_e, v: number) => setMappingTab(v)}
+									variant="fullWidth"
+								>
+									<Tab label="Unmapped" aria-label="unmapped tab" />
+									<Tab label="Mapped" aria-label="mapped tab" />
+								</Tabs>
+								<Box sx={{ p: 1.5, maxHeight: 400, overflow: "auto" }}>
+									{mappingTab === 0 &&
+										(pendingPos ? (
+											<Box
+												sx={{
+													display: "flex",
+													flexDirection: "column",
+													gap: 1,
 												}}
 											>
-												Cancel
-											</Button>
-										</Box>
-									</>
-								) : (
-									<Typography variant="body2" color="text.secondary">
-										{mappedPositions.length === 0
-											? "Click the canvas to place the first marker."
-											: `${mappedPositions.length} marker(s) placed.`}
-									</Typography>
-								)}
-
-								{mappedPositions.length > 0 && (
-									<Box sx={{ mt: 1 }}>
-										{mappedPositions.map((p) => (
-											<Typography key={p.id} variant="caption" display="block">
-												{p.label} — ({p.x}, {p.y})
+												<Typography variant="body2">
+													New marker at ({pendingPos.x}, {pendingPos.y})
+												</Typography>
+												<TextField
+													label="Label (fitting position ID)"
+													size="small"
+													value={editingLabel}
+													onChange={(e) => setEditingLabel(e.target.value)}
+													onKeyDown={(e) => {
+														if (e.key === "Enter") confirmMarker();
+														if (e.key === "Escape") {
+															setPendingPos(null);
+															setEditingLabel("");
+														}
+													}}
+													autoFocus
+													inputProps={{ "aria-label": "marker label" }}
+												/>
+												<Box sx={{ display: "flex", gap: 1 }}>
+													<Button
+														variant="contained"
+														size="small"
+														onClick={confirmMarker}
+														disabled={!editingLabel.trim()}
+													>
+														Confirm
+													</Button>
+													<Button
+														size="small"
+														onClick={() => {
+															setPendingPos(null);
+															setEditingLabel("");
+														}}
+													>
+														Cancel
+													</Button>
+												</Box>
+											</Box>
+										) : (
+											<Typography variant="body2" color="text.secondary">
+												{mappedPositions.length === 0
+													? "Click the canvas to place the first marker."
+													: "Click the canvas to add another marker."}
 											</Typography>
 										))}
-									</Box>
-								)}
+									{mappingTab === 1 &&
+										(mappedPositions.length === 0 ? (
+											<Typography variant="body2" color="text.secondary">
+												No markers placed yet.
+											</Typography>
+										) : (
+											mappedPositions.map((p) => (
+												<Typography
+													key={p.id}
+													variant="caption"
+													display="block"
+													sx={{ py: 0.5 }}
+												>
+													{p.label} — ({p.x}, {p.y})
+												</Typography>
+											))
+										))}
+								</Box>
 							</Box>
+
+							{/* Canvas area */}
+							{selectedImage ? (
+								<Box sx={{ flexGrow: 1, minWidth: 400 }}>
+									<DiagramCanvasViewport
+										imageSvgUrl={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(selectedImage.image_svg)}`}
+										markers={mappedPositions.map<CanvasMarker>((p) => ({
+											id: p.id,
+											x: p.x,
+											y: p.y,
+											status: "unmapped",
+										}))}
+										onCanvasClick={(x, y) => {
+											setPendingPos({ x, y });
+											setEditingLabel("");
+											setMappingTab(0); // switch to Unmapped tab
+										}}
+										onMarkerDrag={(id, x, y) => {
+											setMappedPositions((prev) =>
+												prev.map((p) => (p.id === id ? { ...p, x, y } : p)),
+											);
+										}}
+									/>
+								</Box>
+							) : (
+								<Box
+									sx={{
+										flexGrow: 1,
+										minWidth: 400,
+										height: 400,
+										display: "flex",
+										justifyContent: "center",
+										alignItems: "center",
+										border: "1px dashed",
+										borderColor: "divider",
+										borderRadius: 1,
+										bgcolor: "grey.50",
+									}}
+									role="button"
+									aria-label="mapping canvas"
+								>
+									<CircularProgress size={28} />
+								</Box>
+							)}
 						</Box>
 
 						<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
