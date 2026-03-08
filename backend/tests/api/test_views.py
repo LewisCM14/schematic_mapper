@@ -410,6 +410,32 @@ class TestUploadChunkView:
         )
         assert response.status_code == 400
 
+    def test_chunk_retry_updates_without_creating_duplicate(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        from api.models import UploadChunk
+
+        session = self._create_session(drawing_type)
+        chunk_b64_first = base64.b64encode(b"hello!").decode()
+        chunk_b64_second = base64.b64encode(b"world!").decode()
+        # First PUT
+        client.put(
+            f"/api/admin/uploads/{session.upload_id}/parts/1",
+            data=json.dumps({"chunk_data": chunk_b64_first}),
+            content_type="application/json",
+        )
+        # Retry same part_number with different data
+        client.put(
+            f"/api/admin/uploads/{session.upload_id}/parts/1",
+            data=json.dumps({"chunk_data": chunk_b64_second}),
+            content_type="application/json",
+        )
+        # Must still be exactly one chunk row
+        assert UploadChunk.objects.filter(upload=session).count() == 1
+        # Data must reflect the latest retry
+        chunk = UploadChunk.objects.get(upload=session, part_number=1)
+        assert bytes(chunk.data) == b"world!"
+
 
 @pytest.mark.django_db
 class TestCompleteUploadView:
@@ -468,6 +494,8 @@ class TestCompleteUploadView:
         )
         assert response.status_code == 422
         assert response.json()["code"] == "checksum_mismatch"
+        session.refresh_from_db()
+        assert session.state == "failed"
 
     def test_idempotent_returns_200_if_already_completed(
         self, client: Client, drawing_type: DrawingType, image: Image
@@ -522,6 +550,29 @@ class TestAbortUploadView:
         )
         response = client.delete(f"/api/admin/uploads/{session.upload_id}")
         assert response.status_code == 409
+
+    def test_aborted_upload_cannot_be_finalized(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        session = ImageUpload.objects.create(
+            drawing_type=drawing_type,
+            component_name="X",
+            file_name="x.svg",
+            file_size=6,
+            expected_checksum="a" * 64,
+            idempotency_key=str(uuid.uuid4()),
+            state="uploading",
+        )
+        # Abort the upload
+        abort_response = client.delete(f"/api/admin/uploads/{session.upload_id}")
+        assert abort_response.status_code == 204
+        # Attempt to finalize — must be rejected
+        complete_response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert complete_response.status_code == 409
 
 
 # ── Admin bulk fitting positions ──────────────────────────────────────────────

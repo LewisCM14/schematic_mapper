@@ -36,14 +36,38 @@ describe("SearchResultItem", () => {
 		expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
 	});
 
-	it("renders the match type badge", () => {
+	it("renders exact match as a success-colored chip", () => {
 		renderItem();
-		expect(screen.getByText("exact")).toBeInTheDocument();
+		const chip = screen.getByText("exact").closest(".MuiChip-root");
+		expect(chip).toHaveClass("MuiChip-colorSuccess");
 	});
 
-	it("renders the matched source badge", () => {
+	it("renders prefix match as an info-colored chip", () => {
+		const result = { ...RESULT, match_type: "prefix" as const };
+		render(
+			<ThemeProvider theme={theme}>
+				<SearchResultItemComponent result={result} onSelect={vi.fn()} />
+			</ThemeProvider>,
+		);
+		const chip = screen.getByText("prefix").closest(".MuiChip-root");
+		expect(chip).toHaveClass("MuiChip-colorInfo");
+	});
+
+	it("renders partial match as a default chip (no color class override)", () => {
+		const result = { ...RESULT, match_type: "partial" as const };
+		render(
+			<ThemeProvider theme={theme}>
+				<SearchResultItemComponent result={result} onSelect={vi.fn()} />
+			</ThemeProvider>,
+		);
+		const chip = screen.getByText("partial").closest(".MuiChip-root");
+		expect(chip).not.toHaveClass("MuiChip-colorSuccess");
+		expect(chip).not.toHaveClass("MuiChip-colorInfo");
+	});
+
+	it("renders matched_source with 'via ' prefix", () => {
 		renderItem();
-		expect(screen.getByText("internal")).toBeInTheDocument();
+		expect(screen.getByText("via internal")).toBeInTheDocument();
 	});
 
 	it("calls onSelect with result on click", async () => {

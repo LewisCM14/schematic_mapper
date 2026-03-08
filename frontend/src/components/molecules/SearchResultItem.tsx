@@ -1,6 +1,11 @@
-import { Box, ListItemButton, ListItemText, Typography } from "@mui/material";
+import {
+	Box,
+	Chip,
+	ListItemButton,
+	ListItemText,
+	Typography,
+} from "@mui/material";
 import type { SearchResultItem } from "../../services/api/schemas";
-import TypeBadge from "../atoms/TypeBadge";
 
 interface SearchResultItemProps {
 	result: SearchResultItem;
@@ -29,8 +34,24 @@ function SearchResultItemComponent({
 						>
 							{result.component_name}
 						</Typography>
-						<TypeBadge drawingType={result.match_type} />
-						<TypeBadge drawingType={result.matched_source} />
+						<Chip
+							label={result.match_type}
+							size="small"
+							color={
+								result.match_type === "exact"
+									? "success"
+									: result.match_type === "prefix"
+										? "info"
+										: "default"
+							}
+						/>
+						<Typography
+							component="span"
+							variant="caption"
+							color="text.secondary"
+						>
+							via {result.matched_source}
+						</Typography>
 					</Box>
 				}
 			/>
