@@ -1,7 +1,10 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PlaceIcon from "@mui/icons-material/Place";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
 	Alert,
 	Box,
@@ -19,6 +22,7 @@ import {
 	Tooltip,
 	Typography,
 } from "@mui/material";
+import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useFittingPositionDetails } from "../services/api/hooks/useFittingPositionDetails";
@@ -145,7 +149,7 @@ function SearchPanel({
 	onSelectFp,
 }: {
 	imageId: string;
-	onSelectFp: (fittingPositionId: string) => void;
+	onSelectFp: (fittingPositionId: string, x: number, y: number) => void;
 }) {
 	const [query, setQuery] = useState("");
 	const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -241,7 +245,13 @@ function SearchPanel({
 					{allResults.map((item) => (
 						<ListItemButton
 							key={item.fitting_position_id}
-							onClick={() => onSelectFp(item.fitting_position_id)}
+							onClick={() =>
+								onSelectFp(
+									item.fitting_position_id,
+									item.x_coordinate,
+									item.y_coordinate,
+								)
+							}
 						>
 							<ListItemText
 								primary={item.label_text}
@@ -304,6 +314,10 @@ function ImageViewerPage() {
 	const [selectedFpId, setSelectedFpId] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState(0);
 
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [panZoomHost, setPanZoomHost] = useState<HTMLDivElement | null>(null);
+	const panzoomRef = useRef<PanzoomObject | null>(null);
+
 	const { data: image, isLoading, isError } = useImage(imageId ?? "");
 	const { data: positions } = useFittingPositions(imageId ?? "");
 
@@ -311,6 +325,33 @@ function ImageViewerPage() {
 		setSelectedFpId(fittingPositionId);
 		setActiveTab(0);
 	}, []);
+
+	const panToMarker = useCallback((x: number, y: number) => {
+		const pz = panzoomRef.current;
+		const container = containerRef.current;
+		if (!pz || !container) return;
+		const scale = pz.getScale();
+		const panX = container.clientWidth / 2 - x * scale;
+		const panY = container.clientHeight / 2 - y * scale;
+		pz.pan(panX, panY);
+	}, []);
+
+	useEffect(() => {
+		if (!panZoomHost) return;
+		const pz = Panzoom(panZoomHost, {
+			contain: "outside",
+			minScale: 0.5,
+			maxScale: 10,
+		});
+		panzoomRef.current = pz;
+		const container = containerRef.current;
+		container?.addEventListener("wheel", pz.zoomWithWheel);
+		return () => {
+			pz.destroy();
+			container?.removeEventListener("wheel", pz.zoomWithWheel);
+			panzoomRef.current = null;
+		};
+	}, [panZoomHost]);
 
 	useEffect(() => {
 		if (!imageId) {
@@ -361,9 +402,10 @@ function ImageViewerPage() {
 				{activeTab === 1 && (
 					<SearchPanel
 						imageId={imageId}
-						onSelectFp={(fpId) => {
+						onSelectFp={(fpId, x, y) => {
 							setSelectedFpId(fpId);
 							setActiveTab(0);
+							panToMarker(x, y);
 						}}
 					/>
 				)}
@@ -395,51 +437,111 @@ function ImageViewerPage() {
 
 				{image && (
 					<Box
+						ref={containerRef}
 						sx={{
 							position: "relative",
-							display: "inline-block",
+							overflow: "hidden",
 							border: "1px solid",
 							borderColor: "divider",
 							borderRadius: 1,
-							overflow: "hidden",
+							width: "100%",
+							height: "70vh",
+							background: "#EEF3F8",
 						}}
 					>
-						{/* SVG schematic */}
+						{/* Zoom controls overlay */}
 						<Box
-							component="img"
-							src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.image_svg)}`}
-							alt={image.component_name}
-							sx={{ display: "block" }}
-						/>
-
-						{/* POI marker pins */}
-						{positions?.map((pos) => {
-							const isSelected = pos.fitting_position_id === selectedFpId;
-							return (
-								<Tooltip
-									key={pos.fitting_position_id}
-									title={pos.label_text}
-									arrow
+							sx={{
+								position: "absolute",
+								top: 8,
+								right: 8,
+								zIndex: 10,
+								display: "flex",
+								flexDirection: "column",
+								gap: 0.5,
+								background: "rgba(255,255,255,0.85)",
+								borderRadius: 1,
+								p: 0.5,
+							}}
+						>
+							<Tooltip title="Zoom in">
+								<IconButton
+									size="small"
+									onClick={() => panzoomRef.current?.zoomIn()}
+									aria-label="zoom in"
 								>
-									<IconButton
-										size="small"
-										onClick={() => handleMarkerClick(pos.fitting_position_id)}
-										sx={{
-											position: "absolute",
-											left: pos.x_coordinate,
-											top: pos.y_coordinate,
-											transform: "translate(-50%, -100%)",
-											color: isSelected ? "error.main" : "primary.main",
-											padding: 0,
-											"&:hover": { color: "primary.dark" },
-										}}
-										aria-label={pos.label_text}
+									<ZoomInIcon fontSize="small" />
+								</IconButton>
+							</Tooltip>
+							<Tooltip title="Zoom out">
+								<IconButton
+									size="small"
+									onClick={() => panzoomRef.current?.zoomOut()}
+									aria-label="zoom out"
+								>
+									<ZoomOutIcon fontSize="small" />
+								</IconButton>
+							</Tooltip>
+							<Tooltip title="Reset view">
+								<IconButton
+									size="small"
+									onClick={() => panzoomRef.current?.reset()}
+									aria-label="reset view"
+								>
+									<RestartAltIcon fontSize="small" />
+								</IconButton>
+							</Tooltip>
+						</Box>
+
+						{/* Panzoom host — wraps SVG image and POI markers together */}
+						<Box
+							ref={setPanZoomHost}
+							sx={{
+								position: "relative",
+								display: "inline-block",
+								cursor: "grab",
+								"&:active": { cursor: "grabbing" },
+								userSelect: "none",
+							}}
+						>
+							{/* SVG schematic */}
+							<Box
+								component="img"
+								src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(image.image_svg)}`}
+								alt={image.component_name}
+								sx={{ display: "block" }}
+								draggable={false}
+							/>
+
+							{/* POI marker pins */}
+							{positions?.map((pos) => {
+								const isSelected = pos.fitting_position_id === selectedFpId;
+								return (
+									<Tooltip
+										key={pos.fitting_position_id}
+										title={pos.label_text}
+										arrow
 									>
-										<PlaceIcon fontSize="medium" />
-									</IconButton>
-								</Tooltip>
-							);
-						})}
+										<IconButton
+											size="small"
+											onClick={() => handleMarkerClick(pos.fitting_position_id)}
+											sx={{
+												position: "absolute",
+												left: pos.x_coordinate,
+												top: pos.y_coordinate,
+												transform: "translate(-50%, -100%)",
+												color: isSelected ? "error.main" : "primary.main",
+												padding: 0,
+												"&:hover": { color: "primary.dark" },
+											}}
+											aria-label={pos.label_text}
+										>
+											<PlaceIcon fontSize="medium" />
+										</IconButton>
+									</Tooltip>
+								);
+							})}
+						</Box>
 					</Box>
 				)}
 			</Box>
