@@ -2,7 +2,7 @@ from typing import Any
 
 from rest_framework import serializers
 
-from .models import DrawingType, FittingPosition, Image
+from .models import DrawingType, FittingPosition, Image, ImageUpload
 
 
 class DrawingTypeSerializer(serializers.ModelSerializer[DrawingType]):
@@ -72,3 +72,70 @@ class FittingPositionDetailSerializer(serializers.Serializer[Any]):
     y_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
     asset = AssetInfoSerializer(allow_null=True)
     source_status = serializers.DictField(child=serializers.CharField())
+
+
+# ── Admin upload ──────────────────────────────────────────────────────────────
+
+
+class UploadSessionCreateSerializer(serializers.Serializer[Any]):
+    drawing_type_id = serializers.IntegerField()
+    component_name = serializers.CharField(max_length=200)
+    file_name = serializers.CharField(max_length=255)
+    file_size = serializers.IntegerField(min_value=1)
+    expected_checksum = serializers.CharField(max_length=64)
+    idempotency_key = serializers.CharField(max_length=128)
+
+
+class UploadChunkSerializer(serializers.Serializer[Any]):
+    chunk_data = serializers.CharField()  # base64-encoded chunk bytes
+
+
+class UploadCompleteSerializer(serializers.Serializer[Any]):
+    idempotency_key = serializers.CharField(max_length=128)
+
+
+class UploadSessionSerializer(serializers.ModelSerializer[ImageUpload]):
+    class Meta:
+        model = ImageUpload
+        fields = ["upload_id", "state", "file_name", "error_message"]
+
+
+# ── Admin bulk fitting positions ──────────────────────────────────────────────
+
+
+class BulkFittingPositionItemSerializer(serializers.Serializer[Any]):
+    fitting_position_id = serializers.CharField(max_length=64)
+    label_text = serializers.CharField(max_length=100)
+    x_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    y_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+
+
+class BulkFittingPositionSerializer(serializers.Serializer[Any]):
+    image_id = serializers.UUIDField()
+    fitting_positions = BulkFittingPositionItemSerializer(many=True)
+
+
+# ── Search ────────────────────────────────────────────────────────────────────
+
+
+class SearchResultSerializer(serializers.Serializer[Any]):
+    fitting_position_id = serializers.CharField()
+    label_text = serializers.CharField()
+    image_id = serializers.UUIDField()
+    x_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    y_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    component_name = serializers.CharField()
+    matched_source = serializers.CharField()
+    matched_field = serializers.CharField()
+    match_type = serializers.CharField()
+
+
+class SearchResponseSerializer(serializers.Serializer[Any]):
+    query = serializers.CharField()
+    image_id = serializers.UUIDField()
+    limit = serializers.IntegerField()
+    results = SearchResultSerializer(many=True)
+    source_status = serializers.DictField(child=serializers.CharField())
+    has_more = serializers.BooleanField()
+    next_cursor = serializers.CharField(allow_null=True)
+    request_id = serializers.CharField()

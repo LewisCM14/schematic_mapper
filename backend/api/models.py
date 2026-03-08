@@ -2,6 +2,22 @@ import uuid
 
 from django.db import models
 
+UPLOAD_STATE_INITIATED = "initiated"
+UPLOAD_STATE_UPLOADING = "uploading"
+UPLOAD_STATE_VERIFYING = "verifying"
+UPLOAD_STATE_COMPLETED = "completed"
+UPLOAD_STATE_FAILED = "failed"
+UPLOAD_STATE_ABORTED = "aborted"
+
+UPLOAD_STATES = [
+    (UPLOAD_STATE_INITIATED, "Initiated"),
+    (UPLOAD_STATE_UPLOADING, "Uploading"),
+    (UPLOAD_STATE_VERIFYING, "Verifying"),
+    (UPLOAD_STATE_COMPLETED, "Completed"),
+    (UPLOAD_STATE_FAILED, "Failed"),
+    (UPLOAD_STATE_ABORTED, "Aborted"),
+]
+
 
 class DrawingType(models.Model):
     drawing_type_id = models.AutoField(primary_key=True)
@@ -58,3 +74,54 @@ class FittingPosition(models.Model):
 
     def __str__(self) -> str:
         return str(self.label_text)
+
+
+class ImageUpload(models.Model):
+    upload_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    drawing_type = models.ForeignKey(
+        DrawingType, on_delete=models.PROTECT, related_name="uploads"
+    )
+    component_name = models.CharField(max_length=200)
+    file_name = models.CharField(max_length=255)
+    file_size = models.BigIntegerField()
+    expected_checksum = models.CharField(max_length=64)
+    idempotency_key = models.CharField(max_length=128, unique=True)
+    state = models.CharField(
+        max_length=20, choices=UPLOAD_STATES, default=UPLOAD_STATE_INITIATED
+    )
+    image = models.OneToOneField(
+        Image,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="upload_session",
+    )
+    error_message = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "image_uploads"
+
+    def __str__(self) -> str:
+        return f"{self.file_name} ({self.state})"
+
+
+class UploadChunk(models.Model):
+    upload = models.ForeignKey(
+        ImageUpload, on_delete=models.CASCADE, related_name="chunks"
+    )
+    part_number = models.PositiveIntegerField()
+    data = models.BinaryField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "upload_chunks"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["upload", "part_number"], name="uq_upload_part"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Part {self.part_number} of {self.upload_id}"

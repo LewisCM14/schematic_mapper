@@ -1,23 +1,30 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PlaceIcon from "@mui/icons-material/Place";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
 	Alert,
 	Box,
+	Chip,
 	CircularProgress,
 	Divider,
 	Drawer,
 	IconButton,
+	List,
+	ListItemButton,
+	ListItemText,
 	Tab,
 	Tabs,
+	TextField,
 	Tooltip,
 	Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useFittingPositionDetails } from "../services/api/hooks/useFittingPositionDetails";
 import { useFittingPositions } from "../services/api/hooks/useFittingPositions";
 import { useImage } from "../services/api/hooks/useImages";
+import { useSearch } from "../services/api/hooks/useSearch";
 
 const DRAWER_WIDTH = 320;
 
@@ -133,6 +140,163 @@ function InfoPanel({
 	);
 }
 
+function SearchPanel({
+	imageId,
+	onSelectFp,
+}: {
+	imageId: string;
+	onSelectFp: (fittingPositionId: string) => void;
+}) {
+	const [query, setQuery] = useState("");
+	const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+	const {
+		data,
+		isLoading,
+		isFetchingNextPage,
+		hasNextPage,
+		fetchNextPage,
+		isError,
+	} = useSearch(imageId, query);
+
+	// Infinite scroll: observe sentinel element
+	useEffect(() => {
+		const el = sentinelRef.current;
+		if (!el || !hasNextPage) return;
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting && !isFetchingNextPage) {
+					fetchNextPage();
+				}
+			},
+			{ threshold: 0.1 },
+		);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+	const allResults = data?.pages.flatMap((p) => p.results) ?? [];
+	const isDegraded = data?.pages[0]?.source_status.asset === "degraded";
+
+	return (
+		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+			<Box sx={{ p: 1.5 }}>
+				<TextField
+					fullWidth
+					size="small"
+					label="Search fitting positions"
+					value={query}
+					onChange={(e) => setQuery(e.target.value)}
+					inputProps={{ "aria-label": "search query" }}
+				/>
+			</Box>
+
+			{isDegraded && (
+				<Alert
+					severity="warning"
+					icon={<WarningAmberIcon fontSize="small" />}
+					sx={{ mx: 1.5, mb: 1 }}
+				>
+					Asset source unavailable — results may be incomplete.
+				</Alert>
+			)}
+
+			{isError && (
+				<Alert severity="error" sx={{ mx: 1.5, mb: 1 }}>
+					Search failed.
+				</Alert>
+			)}
+
+			{query.length > 0 && query.length < 2 && (
+				<Typography
+					variant="caption"
+					color="text.secondary"
+					sx={{ px: 2, py: 1 }}
+				>
+					Enter at least 2 characters to search.
+				</Typography>
+			)}
+
+			{isLoading && query.length >= 2 && (
+				<Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+					<CircularProgress size={24} />
+				</Box>
+			)}
+
+			{!isLoading &&
+				query.length >= 2 &&
+				allResults.length === 0 &&
+				!isError && (
+					<Typography
+						variant="body2"
+						color="text.secondary"
+						sx={{ px: 2, py: 1 }}
+					>
+						No results found.
+					</Typography>
+				)}
+
+			<Box sx={{ overflow: "auto", flexGrow: 1 }}>
+				<List dense disablePadding>
+					{allResults.map((item) => (
+						<ListItemButton
+							key={item.fitting_position_id}
+							onClick={() => onSelectFp(item.fitting_position_id)}
+						>
+							<ListItemText
+								primary={item.label_text}
+								secondaryTypographyProps={{ component: "span" }}
+								secondary={
+									<Box
+										component="span"
+										sx={{
+											display: "flex",
+											gap: 0.5,
+											flexWrap: "wrap",
+											mt: 0.5,
+										}}
+									>
+										<Typography
+											component="span"
+											variant="caption"
+											color="text.secondary"
+											sx={{ display: "block", width: "100%" }}
+										>
+											{item.component_name}
+										</Typography>
+										<Chip
+											label={item.match_type}
+											size="small"
+											variant="outlined"
+											sx={{ height: 18, fontSize: "0.65rem" }}
+										/>
+										<Chip
+											label={item.matched_source}
+											size="small"
+											color="primary"
+											variant="outlined"
+											sx={{ height: 18, fontSize: "0.65rem" }}
+										/>
+									</Box>
+								}
+							/>
+						</ListItemButton>
+					))}
+				</List>
+
+				{/* Sentinel for infinite scroll */}
+				<div ref={sentinelRef} />
+
+				{isFetchingNextPage && (
+					<Box sx={{ display: "flex", justifyContent: "center", py: 1 }}>
+						<CircularProgress size={20} />
+					</Box>
+				)}
+			</Box>
+		</Box>
+	);
+}
+
 function ImageViewerPage() {
 	const { imageId } = useParams<{ imageId: string }>();
 	const navigate = useNavigate();
@@ -143,6 +307,11 @@ function ImageViewerPage() {
 	const { data: image, isLoading, isError } = useImage(imageId ?? "");
 	const { data: positions } = useFittingPositions(imageId ?? "");
 
+	const handleMarkerClick = useCallback((fittingPositionId: string) => {
+		setSelectedFpId(fittingPositionId);
+		setActiveTab(0);
+	}, []);
+
 	useEffect(() => {
 		if (!imageId) {
 			navigate("/", { replace: true });
@@ -150,11 +319,6 @@ function ImageViewerPage() {
 	}, [imageId, navigate]);
 
 	if (!imageId) return null;
-
-	const handleMarkerClick = (fittingPositionId: string) => {
-		setSelectedFpId(fittingPositionId);
-		setActiveTab(0);
-	};
 
 	return (
 		<Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
@@ -185,9 +349,24 @@ function ImageViewerPage() {
 							label="Information"
 							aria-label="information tab"
 						/>
+						<Tab
+							icon={<SearchOutlinedIcon fontSize="small" />}
+							iconPosition="start"
+							label="Search"
+							aria-label="search tab"
+						/>
 					</Tabs>
 				</Box>
 				{activeTab === 0 && <InfoPanel fittingPositionId={selectedFpId} />}
+				{activeTab === 1 && (
+					<SearchPanel
+						imageId={imageId}
+						onSelectFp={(fpId) => {
+							setSelectedFpId(fpId);
+							setActiveTab(0);
+						}}
+					/>
+				)}
 			</Drawer>
 
 			{/* Main canvas area */}

@@ -197,4 +197,116 @@ describe("ImageViewerPage", () => {
 			).toBeInTheDocument();
 		});
 	});
+
+	it("renders the Search tab", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
+		renderPage();
+		await waitFor(() => {
+			expect(screen.getByRole("tab", { name: /search/i })).toBeInTheDocument();
+		});
+	});
+
+	it("shows min-chars hint when query is 1 char", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
+		renderPage();
+
+		const searchTab = await screen.findByRole("tab", { name: /search/i });
+		await userEvent.click(searchTab);
+
+		const input = screen.getByRole("textbox", { name: /search query/i });
+		await userEvent.type(input, "p");
+
+		await waitFor(() => {
+			expect(
+				screen.getByText("Enter at least 2 characters to search."),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("shows search results when query >= 2 chars", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
+		vi.spyOn(endpointsApi, "fetchSearch").mockResolvedValue({
+			query: "pump",
+			image_id: IMAGE_ID,
+			limit: 25,
+			results: [
+				{
+					fitting_position_id: "FP-001",
+					label_text: "PUMP-01",
+					image_id: IMAGE_ID,
+					x_coordinate: 100,
+					y_coordinate: 200,
+					component_name: "Cooling System",
+					matched_source: "internal",
+					matched_field: "label_text",
+					match_type: "prefix",
+				},
+			],
+			source_status: { internal: "ok", asset: "ok" },
+			has_more: false,
+			next_cursor: null,
+			request_id: "req-test-1",
+		});
+		renderPage();
+
+		const searchTab = await screen.findByRole("tab", { name: /search/i });
+		await userEvent.click(searchTab);
+
+		const input = screen.getByRole("textbox", { name: /search query/i });
+		await userEvent.type(input, "pump");
+
+		await waitFor(() => {
+			expect(screen.getByText("PUMP-01")).toBeInTheDocument();
+		});
+	});
+
+	it("clicking a search result switches to Information tab", async () => {
+		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
+		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
+		vi.spyOn(endpointsApi, "fetchSearch").mockResolvedValue({
+			query: "pump",
+			image_id: IMAGE_ID,
+			limit: 25,
+			results: [
+				{
+					fitting_position_id: "FP-001",
+					label_text: "PUMP-01",
+					image_id: IMAGE_ID,
+					x_coordinate: 100,
+					y_coordinate: 200,
+					component_name: "Cooling System",
+					matched_source: "internal",
+					matched_field: "label_text",
+					match_type: "exact",
+				},
+			],
+			source_status: { internal: "ok", asset: "ok" },
+			has_more: false,
+			next_cursor: null,
+			request_id: "req-test-2",
+		});
+		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue(
+			mockDetail,
+		);
+		renderPage();
+
+		const searchTab = await screen.findByRole("tab", { name: /search/i });
+		await userEvent.click(searchTab);
+		const input = screen.getByRole("textbox", { name: /search query/i });
+		await userEvent.type(input, "pump");
+
+		const resultItem = await screen.findByText("PUMP-01");
+		await userEvent.click(resultItem);
+
+		// Should now show the Information tab content
+		await waitFor(() => {
+			expect(screen.getByRole("tab", { name: /information/i })).toHaveAttribute(
+				"aria-selected",
+				"true",
+			);
+		});
+	});
 });

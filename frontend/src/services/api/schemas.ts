@@ -49,6 +49,51 @@ export const FittingPositionDetailSchema = z.object({
 	source_status: z.record(z.string(), z.string()),
 });
 
+// ── Search ────────────────────────────────────────────────────────────────────
+
+export const SearchResultItemSchema = z.object({
+	fitting_position_id: z.string(),
+	label_text: z.string(),
+	image_id: z.string().uuid(),
+	x_coordinate: z.coerce.number(),
+	y_coordinate: z.coerce.number(),
+	component_name: z.string(),
+	matched_source: z.string(),
+	matched_field: z.string(),
+	match_type: z.enum(["exact", "prefix", "partial"]),
+});
+
+export const SearchResponseSchema = z.object({
+	query: z.string(),
+	image_id: z.string().uuid(),
+	limit: z.number(),
+	results: z.array(SearchResultItemSchema),
+	source_status: z.record(z.string(), z.string()),
+	has_more: z.boolean(),
+	next_cursor: z.string().nullable(),
+	request_id: z.string(),
+});
+
+// ── Admin upload ──────────────────────────────────────────────────────────────
+
+export const UploadSessionSchema = z.object({
+	upload_id: z.string().uuid(),
+	state: z.string(),
+	file_name: z.string(),
+	error_message: z.string(),
+});
+
+export const UploadCompleteResultSchema = z.object({
+	upload_id: z.string().uuid(),
+	image_id: z.string().uuid(),
+	state: z.string(),
+});
+
+export const BulkFittingPositionsResultSchema = z.object({
+	created: z.number(),
+	updated: z.number(),
+});
+
 export const ImageListSchema = z.array(ImageSchema);
 export const FittingPositionListSchema = z.array(FittingPositionSchema);
 
@@ -59,3 +104,10 @@ export type ImageDetail = z.infer<typeof ImageDetailSchema>;
 export type FittingPosition = z.infer<typeof FittingPositionSchema>;
 export type AssetInfo = z.infer<typeof AssetInfoSchema>;
 export type FittingPositionDetail = z.infer<typeof FittingPositionDetailSchema>;
+export type SearchResultItem = z.infer<typeof SearchResultItemSchema>;
+export type SearchResponse = z.infer<typeof SearchResponseSchema>;
+export type UploadSession = z.infer<typeof UploadSessionSchema>;
+export type UploadCompleteResult = z.infer<typeof UploadCompleteResultSchema>;
+export type BulkFittingPositionsResult = z.infer<
+	typeof BulkFittingPositionsResultSchema
+>;
