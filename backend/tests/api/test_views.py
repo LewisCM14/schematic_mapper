@@ -580,3 +580,32 @@ class TestSearchView:
         assert len(d2["results"]) == 2
         assert d2["has_more"] is False
         assert d2["next_cursor"] is None
+
+    def test_returns_400_for_unknown_source(
+        self, client: Client, image: Image
+    ) -> None:
+        self._make_fp(image)
+        response = client.get(
+            f"/api/search?query=pump&image_id={image.image_id}&sources=unknown"
+        )
+        assert response.status_code == 400
+        assert response.json()["code"] == "search_invalid_source"
+
+    def test_returns_400_for_mixed_valid_and_invalid_source(
+        self, client: Client, image: Image
+    ) -> None:
+        self._make_fp(image)
+        response = client.get(
+            f"/api/search?query=pump&image_id={image.image_id}&sources=internal,unknown"
+        )
+        assert response.status_code == 400
+        assert response.json()["code"] == "search_invalid_source"
+
+    def test_valid_sources_pass_through(
+        self, client: Client, image: Image
+    ) -> None:
+        self._make_fp(image)
+        response = client.get(
+            f"/api/search?query=pump&image_id={image.image_id}&sources=internal"
+        )
+        assert response.status_code == 200

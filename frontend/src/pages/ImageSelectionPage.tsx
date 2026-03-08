@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import TopAppHeader from "../components/TopAppHeader";
 import { useImages } from "../services/api/hooks/useImages";
 
 function ImageSelectionPage() {
@@ -46,10 +47,9 @@ function ImageSelectionPage() {
 	const isLoading = typesLoading || (showGrid && imagesLoading);
 
 	return (
-		<Container maxWidth="lg" sx={{ mt: 6 }}>
-			<Typography variant="h4" gutterBottom>
-				Schematic Mapper
-			</Typography>
+		<>
+			<TopAppHeader title="Schematic Mapper" />
+			<Container maxWidth="lg" sx={{ mt: 3 }}>
 			<Typography variant="body1" color="text.secondary" gutterBottom>
 				Select a drawing type to browse available schematics.
 			</Typography>
@@ -133,6 +133,7 @@ function ImageSelectionPage() {
 				)}
 			</Box>
 		</Container>
+		</>
 	);
 }
 

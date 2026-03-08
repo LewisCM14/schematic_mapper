@@ -22,8 +22,7 @@ from .models import (
     UploadChunk,
 )
 from .search_service import search as run_search
-from .serializers import (
-    BulkFittingPositionSerializer,
+from .serializers import (    BulkFittingPositionSerializer,
     FittingPositionDetailSerializer,
     FittingPositionSerializer,
     ImageDetailSerializer,
@@ -34,6 +33,8 @@ from .serializers import (
     UploadSessionCreateSerializer,
     UploadSessionSerializer,
 )
+
+VALID_SEARCH_SOURCES: frozenset[str] = frozenset({"internal", "asset", "sensor"})
 
 
 @api_view(["GET"])
@@ -331,6 +332,17 @@ def search_view(request: Request) -> Response:
 
     sources_raw = request.query_params.get("sources", "internal,asset")
     sources = [s.strip() for s in sources_raw.split(",") if s.strip()]
+
+    for s in sources:
+        if s not in VALID_SEARCH_SOURCES:
+            return Response(
+                {
+                    "error": f'Invalid source: "{s}"',
+                    "code": "search_invalid_source",
+                    "status": 400,
+                },
+                status=400,
+            )
 
     try:
         limit = max(1, min(100, int(request.query_params.get("limit", "25"))))

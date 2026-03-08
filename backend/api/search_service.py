@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .asset_adapter import search_assets
-from .models import FittingPosition, Image
+from .search_config_service import SearchConfigService
+from .search_index_service import SearchIndexService, SearchProjectionRow
 
 MatchType = Literal["exact", "prefix", "partial"]
 SourceName = Literal["internal", "asset"]
@@ -73,11 +74,13 @@ def search(
     cursor: str | None,
     request_id: str,
 ) -> SearchResponse:
-    image = Image.objects.select_related("drawing_type").get(pk=image_id)
-    positions = list(FittingPosition.objects.filter(image_id=image_id, is_active=True))
+    config_service = SearchConfigService()
+    index_service = SearchIndexService(config_service)
 
-    # Map label_text → FittingPosition for joining external results
-    fp_by_label: dict[str, FittingPosition] = {fp.label_text: fp for fp in positions}
+    projection_rows = index_service.get_searchable_fields(image_id)
+    row_by_label: dict[str, SearchProjectionRow] = {
+        row.label_text: row for row in projection_rows
+    }
 
     source_status: dict[str, str] = {}
     # keyed by fitting_position_id; lowest match_rank wins
@@ -92,54 +95,51 @@ def search(
     # ── Internal ──────────────────────────────────────────────────────────────
     if "internal" in sources:
         source_status["internal"] = "ok"
-        for fp in positions:
-            for field, value in [
-                ("label_text", fp.label_text),
-                ("component_name", image.component_name),
-            ]:
+        internal_config = config_service.get_config("internal")
+        for proj_row in projection_rows:
+            for col_name in internal_config.searchable_columns:
+                value = str(getattr(proj_row, col_name))
                 mt = _match_type(value, query)
                 if mt:
                     _upsert(
                         SearchResultItem(
-                            fitting_position_id=fp.fitting_position_id,
-                            label_text=fp.label_text,
+                            fitting_position_id=proj_row.fitting_position_id,
+                            label_text=proj_row.label_text,
                             image_id=image_id,
-                            x_coordinate=fp.x_coordinate,
-                            y_coordinate=fp.y_coordinate,
-                            component_name=image.component_name,
+                            x_coordinate=proj_row.x_coordinate,
+                            y_coordinate=proj_row.y_coordinate,
+                            component_name=proj_row.component_name,
                             matched_source="internal",
-                            matched_field=field,
+                            matched_field=col_name,
                             match_type=mt,
                         )
                     )
 
     # ── Asset ─────────────────────────────────────────────────────────────────
-    if "asset" in sources and positions:
-        labels = [fp.label_text for fp in positions]
+    if "asset" in sources and projection_rows:
+        labels = [row.label_text for row in projection_rows]
         asset_result = search_assets(labels, query)
         source_status["asset"] = asset_result.source_status
-        for row in asset_result.rows:
-            fp_maybe = fp_by_label.get(row.fitting_position)
-            if fp_maybe is None:
+        asset_config = config_service.get_config("asset")
+        for asset_row in asset_result.rows:
+            proj_row_maybe = row_by_label.get(asset_row.fitting_position)
+            if proj_row_maybe is None:
                 continue
-            fp = fp_maybe
-            for asset_field, value in [
-                ("high_level_component", row.high_level_component),
-                ("sub_system_name", row.sub_system_name),
-                ("sub_component_name", row.sub_component_name),
-            ]:
+            proj_row = proj_row_maybe
+            for col_name in asset_config.searchable_columns:
+                value = str(getattr(asset_row, col_name))
                 mt = _match_type(value, query)
                 if mt:
                     _upsert(
                         SearchResultItem(
-                            fitting_position_id=fp.fitting_position_id,
-                            label_text=fp.label_text,
+                            fitting_position_id=proj_row.fitting_position_id,
+                            label_text=proj_row.label_text,
                             image_id=image_id,
-                            x_coordinate=fp.x_coordinate,
-                            y_coordinate=fp.y_coordinate,
-                            component_name=image.component_name,
+                            x_coordinate=proj_row.x_coordinate,
+                            y_coordinate=proj_row.y_coordinate,
+                            component_name=proj_row.component_name,
                             matched_source="asset",
-                            matched_field=asset_field,
+                            matched_field=col_name,
                             match_type=mt,
                         )
                     )

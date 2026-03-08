@@ -2,57 +2,16 @@ import { ThemeProvider } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
-import * as endpointsApi from "../services/api/endpoints";
+import { describe, expect, it } from "vitest";
+import { FIXTURES, IMAGE_ID, server } from "../test/handlers";
 import theme from "../theme";
 import ImageViewerPage from "./ImageViewerPage";
 
-const IMAGE_ID = "00000000-0000-0000-0000-000000000001";
-
-const mockImageDetail = {
-	image_id: IMAGE_ID,
-	component_name: "Cooling System Assembly",
-	drawing_type: {
-		drawing_type_id: 1,
-		type_name: "composite",
-		description: "",
-		is_active: true,
-	},
-	width_px: 800,
-	height_px: 600,
-	uploaded_at: "2024-01-01T00:00:00Z",
-	image_svg:
-		'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"/>',
-};
-
-const mockPositions = [
-	{
-		fitting_position_id: "FP-PUMP-01-INLET",
-		x_coordinate: 300,
-		y_coordinate: 250,
-		label_text: "FP-PUMP-01-INLET",
-		is_active: true,
-	},
-];
-
-const mockDetail = {
-	fitting_position_id: "FP-PUMP-01-INLET",
-	label_text: "FP-PUMP-01-INLET",
-	x_coordinate: 300,
-	y_coordinate: 250,
-	asset: {
-		asset_record_id: "AR-001",
-		high_level_component: "Cooling Pump",
-		sub_system_name: "Primary Loop",
-		sub_component_name: "Inlet Valve",
-	},
-	source_status: { asset: "ok" },
-};
-
 function renderPage(imageId = IMAGE_ID) {
 	const client = new QueryClient({
-		defaultOptions: { queries: { retry: false } },
+		defaultOptions: { queries: { retry: false, gcTime: 0 } },
 	});
 	return render(
 		<ThemeProvider theme={theme}>
@@ -71,7 +30,7 @@ function renderPage(imageId = IMAGE_ID) {
 describe("ImageViewerPage", () => {
 	it("redirects to / when imageId is missing", () => {
 		const client = new QueryClient({
-			defaultOptions: { queries: { retry: false } },
+			defaultOptions: { queries: { retry: false, gcTime: 0 } },
 		});
 		render(
 			<ThemeProvider theme={theme}>
@@ -89,19 +48,14 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows image heading when data loads", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
 		renderPage();
+		expect(screen.getByText("Schematic Mapper")).toBeInTheDocument();
 		await waitFor(() => {
 			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
 		});
 	});
 
 	it("renders POI marker pins", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
-			mockPositions,
-		);
 		renderPage();
 		await waitFor(() => {
 			expect(
@@ -111,10 +65,11 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows error when image fails to load", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockRejectedValue(
-			new Error("Not Found"),
+		server.use(
+			http.get("/api/images/:imageId", () =>
+				new HttpResponse(null, { status: 404 }),
+			),
 		);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
 		renderPage();
 		await waitFor(() => {
 			expect(
@@ -124,8 +79,6 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows default drawer instruction text before any marker is clicked", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
 		renderPage();
 		await waitFor(() => {
 			expect(
@@ -135,13 +88,6 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("fetches and displays asset details after clicking a POI marker", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
-			mockPositions,
-		);
-		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue(
-			mockDetail,
-		);
 		renderPage();
 
 		const marker = await screen.findByRole("button", {
@@ -157,15 +103,15 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows degraded warning when asset source is unavailable", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
-			mockPositions,
+		server.use(
+			http.get("/api/fitting-positions/:id/details", () =>
+				HttpResponse.json({
+					...FIXTURES.positionDetail,
+					asset: null,
+					source_status: { asset: "degraded" },
+				}),
+			),
 		);
-		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue({
-			...mockDetail,
-			asset: null,
-			source_status: { asset: "degraded" },
-		});
 		renderPage();
 
 		const marker = await screen.findByRole("button", {
@@ -181,15 +127,15 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows no-asset message when source is ok but record is null", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue(
-			mockPositions,
+		server.use(
+			http.get("/api/fitting-positions/:id/details", () =>
+				HttpResponse.json({
+					...FIXTURES.positionDetail,
+					asset: null,
+					source_status: { asset: "ok" },
+				}),
+			),
 		);
-		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue({
-			...mockDetail,
-			asset: null,
-			source_status: { asset: "ok" },
-		});
 		renderPage();
 
 		const marker = await screen.findByRole("button", {
@@ -205,8 +151,6 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("renders the Search tab", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
 		renderPage();
 		await waitFor(() => {
 			expect(screen.getByRole("tab", { name: /search/i })).toBeInTheDocument();
@@ -214,8 +158,6 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows min-chars hint when query is 1 char", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
 		renderPage();
 
 		const searchTab = await screen.findByRole("tab", { name: /search/i });
@@ -232,30 +174,32 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("shows search results when query >= 2 chars", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
-		vi.spyOn(endpointsApi, "fetchSearch").mockResolvedValue({
-			query: "pump",
-			image_id: IMAGE_ID,
-			limit: 25,
-			results: [
-				{
-					fitting_position_id: "FP-001",
-					label_text: "PUMP-01",
+		server.use(
+			http.get("/api/search", () =>
+				HttpResponse.json({
+					query: "pump",
 					image_id: IMAGE_ID,
-					x_coordinate: 100,
-					y_coordinate: 200,
-					component_name: "Cooling System",
-					matched_source: "internal",
-					matched_field: "label_text",
-					match_type: "prefix",
-				},
-			],
-			source_status: { internal: "ok", asset: "ok" },
-			has_more: false,
-			next_cursor: null,
-			request_id: "req-test-1",
-		});
+					limit: 25,
+					results: [
+						{
+							fitting_position_id: "FP-001",
+							label_text: "PUMP-01",
+							image_id: IMAGE_ID,
+							x_coordinate: 100,
+							y_coordinate: 200,
+							component_name: "Cooling System",
+							matched_source: "internal",
+							matched_field: "label_text",
+							match_type: "prefix",
+						},
+					],
+					source_status: { internal: "ok", asset: "ok" },
+					has_more: false,
+					next_cursor: null,
+					request_id: "req-test-1",
+				}),
+			),
+		);
 		renderPage();
 
 		const searchTab = await screen.findByRole("tab", { name: /search/i });
@@ -270,32 +214,31 @@ describe("ImageViewerPage", () => {
 	});
 
 	it("clicking a search result switches to Information tab", async () => {
-		vi.spyOn(endpointsApi, "fetchImage").mockResolvedValue(mockImageDetail);
-		vi.spyOn(endpointsApi, "fetchFittingPositions").mockResolvedValue([]);
-		vi.spyOn(endpointsApi, "fetchSearch").mockResolvedValue({
-			query: "pump",
-			image_id: IMAGE_ID,
-			limit: 25,
-			results: [
-				{
-					fitting_position_id: "FP-001",
-					label_text: "PUMP-01",
+		server.use(
+			http.get("/api/search", () =>
+				HttpResponse.json({
+					query: "pump",
 					image_id: IMAGE_ID,
-					x_coordinate: 100,
-					y_coordinate: 200,
-					component_name: "Cooling System",
-					matched_source: "internal",
-					matched_field: "label_text",
-					match_type: "exact",
-				},
-			],
-			source_status: { internal: "ok", asset: "ok" },
-			has_more: false,
-			next_cursor: null,
-			request_id: "req-test-2",
-		});
-		vi.spyOn(endpointsApi, "fetchFittingPositionDetails").mockResolvedValue(
-			mockDetail,
+					limit: 25,
+					results: [
+						{
+							fitting_position_id: "FP-001",
+							label_text: "PUMP-01",
+							image_id: IMAGE_ID,
+							x_coordinate: 100,
+							y_coordinate: 200,
+							component_name: "Cooling System",
+							matched_source: "internal",
+							matched_field: "label_text",
+							match_type: "exact",
+						},
+					],
+					source_status: { internal: "ok", asset: "ok" },
+					has_more: false,
+					next_cursor: null,
+					request_id: "req-test-2",
+				}),
+			),
 		);
 		renderPage();
 
@@ -307,7 +250,6 @@ describe("ImageViewerPage", () => {
 		const resultItem = await screen.findByText("PUMP-01");
 		await userEvent.click(resultItem);
 
-		// Should now show the Information tab content
 		await waitFor(() => {
 			expect(screen.getByRole("tab", { name: /information/i })).toHaveAttribute(
 				"aria-selected",

@@ -28,6 +28,7 @@ import {
 } from "../services/api/hooks/useAdminUpload";
 import { useImages } from "../services/api/hooks/useImages";
 import type { DrawingType } from "../services/api/schemas";
+import TopAppHeader from "../components/TopAppHeader";
 
 const STEPS = [
 	"Select Type",
@@ -225,7 +226,9 @@ function AdminPage() {
 	// ── Render ────────────────────────────────────────────────────────────────
 
 	return (
-		<Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
+		<>
+			<TopAppHeader title="Admin Panel" />
+			<Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
 			<Typography variant="h5" gutterBottom>
 				Admin — Upload &amp; Map
 			</Typography>
@@ -571,6 +574,7 @@ function AdminPage() {
 				</Paper>
 			)}
 		</Box>
+		</>
 	);
 }
 

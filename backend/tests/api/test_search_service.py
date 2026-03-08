@@ -6,6 +6,8 @@ import pytest
 
 from api.asset_adapter import AssetSearchResult
 from api.models import DrawingType, FittingPosition, Image
+from api.search_config_service import SearchConfigService
+from api.search_index_service import SearchIndexService
 from api.search_service import _decode_cursor, _encode_cursor, _match_type, search
 
 
@@ -204,3 +206,104 @@ class TestSearchService:
             request_id="req",
         )
         assert result.source_status["internal"] == "ok"
+
+
+class TestSearchConfigService:
+    def test_known_source_returns_config(self) -> None:
+        svc = SearchConfigService()
+        config = svc.get_config("internal")
+        assert config.source_name == "internal"
+        assert "label_text" in config.searchable_columns
+        assert "component_name" in config.searchable_columns
+
+    def test_asset_source_returns_correct_columns(self) -> None:
+        svc = SearchConfigService()
+        config = svc.get_config("asset")
+        assert "high_level_component" in config.searchable_columns
+        assert "sub_system_name" in config.searchable_columns
+        assert "sub_component_name" in config.searchable_columns
+
+    def test_unknown_source_raises_key_error(self) -> None:
+        svc = SearchConfigService()
+        with pytest.raises(KeyError):
+            svc.get_config("nonexistent")
+
+    def test_get_enabled_sources_excludes_disabled(self) -> None:
+        svc = SearchConfigService()
+        enabled = svc.get_enabled_sources()
+        assert all(c.enabled for c in enabled)
+        names = {c.source_name for c in enabled}
+        assert "internal" in names
+        assert "asset" in names
+
+    def test_field_weights_present(self) -> None:
+        svc = SearchConfigService()
+        config = svc.get_config("internal")
+        assert config.field_weights["label_text"] > config.field_weights["component_name"]
+
+
+@pytest.mark.django_db
+class TestSearchIndexService:
+    def _setup(self) -> tuple[Image, list[FittingPosition]]:
+        dt = DrawingType.objects.create(type_name="index-test")
+        img = Image.objects.create(
+            drawing_type=dt,
+            component_name="Index Test Assembly",
+            image_binary=b"<svg/>",
+            content_hash="idx-hash",
+            width_px=800,
+            height_px=600,
+        )
+        fps = [
+            FittingPosition.objects.create(
+                fitting_position_id="IDX-001",
+                image=img,
+                x_coordinate="10.000",
+                y_coordinate="20.000",
+                label_text="IDX-PUMP-01",
+            ),
+            FittingPosition.objects.create(
+                fitting_position_id="IDX-002",
+                image=img,
+                x_coordinate="30.000",
+                y_coordinate="40.000",
+                label_text="IDX-VALVE-01",
+                is_active=False,
+            ),
+        ]
+        return img, fps
+
+    def test_returns_only_active_positions(self) -> None:
+        img, _ = self._setup()
+        svc = SearchIndexService()
+        rows = svc.get_searchable_fields(img.image_id)
+        ids = {r.fitting_position_id for r in rows}
+        assert "IDX-001" in ids
+        assert "IDX-002" not in ids  # is_active=False excluded
+
+    def test_projection_includes_component_name(self) -> None:
+        img, _ = self._setup()
+        svc = SearchIndexService()
+        rows = svc.get_searchable_fields(img.image_id)
+        assert all(r.component_name == "Index Test Assembly" for r in rows)
+
+    def test_projection_includes_label_text(self) -> None:
+        img, _ = self._setup()
+        svc = SearchIndexService()
+        rows = svc.get_searchable_fields(img.image_id)
+        labels = {r.label_text for r in rows}
+        assert "IDX-PUMP-01" in labels
+
+    def test_empty_image_returns_empty_list(self) -> None:
+        dt = DrawingType.objects.create(type_name="empty-test")
+        img = Image.objects.create(
+            drawing_type=dt,
+            component_name="Empty Assembly",
+            image_binary=b"<svg/>",
+            content_hash="empty-hash",
+            width_px=100,
+            height_px=100,
+        )
+        svc = SearchIndexService()
+        rows = svc.get_searchable_fields(img.image_id)
+        assert rows == []

@@ -26,6 +26,7 @@ import { useTheme } from "@mui/material/styles";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import TopAppHeader from "../components/TopAppHeader";
 import ViewerFooterStatusBar from "../components/ViewerFooterStatusBar";
 import { useFittingPositionDetails } from "../services/api/hooks/useFittingPositionDetails";
 import { useFittingPositions } from "../services/api/hooks/useFittingPositions";
@@ -397,6 +398,14 @@ function ImageViewerPage() {
 
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+			<TopAppHeader
+				title="Schematic Mapper"
+				contextLabel={
+					image
+						? `${image.component_name} — ${image.drawing_type.type_name}`
+						: undefined
+				}
+			/>
 			<Box
 				sx={{ display: "flex", flexGrow: 1, overflow: "hidden", minHeight: 0 }}
 			>
