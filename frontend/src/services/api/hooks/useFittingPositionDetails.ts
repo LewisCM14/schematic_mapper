@@ -7,5 +7,7 @@ export function useFittingPositionDetails(fittingPositionId: string | null) {
 		queryKey: queryKeys.fittingPositions.detail(fittingPositionId ?? ""),
 		queryFn: () => fetchFittingPositionDetails(fittingPositionId ?? ""),
 		enabled: Boolean(fittingPositionId),
+		staleTime: 60 * 1000,
+		gcTime: 15 * 60 * 1000,
 	});
 }

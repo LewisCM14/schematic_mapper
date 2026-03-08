@@ -12,6 +12,8 @@ export function useImages(drawingTypeId?: number) {
 			drawingTypeId !== undefined ? { drawingTypeId } : undefined,
 		),
 		queryFn: () => fetchImages(Object.keys(params).length ? params : undefined),
+		staleTime: 5 * 60 * 1000,
+		gcTime: 30 * 60 * 1000,
 	});
 }
 
@@ -20,5 +22,7 @@ export function useImage(imageId: string) {
 		queryKey: queryKeys.images.detail(imageId),
 		queryFn: () => fetchImage(imageId),
 		enabled: Boolean(imageId),
+		staleTime: 15 * 60 * 1000,
+		gcTime: 60 * 60 * 1000,
 	});
 }

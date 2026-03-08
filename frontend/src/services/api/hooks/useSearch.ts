@@ -23,5 +23,7 @@ export function useSearch(
 		initialPageParam: null as string | null,
 		getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
 		enabled: Boolean(imageId) && query.length >= 2,
+		staleTime: 30 * 1000,
+		gcTime: 10 * 60 * 1000,
 	});
 }
