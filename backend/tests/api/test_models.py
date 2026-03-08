@@ -1,7 +1,7 @@
 import pytest
 from django.db.utils import IntegrityError
 
-from api.models import DrawingType, FittingPosition, Image
+from api.models import DrawingType, FittingPosition, Image, ImageUpload
 
 
 @pytest.mark.django_db
@@ -116,3 +116,33 @@ class TestFittingPositionModel:
             label_text="SHARED-LABEL",
         )
         assert fp2.fitting_position_id == "FP-006"
+
+
+@pytest.mark.django_db
+class TestImageUploadModel:
+    def _make_session(self, drawing_type: DrawingType, **kwargs: object) -> ImageUpload:
+        defaults = {
+            "component_name": "Assembly",
+            "file_name": "test.svg",
+            "file_size": 1024,
+            "expected_checksum": "abc123",
+            "idempotency_key": "key-001",
+        }
+        defaults.update(kwargs)
+        return ImageUpload.objects.create(drawing_type=drawing_type, **defaults)
+
+    def test_uploader_identity_is_nullable(self, drawing_type: DrawingType) -> None:
+        session = self._make_session(drawing_type, uploader_identity=None)
+        session.refresh_from_db()
+        assert session.uploader_identity is None
+
+    def test_uploader_identity_stores_string(self, drawing_type: DrawingType) -> None:
+        session = self._make_session(
+            drawing_type, uploader_identity="admin@example.com"
+        )
+        session.refresh_from_db()
+        assert session.uploader_identity == "admin@example.com"
+
+    def test_default_uploader_identity_is_none(self, drawing_type: DrawingType) -> None:
+        session = self._make_session(drawing_type)
+        assert session.uploader_identity is None

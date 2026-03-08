@@ -1,0 +1,25 @@
+import { useTheme } from "@mui/material/styles";
+
+interface POIMarkerPinProps {
+	selected: boolean;
+}
+
+function POIMarkerPin({ selected }: POIMarkerPinProps) {
+	const theme = useTheme();
+	const fill = selected
+		? theme.palette.map.poi.selected
+		: theme.palette.map.poi.default;
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width="24"
+			height="24"
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+		>
+			<circle cx="12" cy="12" r="8" fill={fill} />
+		</svg>
+	);
+}
+
+export default POIMarkerPin;

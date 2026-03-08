@@ -22,8 +22,9 @@ describe("useImages", () => {
 		const { wrapper } = makeWrapper();
 		const { result } = renderHook(() => useImages(), { wrapper });
 		await waitFor(() => expect(result.current.isSuccess).toBe(true));
-		expect(result.current.data).toHaveLength(1);
-		expect(result.current.data?.[0].image_id).toBe(IMAGE_ID);
+		const images = result.current.data?.pages.flatMap((p) => p.results) ?? [];
+		expect(images).toHaveLength(1);
+		expect(images[0].image_id).toBe(IMAGE_ID);
 	});
 
 	it("applies drawing_type_id filter param", async () => {
@@ -31,6 +32,21 @@ describe("useImages", () => {
 		const { result } = renderHook(() => useImages(1), { wrapper });
 		await waitFor(() => expect(result.current.isSuccess).toBe(true));
 		expect(result.current.data).toBeDefined();
+	});
+
+	it("first page has has_more false when only one page of data", async () => {
+		const { wrapper } = makeWrapper();
+		const { result } = renderHook(() => useImages(), { wrapper });
+		await waitFor(() => expect(result.current.isSuccess).toBe(true));
+		const firstPage = result.current.data?.pages[0];
+		expect(firstPage?.has_more).toBe(false);
+	});
+
+	it("getNextPageParam returns undefined when has_more is false", async () => {
+		const { wrapper } = makeWrapper();
+		const { result } = renderHook(() => useImages(), { wrapper });
+		await waitFor(() => expect(result.current.isSuccess).toBe(true));
+		expect(result.current.hasNextPage).toBe(false);
 	});
 
 	it("uses correct query key without filter", () => {

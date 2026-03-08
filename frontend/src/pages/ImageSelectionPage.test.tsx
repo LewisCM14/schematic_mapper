@@ -115,7 +115,11 @@ describe("ImageSelectionPage", () => {
 				if (callCount > 1) {
 					return new HttpResponse(null, { status: 500 });
 				}
-				return HttpResponse.json([FIXTURES.image]);
+				return HttpResponse.json({
+					results: [FIXTURES.image],
+					has_more: false,
+					next_cursor: null,
+				});
 			}),
 		);
 		const user = userEvent.setup();

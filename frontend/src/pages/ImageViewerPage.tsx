@@ -1,5 +1,4 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import PlaceIcon from "@mui/icons-material/Place";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
@@ -8,14 +7,11 @@ import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import {
 	Alert,
 	Box,
-	Chip,
 	CircularProgress,
 	Divider,
 	Drawer,
 	IconButton,
 	List,
-	ListItemButton,
-	ListItemText,
 	Tab,
 	Tabs,
 	TextField,
@@ -26,6 +22,8 @@ import { useTheme } from "@mui/material/styles";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import POIMarkerPin from "../components/atoms/POIMarkerPin";
+import SearchResultItemComponent from "../components/molecules/SearchResultItem";
 import POITooltipCard from "../components/POITooltipCard";
 import TopAppHeader from "../components/TopAppHeader";
 import ViewerFooterStatusBar from "../components/ViewerFooterStatusBar";
@@ -260,54 +258,17 @@ function SearchPanel({
 			<Box sx={{ overflow: "auto", flexGrow: 1 }}>
 				<List dense disablePadding>
 					{allResults.map((item) => (
-						<ListItemButton
+						<SearchResultItemComponent
 							key={item.fitting_position_id}
-							onClick={() =>
+							result={item}
+							onSelect={(r) =>
 								onSelectFp(
-									item.fitting_position_id,
-									item.x_coordinate,
-									item.y_coordinate,
+									r.fitting_position_id,
+									r.x_coordinate,
+									r.y_coordinate,
 								)
 							}
-						>
-							<ListItemText
-								primary={item.label_text}
-								secondaryTypographyProps={{ component: "span" }}
-								secondary={
-									<Box
-										component="span"
-										sx={{
-											display: "flex",
-											gap: 0.5,
-											flexWrap: "wrap",
-											mt: 0.5,
-										}}
-									>
-										<Typography
-											component="span"
-											variant="caption"
-											color="text.secondary"
-											sx={{ display: "block", width: "100%" }}
-										>
-											{item.component_name}
-										</Typography>
-										<Chip
-											label={item.match_type}
-											size="small"
-											variant="outlined"
-											sx={{ height: 18, fontSize: "0.65rem" }}
-										/>
-										<Chip
-											label={item.matched_source}
-											size="small"
-											color="primary"
-											variant="outlined"
-											sx={{ height: 18, fontSize: "0.65rem" }}
-										/>
-									</Box>
-								}
-							/>
-						</ListItemButton>
+						/>
 					))}
 				</List>
 
@@ -590,13 +551,12 @@ function ImageViewerPage() {
 													left: pos.x_coordinate,
 													top: pos.y_coordinate,
 													transform: "translate(-50%, -100%)",
-													color: isSelected ? "error.main" : "primary.main",
 													padding: 0,
-													"&:hover": { color: "primary.dark" },
+													"&:hover": { opacity: 0.8 },
 												}}
 												aria-label={pos.label_text}
 											>
-												<PlaceIcon fontSize="medium" />
+												<POIMarkerPin selected={isSelected} />
 											</IconButton>
 										</Tooltip>
 									);

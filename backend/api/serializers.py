@@ -13,6 +13,7 @@ class DrawingTypeSerializer(serializers.ModelSerializer[DrawingType]):
 
 class ImageSerializer(serializers.ModelSerializer[Image]):
     drawing_type = DrawingTypeSerializer(read_only=True)
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Image
@@ -23,7 +24,11 @@ class ImageSerializer(serializers.ModelSerializer[Image]):
             "width_px",
             "height_px",
             "uploaded_at",
+            "thumbnail_url",
         ]
+
+    def get_thumbnail_url(self, obj: Image) -> str | None:
+        return None
 
 
 class ImageDetailSerializer(serializers.ModelSerializer[Image]):
@@ -97,7 +102,13 @@ class UploadCompleteSerializer(serializers.Serializer[Any]):
 class UploadSessionSerializer(serializers.ModelSerializer[ImageUpload]):
     class Meta:
         model = ImageUpload
-        fields = ["upload_id", "state", "file_name", "error_message"]
+        fields = [
+            "upload_id",
+            "state",
+            "file_name",
+            "error_message",
+            "uploader_identity",
+        ]
 
 
 # ── Admin bulk fitting positions ──────────────────────────────────────────────

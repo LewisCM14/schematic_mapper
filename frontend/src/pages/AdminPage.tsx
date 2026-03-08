@@ -69,12 +69,13 @@ function AdminPage() {
 	const [selectedDrawingTypeId, setSelectedDrawingTypeId] = useState<
 		number | ""
 	>("");
-	const { data: images } = useImages();
+	const { data: imagesData } = useImages();
+	const images = imagesData?.pages.flatMap((p) => p.results) ?? [];
 
 	// Derive unique drawing types from available images
 	const drawingTypes: DrawingType[] = [];
 	const seenIds = new Set<number>();
-	for (const img of images ?? []) {
+	for (const img of images) {
 		if (!seenIds.has(img.drawing_type.drawing_type_id)) {
 			seenIds.add(img.drawing_type.drawing_type_id);
 			drawingTypes.push(img.drawing_type);

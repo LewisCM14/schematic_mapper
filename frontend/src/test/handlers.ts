@@ -20,6 +20,7 @@ export const FIXTURES = {
 		width_px: 800,
 		height_px: 600,
 		uploaded_at: "2024-01-01T00:00:00Z",
+		thumbnail_url: null,
 	},
 	imageDetail: {
 		image_id: IMAGE_ID,
@@ -33,6 +34,7 @@ export const FIXTURES = {
 		width_px: 800,
 		height_px: 600,
 		uploaded_at: "2024-01-01T00:00:00Z",
+		thumbnail_url: null,
 		image_svg:
 			'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"/>',
 	},
@@ -88,7 +90,13 @@ export const handlers = [
 		HttpResponse.json({ status: "ok", db: "connected" }),
 	),
 
-	http.get("/api/images", () => HttpResponse.json([FIXTURES.image])),
+	http.get("/api/images", () =>
+		HttpResponse.json({
+			results: [FIXTURES.image],
+			has_more: false,
+			next_cursor: null,
+		}),
+	),
 
 	http.get("/api/images/:imageId", () =>
 		HttpResponse.json(FIXTURES.imageDetail),

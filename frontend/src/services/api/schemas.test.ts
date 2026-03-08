@@ -25,6 +25,7 @@ const VALID_IMAGE = {
 	width_px: 800,
 	height_px: 600,
 	uploaded_at: "2024-01-01T00:00:00Z",
+	thumbnail_url: null,
 };
 
 describe("ImageSchema", () => {

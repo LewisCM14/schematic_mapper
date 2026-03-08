@@ -1,17 +1,24 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { fetchImage, fetchImages } from "../endpoints";
 import { queryKeys } from "../queryKeys";
 
 export function useImages(drawingTypeId?: number) {
-	const params: Record<string, string> = {};
+	const baseParams: Record<string, string> = {};
 	if (drawingTypeId !== undefined) {
-		params.drawing_type_id = String(drawingTypeId);
+		baseParams.drawing_type_id = String(drawingTypeId);
 	}
-	return useQuery({
+	return useInfiniteQuery({
 		queryKey: queryKeys.images.list(
 			drawingTypeId !== undefined ? { drawingTypeId } : undefined,
 		),
-		queryFn: () => fetchImages(Object.keys(params).length ? params : undefined),
+		queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
+			const params = { ...baseParams };
+			if (pageParam) params.cursor = pageParam;
+			return fetchImages(Object.keys(params).length ? params : undefined);
+		},
+		initialPageParam: undefined as string | undefined,
+		getNextPageParam: (lastPage) =>
+			lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined,
 		staleTime: 5 * 60 * 1000,
 		gcTime: 30 * 60 * 1000,
 	});

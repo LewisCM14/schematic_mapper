@@ -5,7 +5,7 @@ import {
 	FittingPositionListSchema,
 	HealthSchema,
 	ImageDetailSchema,
-	ImageListSchema,
+	ImageListPageSchema,
 	SearchResponseSchema,
 	UploadCompleteResultSchema,
 	UploadSessionSchema,
@@ -18,7 +18,7 @@ export async function fetchHealth() {
 
 export async function fetchImages(params?: Record<string, string>) {
 	const response = await httpClient.get("/images", { params });
-	return ImageListSchema.parse(response.data);
+	return ImageListPageSchema.parse(response.data);
 }
 
 export async function fetchImage(imageId: string) {

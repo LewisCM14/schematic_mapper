@@ -102,6 +102,7 @@ class ImageUpload(models.Model):
         blank=True,
         related_name="upload_session",
     )
+    uploader_identity = models.CharField(max_length=255, blank=True, null=True)
     error_message = models.CharField(max_length=500, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

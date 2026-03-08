@@ -19,6 +19,7 @@ export const ImageSchema = z.object({
 	width_px: z.number(),
 	height_px: z.number(),
 	uploaded_at: z.string(),
+	thumbnail_url: z.string().url().nullable(),
 });
 
 export const ImageDetailSchema = ImageSchema.extend({
@@ -94,7 +95,12 @@ export const BulkFittingPositionsResultSchema = z.object({
 	updated: z.number(),
 });
 
-export const ImageListSchema = z.array(ImageSchema);
+export const ImageListPageSchema = z.object({
+	results: z.array(ImageSchema),
+	has_more: z.boolean(),
+	next_cursor: z.string().nullable(),
+});
+
 export const FittingPositionListSchema = z.array(FittingPositionSchema);
 
 export type Health = z.infer<typeof HealthSchema>;

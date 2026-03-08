@@ -70,25 +70,66 @@ class TestListImagesView:
         response = client.get("/api/images")
         assert response.status_code == 200
 
-    def test_returns_list(self, client: Client, image: Image) -> None:
+    def test_returns_paginated_shape(self, client: Client, image: Image) -> None:
         response = client.get("/api/images")
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 1
+        assert "results" in data
+        assert "has_more" in data
+        assert "next_cursor" in data
+
+    def test_results_list(self, client: Client, image: Image) -> None:
+        response = client.get("/api/images")
+        data = response.json()
+        assert isinstance(data["results"], list)
+        assert len(data["results"]) == 1
 
     def test_response_shape(self, client: Client, image: Image) -> None:
         response = client.get("/api/images")
-        item = response.json()[0]
+        item = response.json()["results"][0]
         assert str(image.image_id) == item["image_id"]
         assert item["component_name"] == "Cooling Assembly"
         assert item["drawing_type"]["type_name"] == "composite"
         assert item["width_px"] == 800
         assert item["height_px"] == 600
         assert "image_svg" not in item
+        assert "thumbnail_url" in item
+        assert item["thumbnail_url"] is None
 
     def test_empty_list_when_no_images(self, client: Client) -> None:
         response = client.get("/api/images")
-        assert response.json() == []
+        data = response.json()
+        assert data["results"] == []
+        assert data["has_more"] is False
+        assert data["next_cursor"] is None
+
+    def test_first_page_no_cursor(self, client: Client, image: Image) -> None:
+        response = client.get("/api/images?limit=1")
+        data = response.json()
+        assert len(data["results"]) == 1
+        assert data["has_more"] is False  # only 1 image total
+        assert data["next_cursor"] is None
+
+    def test_cursor_pagination(self, client: Client, image: Image) -> None:
+        # Create a second image so we can paginate
+        other_dt = DrawingType.objects.create(type_name="system")
+        Image.objects.create(
+            drawing_type=other_dt,
+            component_name="Second Assembly",
+            image_binary=b"<svg/>",
+            content_hash="xyz",
+            width_px=800,
+            height_px=600,
+        )
+        response = client.get("/api/images?limit=1")
+        data = response.json()
+        assert len(data["results"]) == 1
+        assert data["has_more"] is True
+        assert data["next_cursor"] is not None
+        # Fetch second page
+        response2 = client.get(f"/api/images?limit=1&cursor={data['next_cursor']}")
+        data2 = response2.json()
+        assert len(data2["results"]) == 1
+        assert data2["has_more"] is False
 
     def test_filters_by_drawing_type_id(self, client: Client, image: Image) -> None:
         # Create a second drawing type and image that should be excluded
@@ -105,8 +146,8 @@ class TestListImagesView:
             f"/api/images?drawing_type_id={image.drawing_type.drawing_type_id}"
         )
         data = response.json()
-        assert len(data) == 1
-        assert data[0]["image_id"] == str(image.image_id)
+        assert len(data["results"]) == 1
+        assert data["results"][0]["image_id"] == str(image.image_id)
 
     def test_returns_400_for_invalid_drawing_type_id(self, client: Client) -> None:
         response = client.get("/api/images?drawing_type_id=notanint")

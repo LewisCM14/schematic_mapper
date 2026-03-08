@@ -59,8 +59,31 @@ def list_images(request: Request) -> Response:
             qs = qs.filter(drawing_type_id=int(drawing_type_id))
         except ValueError:
             return Response({"error": "drawing_type_id must be an integer"}, status=400)
-    serializer = ImageSerializer(qs, many=True)
-    return Response(serializer.data)
+
+    try:
+        limit = max(1, min(100, int(request.query_params.get("limit", "25"))))
+    except ValueError:
+        limit = 25
+
+    cursor = request.query_params.get("cursor") or None
+    offset = 0
+    if cursor:
+        try:
+            offset = int(base64.b64decode(cursor).decode("utf-8"))
+        except Exception:
+            offset = 0
+
+    total = qs.count()
+    page_qs = qs[offset : offset + limit]
+    has_more = (offset + limit) < total
+    next_cursor: str | None = (
+        base64.b64encode(str(offset + limit).encode()).decode() if has_more else None
+    )
+
+    serializer = ImageSerializer(page_qs, many=True)
+    return Response(
+        {"results": serializer.data, "has_more": has_more, "next_cursor": next_cursor}
+    )
 
 
 @api_view(["GET"])

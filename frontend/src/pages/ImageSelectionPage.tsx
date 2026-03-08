@@ -1,19 +1,15 @@
 import {
 	Box,
-	Card,
-	CardActionArea,
-	CardContent,
+	Button,
 	CircularProgress,
 	Container,
-	FormControl,
 	Grid,
-	InputLabel,
-	MenuItem,
-	Select,
 	Typography,
 } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import FilterBar from "../components/molecules/FilterBar";
+import ImageTileCard from "../components/molecules/ImageTileCard";
 import TopAppHeader from "../components/TopAppHeader";
 import { useImages } from "../services/api/hooks/useImages";
 
@@ -22,12 +18,13 @@ function ImageSelectionPage() {
 	const [selectedTypeId, setSelectedTypeId] = useState<number | "">("");
 
 	// Fetch all images unfiltered to derive available drawing types
-	const { data: allImages, isLoading: typesLoading } = useImages();
+	const { data: allData, isLoading: typesLoading } = useImages();
+	const allImages = allData?.pages.flatMap((p) => p.results) ?? [];
 
 	// Derive unique drawing types from the unfiltered list
 	const drawingTypes = Array.from(
 		new Map(
-			(allImages ?? []).map((img) => [
+			allImages.map((img) => [
 				img.drawing_type.drawing_type_id,
 				img.drawing_type,
 			]),
@@ -36,14 +33,18 @@ function ImageSelectionPage() {
 
 	// Fetch images filtered by selected drawing type
 	const {
-		data: filteredImages,
+		data: filteredData,
 		isLoading: imagesLoading,
 		isError,
+		hasNextPage,
+		fetchNextPage,
+		isFetchingNextPage,
 	} = useImages(selectedTypeId !== "" ? selectedTypeId : undefined);
+	const filteredImages = filteredData?.pages.flatMap((p) => p.results) ?? [];
 
 	// Only show tile grid after a type has been selected and data is ready
 	const showGrid = selectedTypeId !== "";
-	const images = showGrid ? (filteredImages ?? []) : [];
+	const images = showGrid ? filteredImages : [];
 	const isLoading = typesLoading || (showGrid && imagesLoading);
 
 	return (
@@ -55,22 +56,13 @@ function ImageSelectionPage() {
 				</Typography>
 
 				<Box sx={{ mt: 3, maxWidth: 320 }}>
-					<FormControl fullWidth size="small">
-						<InputLabel id="drawing-type-label">Drawing Type</InputLabel>
-						<Select
-							labelId="drawing-type-label"
-							label="Drawing Type"
-							value={selectedTypeId}
-							onChange={(e) => setSelectedTypeId(e.target.value as number | "")}
-							inputProps={{ "aria-label": "drawing type" }}
-						>
-							{drawingTypes.map((dt) => (
-								<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
-									{dt.type_name}
-								</MenuItem>
-							))}
-						</Select>
-					</FormControl>
+					<FilterBar
+						drawingTypes={drawingTypes}
+						selectedTypeId={
+							selectedTypeId !== "" ? String(selectedTypeId) : null
+						}
+						onTypeChange={(id) => setSelectedTypeId(Number(id))}
+					/>
 				</Box>
 
 				<Box sx={{ mt: 4 }}>
@@ -99,37 +91,30 @@ function ImageSelectionPage() {
 					)}
 
 					{showGrid && images.length > 0 && (
-						<Grid container spacing={3}>
-							{images.map((image) => (
-								<Grid key={image.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
-									<Card>
-										<CardActionArea
-											onClick={() => navigate(`/viewer/${image.image_id}`)}
-										>
-											<CardContent>
-												<Typography variant="h6" noWrap>
-													{image.component_name}
-												</Typography>
-												<Typography
-													variant="body2"
-													color="text.secondary"
-													sx={{ mt: 0.5 }}
-												>
-													{image.drawing_type.type_name}
-												</Typography>
-												<Typography
-													variant="caption"
-													color="text.disabled"
-													sx={{ mt: 1, display: "block" }}
-												>
-													{image.width_px} × {image.height_px} px
-												</Typography>
-											</CardContent>
-										</CardActionArea>
-									</Card>
-								</Grid>
-							))}
-						</Grid>
+						<>
+							<Grid container spacing={3}>
+								{images.map((image) => (
+									<Grid key={image.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
+										<ImageTileCard
+											image={image}
+											onClick={(id) => navigate(`/viewer/${id}`)}
+										/>
+									</Grid>
+								))}
+							</Grid>
+
+							{hasNextPage && (
+								<Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+									<Button
+										variant="outlined"
+										onClick={() => fetchNextPage()}
+										disabled={isFetchingNextPage}
+									>
+										{isFetchingNextPage ? "Loading…" : "Load more"}
+									</Button>
+								</Box>
+							)}
+						</>
 					)}
 				</Box>
 			</Container>
