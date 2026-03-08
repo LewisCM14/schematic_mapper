@@ -26,7 +26,11 @@ class SearchConfigService:
         "asset": SourceSearchConfig(
             source_name="asset",
             enabled=True,
-            searchable_columns=["sub_component_name", "high_level_component", "sub_system_name"],
+            searchable_columns=[
+                "sub_component_name",
+                "high_level_component",
+                "sub_system_name",
+            ],
             field_weights={
                 "sub_component_name": 8,
                 "high_level_component": 6,
@@ -39,6 +43,10 @@ class SearchConfigService:
         if source_name not in self._configs:
             raise KeyError(f"Unknown source: {source_name!r}")
         return self._configs[source_name]
+
+    def get_field_weight(self, source_name: str, column: str) -> int:
+        config = self.get_config(source_name)
+        return config.field_weights.get(column, 0)
 
     def get_enabled_sources(self) -> list[SourceSearchConfig]:
         return [c for c in self._configs.values() if c.enabled]

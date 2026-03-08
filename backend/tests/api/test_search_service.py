@@ -207,6 +207,45 @@ class TestSearchService:
         )
         assert result.source_status["internal"] == "ok"
 
+    def test_higher_weight_field_ranks_before_lower_weight(self) -> None:
+        """label_text (weight 10) must outrank component_name (weight 5) same match type."""
+        dt = DrawingType.objects.create(type_name="weight-test")
+        # FP-A: query matches via component_name only (weight 5)
+        img_a = Image.objects.create(
+            drawing_type=dt,
+            component_name="pump-alpha",
+            image_binary=b"<svg/>",
+            content_hash="wa1",
+            width_px=800,
+            height_px=600,
+        )
+        FittingPosition.objects.create(
+            fitting_position_id="WA-001",
+            image=img_a,
+            x_coordinate="1.000",
+            y_coordinate="1.000",
+            label_text="valve-zz",
+        )
+        # FP-B: query matches via label_text (weight 10)
+        FittingPosition.objects.create(
+            fitting_position_id="WA-002",
+            image=img_a,
+            x_coordinate="2.000",
+            y_coordinate="2.000",
+            label_text="pump-beta",
+        )
+        result = search(
+            image_id=img_a.image_id,
+            query="pump",
+            sources=["internal"],
+            limit=25,
+            cursor=None,
+            request_id="req",
+        )
+        ids = [r.fitting_position_id for r in result.results]
+        # WA-002 matched label_text (weight 10); WA-001 matched component_name (weight 5)
+        assert ids.index("WA-002") < ids.index("WA-001")
+
 
 class TestSearchConfigService:
     def test_known_source_returns_config(self) -> None:
@@ -239,7 +278,18 @@ class TestSearchConfigService:
     def test_field_weights_present(self) -> None:
         svc = SearchConfigService()
         config = svc.get_config("internal")
-        assert config.field_weights["label_text"] > config.field_weights["component_name"]
+        assert (
+            config.field_weights["label_text"] > config.field_weights["component_name"]
+        )
+
+    def test_get_field_weight_returns_configured_value(self) -> None:
+        svc = SearchConfigService()
+        assert svc.get_field_weight("internal", "label_text") == 10
+        assert svc.get_field_weight("internal", "component_name") == 5
+
+    def test_get_field_weight_unknown_column_returns_zero(self) -> None:
+        svc = SearchConfigService()
+        assert svc.get_field_weight("internal", "nonexistent_col") == 0
 
 
 @pytest.mark.django_db

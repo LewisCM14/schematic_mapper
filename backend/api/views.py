@@ -22,7 +22,8 @@ from .models import (
     UploadChunk,
 )
 from .search_service import search as run_search
-from .serializers import (    BulkFittingPositionSerializer,
+from .serializers import (
+    BulkFittingPositionSerializer,
     FittingPositionDetailSerializer,
     FittingPositionSerializer,
     ImageDetailSerializer,
@@ -361,7 +362,7 @@ def search_view(request: Request) -> Response:
         limit = 25
 
     cursor = request.query_params.get("cursor") or None
-    request_id = str(uuid.uuid4())
+    request_id = request.META.get("HTTP_X_REQUEST_ID", "-")
 
     result = run_search(
         image_id=image_id,

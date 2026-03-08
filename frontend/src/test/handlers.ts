@@ -110,8 +110,8 @@ export const handlers = [
 
 	http.put("/api/admin/uploads/:id/parts/:partNumber", ({ params }) =>
 		HttpResponse.json({
-			upload_id: params["id"],
-			part_number: Number(params["partNumber"]),
+			upload_id: params.id,
+			part_number: Number(params.partNumber),
 			state: "uploading",
 		}),
 	),

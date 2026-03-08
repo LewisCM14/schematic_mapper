@@ -147,7 +147,11 @@ def search(
     # ── Rank + paginate ───────────────────────────────────────────────────────
     ranked = sorted(
         hits.values(),
-        key=lambda t: (t[0], t[1].label_text),
+        key=lambda t: (
+            t[0],
+            -config_service.get_field_weight(t[1].matched_source, t[1].matched_field),
+            t[1].label_text,
+        ),
     )
     all_results = [item for _, item in ranked]
 

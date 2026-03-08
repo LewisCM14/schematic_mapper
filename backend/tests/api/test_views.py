@@ -12,6 +12,46 @@ from api.models import DrawingType, FittingPosition, Image, ImageUpload
 
 
 @pytest.mark.django_db
+class TestRequestIdMiddleware:
+    def test_generated_request_id_in_response(self, client: Client) -> None:
+        response = client.get("/api/health")
+        assert "X-Request-ID" in response
+        value = response["X-Request-ID"]
+        # Must be a valid UUID
+        uuid.UUID(value)
+
+    def test_supplied_request_id_echoed(self, client: Client) -> None:
+        fixed_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        response = client.get("/api/health", HTTP_X_REQUEST_ID=fixed_id)
+        assert response["X-Request-ID"] == fixed_id
+
+    def test_api_logger_captures_request_id(self, client: Client) -> None:
+        import logging
+
+        fixed_id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+        logger = logging.getLogger("api")
+        captured: list[str] = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                captured.append(getattr(record, "request_id", ""))
+
+        handler = _Capture()
+        logger.addHandler(handler)
+        try:
+            # Simulate what middleware does
+            from config import log_filters
+
+            log_filters.set_request_id(fixed_id)
+            logger.debug("test message")
+            log_filters.clear_request_id()
+        finally:
+            logger.removeHandler(handler)
+
+        assert captured and captured[0] == fixed_id
+
+
+@pytest.mark.django_db
 class TestHealthView:
     def test_returns_200(self, client: Client) -> None:
         response = client.get("/api/health")
@@ -510,9 +550,7 @@ class TestBulkFittingPositionsView:
         assert response.status_code == 400
         assert response.json()["code"] == "bulk_duplicate_ids"
 
-    def test_unique_ids_succeed_as_before(
-        self, client: Client, image: Image
-    ) -> None:
+    def test_unique_ids_succeed_as_before(self, client: Client, image: Image) -> None:
         payload = {
             "image_id": str(image.image_id),
             "fitting_positions": [
@@ -637,9 +675,7 @@ class TestSearchView:
         assert d2["has_more"] is False
         assert d2["next_cursor"] is None
 
-    def test_returns_400_for_unknown_source(
-        self, client: Client, image: Image
-    ) -> None:
+    def test_returns_400_for_unknown_source(self, client: Client, image: Image) -> None:
         self._make_fp(image)
         response = client.get(
             f"/api/search?query=pump&image_id={image.image_id}&sources=unknown"
@@ -657,9 +693,7 @@ class TestSearchView:
         assert response.status_code == 400
         assert response.json()["code"] == "search_invalid_source"
 
-    def test_valid_sources_pass_through(
-        self, client: Client, image: Image
-    ) -> None:
+    def test_valid_sources_pass_through(self, client: Client, image: Image) -> None:
         self._make_fp(image)
         response = client.get(
             f"/api/search?query=pump&image_id={image.image_id}&sources=internal"
