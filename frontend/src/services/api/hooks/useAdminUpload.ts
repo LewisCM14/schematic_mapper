@@ -5,6 +5,7 @@ import {
 	type CreateUploadSessionParams,
 	completeUpload,
 	createUploadSession,
+	fetchImage,
 	saveBulkFittingPositions,
 	uploadChunk,
 } from "../endpoints";
@@ -32,6 +33,7 @@ export function useUploadChunk() {
 }
 
 export function useCompleteUpload() {
+	const queryClient = useQueryClient();
 	return useMutation({
 		mutationFn: ({
 			uploadId,
@@ -40,6 +42,13 @@ export function useCompleteUpload() {
 			uploadId: string;
 			idempotencyKey: string;
 		}) => completeUpload(uploadId, idempotencyKey),
+		onSuccess: (result) => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.images.list() });
+			void queryClient.prefetchQuery({
+				queryKey: queryKeys.images.detail(result.image_id),
+				queryFn: () => fetchImage(result.image_id),
+			});
+		},
 	});
 }
 
@@ -62,6 +71,12 @@ export function useSaveBulkFittingPositions() {
 		onSuccess: (_data, variables) => {
 			queryClient.invalidateQueries({
 				queryKey: queryKeys.images.fittingPositions(variables.imageId),
+			});
+			queryClient.invalidateQueries({
+				queryKey: ["search", variables.imageId],
+			});
+			queryClient.invalidateQueries({
+				queryKey: ["fitting-positions"],
 			});
 		},
 	});
