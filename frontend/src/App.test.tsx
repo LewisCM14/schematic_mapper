@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import App from "./App";
 import * as healthApi from "./services/api/health";
 
@@ -9,7 +10,9 @@ function renderWithClient(ui: React.ReactElement) {
 		defaultOptions: { queries: { retry: false } },
 	});
 	return render(
-		<QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+		<MemoryRouter initialEntries={["/"]}>
+			<QueryClientProvider client={client}>{ui}</QueryClientProvider>
+		</MemoryRouter>,
 	);
 }
 
