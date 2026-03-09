@@ -2128,4 +2128,77 @@ All of the following must pass before Phase 12 is considered complete:
 - `npm run test` — all frontend tests pass.
 - `npm run build` — production build succeeds.
 - `npm run lint` — no Biome errors.
+
+---
+
+### Phase 13 — Spec Conformance Remediation (Final)
+*Seventh and final conformance audit. Addresses the remaining gaps between the codebase and the non-implementation sections of this specification. After this phase the prototype is at 100% spec conformance.*
+
+#### 13a: `SourceSearchConfig` — Add `table_name` and `normalization_rules` Fields *(Medium)*
+*Addresses: Spec §5 Search Configuration states that source configuration includes "external table/view name" and "normalization rules (case folding, trimming, alias mapping)." The current `SourceSearchConfig` dataclass only has `source_name`, `enabled`, `searchable_columns`, and `field_weights`. The asset table name `asset_information` is hardcoded in `asset_adapter.py`, and normalization (case folding via `.lower()`, trimming via `.strip()`) is hardcoded in `search_service.py` and `views.py` rather than being driven by the configuration.*
+
+- Add `table_name: str | None` to the `SourceSearchConfig` dataclass. Set to `None` for `internal` and `"asset_information"` for `asset`.
+- Add `normalization_rules: list[str]` to the `SourceSearchConfig` dataclass. Supported values: `"case_fold"`, `"trim"`. Both sources should default to `["case_fold", "trim"]`.
+- In `asset_adapter.py`, update `search_assets()` to accept a `table_name: str` parameter instead of hardcoding `asset_information` in the SQL query. The caller (`search_service.py`) reads the table name from the config.
+- In `search_service.py`, add a `_normalize(value: str, rules: list[str]) -> str` helper that applies the configured normalization rules in order. Use this function when matching values and normalizing the query string, replacing the current hardcoded `.lower()` calls.
+- Update `tests/api/test_search_service.py`:
+    - Assert `SourceSearchConfig` for `asset` has `table_name == "asset_information"`.
+    - Assert `SourceSearchConfig` for `internal` has `table_name is None`.
+    - Assert both sources have `normalization_rules == ["case_fold", "trim"]`.
+    - Assert `_normalize` applies case folding and trimming per config.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean; `uv run ruff check .` clean.
+
+#### 13b: Read-Through Cache for Asset Adapter *(Medium)*
+*Addresses: Spec §Scalability and Resilience Controls lists "Read-through caching for slower external datasets." Every call to `fetch_asset_details()` and `search_assets()` queries the external asset database directly with no caching layer. In a production environment with a remote Oracle database this adds avoidable latency and load.*
+
+- Add a lightweight in-memory TTL cache module (`api/cache.py`) providing a generic `TTLCache` class:
+    - Storage: `dict[str, tuple[float, T]]` mapping cache keys to `(expiry_timestamp, value)`.
+    - Methods: `get(key) -> T | None`, `set(key, value, ttl_seconds)`, `clear()`.
+    - Thread-safe via `threading.Lock`.
+- In `asset_adapter.py`:
+    - Instantiate a module-level `TTLCache` instance for asset lookups.
+    - In `fetch_asset_details()`, check the cache before querying. On cache miss, query the DB and store the result with a `300`-second (5 minute) TTL. On cache hit, return the cached value.
+    - In `search_assets()`, build a cache key from the sorted labels and query string. Check cache, query on miss, cache on hit.
+    - On circuit-breaker trip, do not cache the degraded result.
+    - Expose `clear_asset_cache()` for test cleanup.
+- Add tests in `tests/api/test_asset_adapter.py`:
+    - Assert a second call to `fetch_asset_details()` with the same fitting_position returns the cached result without a second DB query (mock the cursor to verify no second execute).
+    - Assert cache expires after TTL and a fresh DB query is made.
+    - Assert degraded results are not cached.
+    - Assert `clear_asset_cache()` forces fresh queries.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean; `uv run ruff check .` clean.
+
+#### 13c: Background Refresh Option for Search Projection *(Medium)*
+*Addresses: Spec §Scalability and Resilience Controls lists "Async/background refresh option for expensive source lookups." `SearchIndexService.get_searchable_fields()` queries the database on every search request — there is no option to pre-compute or cache the search projection.*
+
+- Add a TTL-cached layer to `SearchIndexService`:
+    - Store projection results (keyed by `image_id`) in a `TTLCache` instance with a configurable TTL (default `600` seconds / 10 minutes for the prototype).
+    - `get_searchable_fields()` checks the cache first. On miss, queries the DB and stores the result.
+    - Add `invalidate(image_id)` to clear a single image's projection.
+    - Add `refresh(image_id)` to force-rebuild and cache a single image's projection.
+    - Add `clear_cache()` for test cleanup.
+- Add a `refresh_search_projection` management command (`api/management/commands/refresh_search_projection.py`):
+    - Accepts optional `--image-id` argument to refresh a single image, or refreshes all images when omitted.
+    - Calls `SearchIndexService.refresh(image_id)` for each image.
+    - Logs the number of projections refreshed.
+    - This command can be scheduled via cron or a task runner for background refresh.
+- In `search_service.py`, after search completes, no change is needed — the index service's caching is transparent to the search function.
+- Update `useSaveBulkFittingPositions` `onSuccess` in the frontend (no change needed — fitting-position invalidation already happens, and the backend cache will be repopulated on next search).
+- Add tests in `tests/api/test_search_service.py`:
+    - Assert `get_searchable_fields()` returns cached results on second call for the same `image_id`.
+    - Assert `invalidate(image_id)` causes a fresh DB query on the next call.
+    - Assert `refresh(image_id)` pre-populates the cache.
+    - Assert the management command runs without error and refreshes projections for all images.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean; `uv run ruff check .` clean.
+
+#### Completion Criteria for Phase 13
+All of the following must pass before Phase 13 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass (no frontend changes expected, but verify no regressions).
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
+
+After Phase 13, the prototype achieves full conformance with all non-implementation sections of this specification.
 - `npm run lint` — no Biome errors.
