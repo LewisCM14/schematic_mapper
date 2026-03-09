@@ -27,6 +27,7 @@ from .models import (
 )
 from .search_service import search as run_search
 from .serializers import (
+    AdminImageUploadSerializer,
     BulkFittingPositionSerializer,
     DrawingTypeSerializer,
     FittingPositionDetailSerializer,
@@ -416,6 +417,73 @@ def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
         request_id,
     )
     return Response(status=204)
+
+
+# ── Admin single-request image upload ─────────────────────────────────────────
+
+
+@api_view(["POST"])
+def admin_upload_image(request: Request) -> Response:
+    serializer = AdminImageUploadSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+
+    data = serializer.validated_data
+    drawing_type = get_object_or_404(DrawingType, pk=data["drawing_type_id"])
+
+    # Decode base64 content
+    try:
+        file_bytes = base64.b64decode(data["image_data"], validate=True)
+    except Exception:
+        return Response(
+            {"error": "Invalid base64 encoding", "code": "invalid_base64"},
+            status=400,
+        )
+
+    # Size check
+    if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        return Response(
+            {"error": "File exceeds maximum upload size", "code": "file_too_large"},
+            status=400,
+        )
+
+    # Checksum verification
+    actual_checksum = hashlib.sha256(file_bytes).hexdigest()
+    if actual_checksum != data["expected_checksum"]:
+        return Response(
+            {"error": "Checksum mismatch", "code": "checksum_mismatch"},
+            status=422,
+        )
+
+    # SVG content validation
+    content_lower = file_bytes[:512].lower()
+    is_svg = b"<svg" in content_lower or b"<?xml" in content_lower
+    if not is_svg:
+        return Response(
+            {"error": "Unsupported file type", "code": "unsupported_file_type"},
+            status=422,
+        )
+
+    # Parse dimensions
+    width_px, height_px = _parse_svg_dimensions(file_bytes)
+
+    image = Image.objects.create(
+        drawing_type=drawing_type,
+        component_name=data["component_name"],
+        image_binary=file_bytes,
+        content_hash=actual_checksum,
+        width_px=width_px,
+        height_px=height_px,
+    )
+
+    return Response(
+        {
+            "image_id": str(image.image_id),
+            "component_name": image.component_name,
+            "drawing_type": DrawingTypeSerializer(drawing_type).data,
+        },
+        status=201,
+    )
 
 
 # ── Admin bulk fitting positions ──────────────────────────────────────────────

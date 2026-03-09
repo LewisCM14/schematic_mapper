@@ -801,6 +801,118 @@ class TestGetUploadSessionView:
         assert response.status_code == 404
 
 
+# ── Admin single-request image upload ─────────────────────────────────────────
+
+
+@pytest.mark.django_db
+class TestAdminUploadImageView:
+    def _svg_payload(
+        self,
+        drawing_type: DrawingType,
+        svg: bytes = b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>',
+    ) -> dict[str, object]:
+        encoded = base64.b64encode(svg).decode()
+        checksum = hashlib.sha256(svg).hexdigest()
+        return {
+            "drawing_type_id": drawing_type.drawing_type_id,
+            "component_name": "Test Component",
+            "file_name": "test.svg",
+            "image_data": encoded,
+            "expected_checksum": checksum,
+        }
+
+    def test_valid_svg_upload_returns_201(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        payload = self._svg_payload(drawing_type)
+        response = client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert "image_id" in data
+        assert data["component_name"] == "Test Component"
+        assert data["drawing_type"]["type_name"] == "composite"
+        # Verify image was persisted
+        assert Image.objects.filter(pk=data["image_id"]).exists()
+
+    def test_checksum_mismatch_returns_422(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        payload = self._svg_payload(drawing_type)
+        payload["expected_checksum"] = "a" * 64
+        response = client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "checksum_mismatch"
+
+    def test_file_too_large_returns_400(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        # Create content just over the 50MB limit
+        from unittest.mock import patch
+
+        svg = b"<svg/>"
+        encoded = base64.b64encode(svg).decode()
+        checksum = hashlib.sha256(svg).hexdigest()
+        payload = {
+            "drawing_type_id": drawing_type.drawing_type_id,
+            "component_name": "Too Large",
+            "file_name": "big.svg",
+            "image_data": encoded,
+            "expected_checksum": checksum,
+        }
+        with patch("api.views.MAX_UPLOAD_SIZE_BYTES", 2):
+            response = client.post(
+                "/api/admin/images",
+                data=json.dumps(payload),
+                content_type="application/json",
+            )
+        assert response.status_code == 400
+        assert response.json()["code"] == "file_too_large"
+
+    def test_non_svg_content_returns_422(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        plain_text = b"This is not SVG content at all"
+        encoded = base64.b64encode(plain_text).decode()
+        checksum = hashlib.sha256(plain_text).hexdigest()
+        payload = {
+            "drawing_type_id": drawing_type.drawing_type_id,
+            "component_name": "Not SVG",
+            "file_name": "readme.txt",
+            "image_data": encoded,
+            "expected_checksum": checksum,
+        }
+        response = client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "unsupported_file_type"
+
+    def test_extracts_svg_dimensions(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"></svg>'
+        payload = self._svg_payload(drawing_type, svg)
+        response = client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        img = Image.objects.get(pk=response.json()["image_id"])
+        assert img.width_px == 640
+        assert img.height_px == 480
+
+
 # ── Admin bulk fitting positions ──────────────────────────────────────────────
 
 

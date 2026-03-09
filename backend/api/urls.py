@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    admin_upload_image,
     bulk_fitting_positions,
     complete_upload,
     create_upload_session,
@@ -27,6 +28,7 @@ urlpatterns = [
     ),
     path("search", search_view),
     # Admin endpoints
+    path("admin/images", admin_upload_image),
     path("admin/uploads", create_upload_session),
     path("admin/uploads/<uuid:upload_id>/parts/<int:part_number>", upload_chunk),
     path("admin/uploads/<uuid:upload_id>/complete", complete_upload),

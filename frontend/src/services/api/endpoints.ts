@@ -61,9 +61,10 @@ export async function fetchSearch({
 	limit = 25,
 	cursor,
 }: SearchParams) {
+	const normalizedQuery = query.trim().toLowerCase();
 	const params: Record<string, string> = {
 		image_id: imageId,
-		query,
+		query: normalizedQuery,
 		sources: sources.join(","),
 		limit: String(limit),
 	};

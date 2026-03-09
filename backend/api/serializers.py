@@ -91,6 +91,14 @@ class UploadSessionCreateSerializer(serializers.Serializer[Any]):
     idempotency_key = serializers.CharField(max_length=128)
 
 
+class AdminImageUploadSerializer(serializers.Serializer[Any]):
+    drawing_type_id = serializers.IntegerField()
+    component_name = serializers.CharField(max_length=200)
+    file_name = serializers.CharField(max_length=255)
+    image_data = serializers.CharField()
+    expected_checksum = serializers.CharField(max_length=64)
+
+
 class UploadChunkSerializer(serializers.Serializer[Any]):
     chunk_data = serializers.CharField()  # base64-encoded chunk bytes
 
