@@ -26,6 +26,7 @@ from .models import (
 from .search_service import search as run_search
 from .serializers import (
     BulkFittingPositionSerializer,
+    DrawingTypeSerializer,
     FittingPositionDetailSerializer,
     FittingPositionSerializer,
     ImageDetailSerializer,
@@ -55,6 +56,13 @@ def health(request: Request) -> Response:
 
     status_code = 200 if db_status == "ok" else 503
     return Response({"status": "ok", "database": db_status}, status=status_code)
+
+
+@api_view(["GET"])
+def list_drawing_types(request: Request) -> Response:
+    qs = DrawingType.objects.filter(is_active=True).order_by("type_name")
+    serializer = DrawingTypeSerializer(qs, many=True)
+    return Response(serializer.data)
 
 
 @api_view(["GET"])

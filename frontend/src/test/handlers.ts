@@ -8,6 +8,14 @@ export const IMAGE_ID = "00000000-0000-4000-8000-000000000001";
 export const UPLOAD_ID = "00000000-0000-4000-8000-000000000099";
 
 export const FIXTURES = {
+	drawingTypes: [
+		{
+			drawing_type_id: 1,
+			type_name: "composite",
+			description: "",
+			is_active: true,
+		},
+	],
 	image: {
 		image_id: IMAGE_ID,
 		component_name: "Cooling System Assembly",
@@ -88,6 +96,10 @@ export const FIXTURES = {
 export const handlers = [
 	http.get("/api/health", () =>
 		HttpResponse.json({ status: "ok", db: "connected" }),
+	),
+
+	http.get("/api/drawing-types", () =>
+		HttpResponse.json(FIXTURES.drawingTypes),
 	),
 
 	http.get("/api/images", () =>

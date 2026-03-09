@@ -1,6 +1,8 @@
 export const queryKeys = {
 	health: ["health"] as const,
 
+	drawingTypes: ["drawing-types"] as const,
+
 	images: {
 		all: ["images"] as const,
 		list: (filters?: Record<string, unknown>) =>

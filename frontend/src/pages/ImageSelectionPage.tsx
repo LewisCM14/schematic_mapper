@@ -2,6 +2,7 @@ import { Box, CircularProgress, Typography } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ImageSelectionTemplate from "../components/templates/ImageSelectionTemplate";
+import { useDrawingTypes } from "../services/api/hooks/useDrawingTypes";
 import { useImages } from "../services/api/hooks/useImages";
 
 function ImageSelectionPage() {
@@ -9,19 +10,9 @@ function ImageSelectionPage() {
 	const [selectedTypeId, setSelectedTypeId] = useState<number | "">("");
 	const [searchText, setSearchText] = useState("");
 
-	// Fetch all images unfiltered to derive available drawing types
-	const { data: allData, isLoading: typesLoading } = useImages();
-	const allImages = allData?.pages.flatMap((p) => p.results) ?? [];
-
-	// Derive unique drawing types from the unfiltered list
-	const drawingTypes = Array.from(
-		new Map(
-			allImages.map((img) => [
-				img.drawing_type.drawing_type_id,
-				img.drawing_type,
-			]),
-		).values(),
-	);
+	// Fetch drawing types from dedicated endpoint
+	const { data: drawingTypes = [], isLoading: typesLoading } =
+		useDrawingTypes();
 
 	// Fetch images filtered by selected drawing type and optional search text
 	const {

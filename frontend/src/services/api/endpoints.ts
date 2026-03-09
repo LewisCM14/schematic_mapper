@@ -1,6 +1,7 @@
 import httpClient from "./httpClient";
 import {
 	BulkFittingPositionsResultSchema,
+	DrawingTypeListSchema,
 	FittingPositionDetailSchema,
 	FittingPositionListSchema,
 	HealthSchema,
@@ -14,6 +15,11 @@ import {
 export async function fetchHealth() {
 	const response = await httpClient.get("/health");
 	return HealthSchema.parse(response.data);
+}
+
+export async function fetchDrawingTypes() {
+	const response = await httpClient.get("/drawing-types");
+	return DrawingTypeListSchema.parse(response.data);
 }
 
 export async function fetchImages(params?: Record<string, string>) {

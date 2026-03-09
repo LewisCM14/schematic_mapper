@@ -7,6 +7,7 @@ from .views import (
     get_fitting_position_details,
     get_image,
     health,
+    list_drawing_types,
     list_fitting_positions,
     list_images,
     search_view,
@@ -16,6 +17,7 @@ from .views import (
 
 urlpatterns = [
     path("health", health),
+    path("drawing-types", list_drawing_types),
     path("images", list_images),
     path("images/<uuid:image_id>", get_image),
     path("images/<uuid:image_id>/fitting-positions", list_fitting_positions),

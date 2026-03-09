@@ -12,6 +12,8 @@ export const DrawingTypeSchema = z.object({
 	is_active: z.boolean(),
 });
 
+export const DrawingTypeListSchema = z.array(DrawingTypeSchema);
+
 export const ImageSchema = z.object({
 	image_id: z.string().uuid(),
 	drawing_type: DrawingTypeSchema,

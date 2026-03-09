@@ -24,8 +24,8 @@ import {
 	useSaveBulkFittingPositions,
 	useUploadChunk,
 } from "../services/api/hooks/useAdminUpload";
+import { useDrawingTypes } from "../services/api/hooks/useDrawingTypes";
 import { useImage, useImages } from "../services/api/hooks/useImages";
-import type { DrawingType } from "../services/api/schemas";
 
 const STEPS = [
 	"Select Type",
@@ -67,21 +67,10 @@ function AdminPage() {
 		number | ""
 	>("");
 	const {
-		data: imagesData,
+		data: drawingTypes = [],
 		isLoading: drawingTypesLoading,
 		isError: drawingTypesError,
-	} = useImages();
-	const images = imagesData?.pages.flatMap((p) => p.results) ?? [];
-
-	// Derive unique drawing types from available images
-	const drawingTypes: DrawingType[] = [];
-	const seenIds = new Set<number>();
-	for (const img of images) {
-		if (!seenIds.has(img.drawing_type.drawing_type_id)) {
-			seenIds.add(img.drawing_type.drawing_type_id);
-			drawingTypes.push(img.drawing_type);
-		}
-	}
+	} = useDrawingTypes();
 
 	// Step 2 — upload
 	const [componentName, setComponentName] = useState("");

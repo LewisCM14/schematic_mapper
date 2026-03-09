@@ -302,7 +302,7 @@ describe("AdminPage", () => {
 
 	it("Step 1 shows loading state while fetching drawing types", async () => {
 		server.use(
-			http.get("/api/images", async () => {
+			http.get("/api/drawing-types", async () => {
 				await new Promise(() => {}); // never resolves
 			}),
 		);
@@ -316,7 +316,10 @@ describe("AdminPage", () => {
 
 	it("Step 1 shows error state when fetching drawing types fails", async () => {
 		server.use(
-			http.get("/api/images", () => new HttpResponse(null, { status: 500 })),
+			http.get(
+				"/api/drawing-types",
+				() => new HttpResponse(null, { status: 500 }),
+			),
 		);
 		renderPage();
 		await waitFor(() => {
@@ -327,18 +330,7 @@ describe("AdminPage", () => {
 	});
 
 	it("Step 1 shows empty state when no drawing types available", async () => {
-		server.use(
-			http.get("/api/images", () =>
-				HttpResponse.json({
-					count: 0,
-					next: null,
-					previous: null,
-					results: [],
-					has_more: false,
-					next_cursor: null,
-				}),
-			),
-		);
+		server.use(http.get("/api/drawing-types", () => HttpResponse.json([])));
 		renderPage();
 		await waitFor(() => {
 			expect(

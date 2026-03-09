@@ -65,6 +65,55 @@ class TestHealthView:
 
 
 @pytest.mark.django_db
+class TestListDrawingTypesView:
+    def test_returns_200(self, client: Client, drawing_type: DrawingType) -> None:
+        response = client.get("/api/drawing-types")
+        assert response.status_code == 200
+
+    def test_returns_seeded_types(self, client: Client, drawing_type: DrawingType) -> None:
+        DrawingType.objects.create(type_name="system")
+        response = client.get("/api/drawing-types")
+        data = response.json()
+        names = [dt["type_name"] for dt in data]
+        assert "composite" in names
+        assert "system" in names
+
+    def test_types_with_no_images_still_appear(self, client: Client) -> None:
+        DrawingType.objects.create(type_name="standalone")
+        response = client.get("/api/drawing-types")
+        data = response.json()
+        names = [dt["type_name"] for dt in data]
+        assert "standalone" in names
+
+    def test_inactive_types_excluded(self, client: Client) -> None:
+        DrawingType.objects.create(type_name="active_type")
+        DrawingType.objects.create(type_name="inactive_type", is_active=False)
+        response = client.get("/api/drawing-types")
+        data = response.json()
+        names = [dt["type_name"] for dt in data]
+        assert "active_type" in names
+        assert "inactive_type" not in names
+
+    def test_response_shape(self, client: Client, drawing_type: DrawingType) -> None:
+        response = client.get("/api/drawing-types")
+        data = response.json()
+        assert isinstance(data, list)
+        item = data[0]
+        assert "drawing_type_id" in item
+        assert "type_name" in item
+        assert "description" in item
+        assert "is_active" in item
+
+    def test_ordered_by_type_name(self, client: Client) -> None:
+        DrawingType.objects.create(type_name="z-type")
+        DrawingType.objects.create(type_name="a-type")
+        response = client.get("/api/drawing-types")
+        data = response.json()
+        names = [dt["type_name"] for dt in data]
+        assert names == sorted(names)
+
+
+@pytest.mark.django_db
 class TestListImagesView:
     def test_returns_200(self, client: Client, image: Image) -> None:
         response = client.get("/api/images")
