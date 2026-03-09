@@ -47,7 +47,9 @@ describe("AdminPage", () => {
 		renderPage();
 
 		// Step 1 — select drawing type
-		const select = await screen.findByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -108,7 +110,9 @@ describe("AdminPage", () => {
 	it("advances to Upload step after selecting a drawing type", async () => {
 		renderPage();
 
-		const select = await screen.findByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -127,7 +131,9 @@ describe("AdminPage", () => {
 	it("Upload button is disabled when no file is selected", async () => {
 		renderPage();
 
-		const select = await screen.findByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -185,7 +191,9 @@ describe("AdminPage", () => {
 		renderPage();
 
 		// Navigate to the upload step
-		const select = await screen.findByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -237,7 +245,9 @@ describe("AdminPage", () => {
 		renderPage();
 
 		// Navigate to the upload step
-		const select = await screen.findByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -298,16 +308,15 @@ describe("AdminPage", () => {
 		);
 		renderPage();
 		await waitFor(() => {
-			expect(screen.getByLabelText("loading drawing types")).toBeInTheDocument();
+			expect(
+				screen.getByLabelText("loading drawing types"),
+			).toBeInTheDocument();
 		});
 	});
 
 	it("Step 1 shows error state when fetching drawing types fails", async () => {
 		server.use(
-			http.get(
-				"/api/images",
-				() => new HttpResponse(null, { status: 500 }),
-			),
+			http.get("/api/images", () => new HttpResponse(null, { status: 500 })),
 		);
 		renderPage();
 		await waitFor(() => {
@@ -336,5 +345,120 @@ describe("AdminPage", () => {
 				screen.getByText("No drawing types available."),
 			).toBeInTheDocument();
 		});
+	});
+
+	it("action footer renders during Step 4 with validation summary", async () => {
+		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
+
+		renderPage();
+
+		// Step 1 — select drawing type
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
+		await userEvent.click(select);
+		const option = await screen.findByRole("option", { name: "composite" });
+		await userEvent.click(option);
+		await userEvent.click(screen.getByRole("button", { name: /next/i }));
+
+		// Step 2 — upload
+		await waitFor(() =>
+			screen.getByRole("textbox", { name: /component name/i }),
+		);
+		await userEvent.type(
+			screen.getByRole("textbox", { name: /component name/i }),
+			"Pump Assembly",
+		);
+
+		const file = new File(["<svg/>"], "test.svg", { type: "image/svg+xml" });
+		const fileInput =
+			document.querySelector<HTMLInputElement>('input[type="file"]');
+		fireEvent.change(fileInput as HTMLInputElement, {
+			target: { files: [file] },
+		});
+
+		await waitFor(() =>
+			expect(
+				screen.getByRole("button", { name: /^upload$/i }),
+			).not.toBeDisabled(),
+		);
+		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+
+		// Step 3 — select image
+		await waitFor(() => {
+			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
+		});
+		await userEvent.click(screen.getByText("Cooling System Assembly"));
+
+		// Step 4 — Map Positions
+		await waitFor(() => {
+			expect(screen.getByText("Map Fitting Positions")).toBeInTheDocument();
+		});
+
+		// Footer should be visible
+		expect(screen.getByTestId("admin-action-footer")).toBeInTheDocument();
+		expect(screen.getByText("0 positions")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+		expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
+	});
+
+	it("Cancel in action footer returns to Step 3 and clears mapping state", async () => {
+		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
+
+		renderPage();
+
+		// Navigate to Step 4
+		const select = await screen.findByRole("combobox", {
+			name: /drawing type/i,
+		});
+		await userEvent.click(select);
+		const option = await screen.findByRole("option", { name: "composite" });
+		await userEvent.click(option);
+		await userEvent.click(screen.getByRole("button", { name: /next/i }));
+
+		await waitFor(() =>
+			screen.getByRole("textbox", { name: /component name/i }),
+		);
+		await userEvent.type(
+			screen.getByRole("textbox", { name: /component name/i }),
+			"Pump Assembly",
+		);
+
+		const file = new File(["<svg/>"], "test.svg", { type: "image/svg+xml" });
+		const fileInput =
+			document.querySelector<HTMLInputElement>('input[type="file"]');
+		fireEvent.change(fileInput as HTMLInputElement, {
+			target: { files: [file] },
+		});
+
+		await waitFor(() =>
+			expect(
+				screen.getByRole("button", { name: /^upload$/i }),
+			).not.toBeDisabled(),
+		);
+		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
+		});
+		await userEvent.click(screen.getByText("Cooling System Assembly"));
+
+		await waitFor(() => {
+			expect(screen.getByText("Map Fitting Positions")).toBeInTheDocument();
+		});
+
+		// Click Cancel in the footer
+		await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+		// Should return to Step 3 (Select Image)
+		await waitFor(() => {
+			expect(
+				screen.getByRole("heading", { name: "Select Image" }),
+			).toBeInTheDocument();
+		});
+
+		// Footer should not be visible in Step 3
+		expect(screen.queryByTestId("admin-action-footer")).not.toBeInTheDocument();
 	});
 });

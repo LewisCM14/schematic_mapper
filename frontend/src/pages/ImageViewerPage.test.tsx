@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES, IMAGE_ID, server } from "../test/handlers";
 import theme from "../theme";
 import ImageViewerPage from "./ImageViewerPage";
@@ -28,6 +28,14 @@ function renderPage(imageId = IMAGE_ID) {
 }
 
 describe("ImageViewerPage", () => {
+	beforeEach(() => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	it("redirects to / when imageId is missing", () => {
 		const client = new QueryClient({
 			defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -76,6 +84,28 @@ describe("ImageViewerPage", () => {
 			expect(
 				screen.getByText("Failed to load schematic image."),
 			).toBeInTheDocument();
+		});
+	});
+
+	it("shows notice and redirects to / when imageId is invalid", async () => {
+		server.use(
+			http.get(
+				"/api/images/:imageId",
+				() => new HttpResponse(null, { status: 404 }),
+			),
+		);
+		renderPage("not-a-real-uuid");
+
+		await waitFor(() => {
+			expect(
+				screen.getByText("Image not found — returning to selection"),
+			).toBeInTheDocument();
+		});
+
+		vi.advanceTimersByTime(3000);
+
+		await waitFor(() => {
+			expect(screen.getByText("Home")).toBeInTheDocument();
 		});
 	});
 

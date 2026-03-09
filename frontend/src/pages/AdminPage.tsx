@@ -7,10 +7,12 @@ import {
 	MenuItem,
 	Paper,
 	Select,
+	Tooltip,
 	Typography,
 } from "@mui/material";
 import { useState } from "react";
 import ImageTileCard from "../components/molecules/ImageTileCard";
+import ValidationSummaryRow from "../components/molecules/ValidationSummaryRow";
 import MappingWorkbench from "../components/organisms/MappingWorkbench";
 import UploadSessionPanel from "../components/organisms/UploadSessionPanel";
 import AdminMappingTemplate from "../components/templates/AdminMappingTemplate";
@@ -64,7 +66,11 @@ function AdminPage() {
 	const [selectedDrawingTypeId, setSelectedDrawingTypeId] = useState<
 		number | ""
 	>("");
-	const { data: imagesData, isLoading: drawingTypesLoading, isError: drawingTypesError } = useImages();
+	const {
+		data: imagesData,
+		isLoading: drawingTypesLoading,
+		isError: drawingTypesError,
+	} = useImages();
 	const images = imagesData?.pages.flatMap((p) => p.results) ?? [];
 
 	// Derive unique drawing types from available images
@@ -244,32 +250,36 @@ function AdminPage() {
 							Failed to load drawing types.
 						</Alert>
 					)}
-					{!drawingTypesLoading && !drawingTypesError && drawingTypes.length === 0 && (
-						<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-							No drawing types available.
-						</Typography>
-					)}
-					{!drawingTypesLoading && !drawingTypesError && drawingTypes.length > 0 && (
-						<Select
-							fullWidth
-							displayEmpty
-							value={selectedDrawingTypeId}
-							onChange={(e) =>
-								setSelectedDrawingTypeId(e.target.value as number | "")
-							}
-							size="small"
-							inputProps={{ "aria-label": "drawing type" }}
-						>
-							<MenuItem value="" disabled>
-								— select drawing type —
-							</MenuItem>
-							{drawingTypes.map((dt) => (
-								<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
-									{dt.type_name}
+					{!drawingTypesLoading &&
+						!drawingTypesError &&
+						drawingTypes.length === 0 && (
+							<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+								No drawing types available.
+							</Typography>
+						)}
+					{!drawingTypesLoading &&
+						!drawingTypesError &&
+						drawingTypes.length > 0 && (
+							<Select
+								fullWidth
+								displayEmpty
+								value={selectedDrawingTypeId}
+								onChange={(e) =>
+									setSelectedDrawingTypeId(e.target.value as number | "")
+								}
+								size="small"
+								inputProps={{ "aria-label": "drawing type" }}
+							>
+								<MenuItem value="" disabled>
+									— select drawing type —
 								</MenuItem>
-							))}
-						</Select>
-					)}
+								{drawingTypes.map((dt) => (
+									<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
+										{dt.type_name}
+									</MenuItem>
+								))}
+							</Select>
+						)}
 					<Box sx={{ mt: 2 }}>
 						<Button
 							variant="contained"
@@ -490,6 +500,53 @@ function AdminPage() {
 							)}
 						</>
 					)}
+				</Paper>
+			)}
+
+			{/* ── Action Footer ── */}
+			{(activeStep === 3 || activeStep === 4) && (
+				<Paper
+					sx={{
+						position: "sticky",
+						bottom: 0,
+						p: 2,
+						mt: 2,
+						display: "flex",
+						alignItems: "center",
+						gap: 2,
+						borderTop: 1,
+						borderColor: "divider",
+					}}
+					data-testid="admin-action-footer"
+				>
+					<ValidationSummaryRow totalCount={mappedPositions.length} />
+					<Box sx={{ flexGrow: 1 }} />
+					<Button
+						variant="outlined"
+						onClick={() => {
+							setActiveStep(2);
+							setMappedPositions([]);
+							setPendingPos(null);
+							setEditingLabel("");
+							setSaveResult(null);
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						variant="contained"
+						onClick={handleSave}
+						disabled={mappedPositions.length === 0 || saveBulk.isPending}
+					>
+						Save
+					</Button>
+					<Tooltip title="Available in enterprise deployment">
+						<span>
+							<Button variant="contained" disabled>
+								Publish
+							</Button>
+						</span>
+					</Tooltip>
 				</Paper>
 			)}
 		</AdminMappingTemplate>
