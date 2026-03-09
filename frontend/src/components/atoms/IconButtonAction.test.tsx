@@ -37,4 +37,9 @@ describe("IconButtonAction", () => {
 		await userEvent.click(screen.getByRole("button", { name: "test action" }));
 		expect(onClick).toHaveBeenCalledOnce();
 	});
+
+	it("renders as disabled when disabled prop is true", () => {
+		renderBtn({ disabled: true });
+		expect(screen.getByRole("button", { name: "test action" })).toBeDisabled();
+	});
 });

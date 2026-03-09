@@ -44,4 +44,18 @@ describe("TopAppHeader", () => {
 		renderHeader();
 		expect(screen.getByLabelText("user menu")).toBeInTheDocument();
 	});
+
+	it("renders a disabled navigation menu icon with tooltip", () => {
+		renderHeader();
+		const btn = screen.getByRole("button", { name: "navigation menu" });
+		expect(btn).toBeInTheDocument();
+		expect(btn).toBeDisabled();
+	});
+
+	it("renders a disabled help icon with tooltip", () => {
+		renderHeader();
+		const btn = screen.getByRole("button", { name: "help" });
+		expect(btn).toBeInTheDocument();
+		expect(btn).toBeDisabled();
+	});
 });

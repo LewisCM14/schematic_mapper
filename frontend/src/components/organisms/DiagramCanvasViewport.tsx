@@ -4,9 +4,11 @@ import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 import { Box, IconButton } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import IconButtonAction from "../atoms/IconButtonAction";
+import POIMarkerCluster from "../atoms/POIMarkerCluster";
 import POIMarkerPin from "../atoms/POIMarkerPin";
+import { clusterMarkers } from "./clusterMarkers";
 
 export interface CanvasMarker {
 	id: string;
@@ -33,6 +35,9 @@ export interface DiagramCanvasViewportProps {
 	) => React.ReactNode;
 }
 
+/** Pixel-distance threshold used for marker clustering. */
+const CLUSTER_THRESHOLD = 40;
+
 function DiagramCanvasViewport({
 	imageSvgUrl,
 	markers,
@@ -48,6 +53,7 @@ function DiagramCanvasViewport({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [panZoomHost, setPanZoomHost] = useState<HTMLDivElement | null>(null);
 	const panzoomRef = useRef<PanzoomObject | null>(null);
+	const [currentScale, setCurrentScale] = useState(1);
 
 	// Drag state
 	const dragRef = useRef<{
@@ -72,14 +78,25 @@ function DiagramCanvasViewport({
 		const onPanzoomChange = () => {
 			onZoomChange?.(pz.getScale());
 		};
+		const onScaleUpdate = () => {
+			setCurrentScale(pz.getScale());
+		};
 		panZoomHost.addEventListener("panzoomchange", onPanzoomChange);
+		panZoomHost.addEventListener("panzoomchange", onScaleUpdate);
 		return () => {
 			pz.destroy();
 			container?.removeEventListener("wheel", pz.zoomWithWheel);
 			panZoomHost.removeEventListener("panzoomchange", onPanzoomChange);
+			panZoomHost.removeEventListener("panzoomchange", onScaleUpdate);
 			panzoomRef.current = null;
 		};
 	}, [panZoomHost, onZoomChange]);
+
+	// Compute clustered markers
+	const clusteredItems = useMemo(
+		() => clusterMarkers(markers, currentScale, CLUSTER_THRESHOLD),
+		[markers, currentScale],
+	);
 
 	// Programmatic pan
 	useEffect(() => {
@@ -226,8 +243,31 @@ function DiagramCanvasViewport({
 					draggable={false}
 				/>
 
-				{/* Marker pins */}
-				{markers.map((marker) => {
+				{/* Marker pins and clusters */}
+				{clusteredItems.map((item) => {
+					if (item.type === "cluster") {
+						return (
+							<Box
+								key={item.id}
+								sx={{
+									position: "absolute",
+									left: item.x,
+									top: item.y,
+									transform: "translate(-50%, -50%)",
+								}}
+							>
+								<POIMarkerCluster
+									count={item.count}
+									onClick={() => {
+										// Zoom in toward cluster centroid to expand it
+										panzoomRef.current?.zoomIn();
+									}}
+								/>
+							</Box>
+						);
+					}
+
+					const marker = item.marker;
 					const isSelected = marker.id === selectedMarkerId;
 					const isUnmapped = marker.status === "unmapped";
 					const button = (

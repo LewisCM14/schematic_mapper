@@ -1,4 +1,7 @@
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import MenuIcon from "@mui/icons-material/Menu";
 import { AppBar, Box, Toolbar } from "@mui/material";
+import IconButtonAction from "../atoms/IconButtonAction";
 import StatusChip from "../atoms/StatusChip";
 import HeaderIdentity from "../molecules/HeaderIdentity";
 import UserMenuTrigger from "../molecules/UserMenuTrigger";
@@ -17,7 +20,14 @@ function TopAppHeader({
 	return (
 		<AppBar position="static" color="primary">
 			<Toolbar>
-				<Box sx={{ flexGrow: 1 }}>
+				<IconButtonAction
+					icon={<MenuIcon />}
+					onClick={() => {}}
+					ariaLabel="navigation menu"
+					tooltip="Navigation (available in enterprise deployment)"
+					disabled
+				/>
+				<Box sx={{ flexGrow: 1, ml: 1 }}>
 					<HeaderIdentity title={title} contextLabel={contextLabel} />
 				</Box>
 				{sourceStatus &&
@@ -26,6 +36,13 @@ function TopAppHeader({
 							<StatusChip status={status as "ok" | "degraded" | "error"} />
 						</Box>
 					))}
+				<IconButtonAction
+					icon={<HelpOutlineIcon />}
+					onClick={() => {}}
+					ariaLabel="help"
+					tooltip="Help (available in enterprise deployment)"
+					disabled
+				/>
 				<UserMenuTrigger />
 			</Toolbar>
 		</AppBar>

@@ -20,6 +20,9 @@ interface ImageSelectionTemplateProps {
 	onLoadMore?: () => void;
 	showGrid: boolean;
 	stateSlot: ReactNode;
+	imagesLoading?: boolean;
+	imagesError?: boolean;
+	imagesErrorMessage?: string;
 }
 
 function ImageSelectionTemplate({
@@ -37,6 +40,9 @@ function ImageSelectionTemplate({
 	onLoadMore,
 	showGrid,
 	stateSlot,
+	imagesLoading,
+	imagesError,
+	imagesErrorMessage,
 }: ImageSelectionTemplateProps) {
 	return (
 		<>
@@ -57,13 +63,16 @@ function ImageSelectionTemplate({
 				<Box sx={{ mt: 4 }}>
 					{stateSlot}
 
-					{showGrid && images.length > 0 && (
+					{showGrid && (
 						<ImageSelectionGrid
 							images={images}
 							onImageClick={onImageClick}
 							hasNextPage={hasNextPage}
 							isFetchingNextPage={isFetchingNextPage}
 							onLoadMore={onLoadMore}
+							isLoading={imagesLoading}
+							isError={imagesError}
+							errorMessage={imagesErrorMessage}
 						/>
 					)}
 				</Box>

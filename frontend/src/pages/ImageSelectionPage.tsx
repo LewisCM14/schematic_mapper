@@ -18,7 +18,7 @@ function ImageSelectionPage() {
 	const {
 		data: filteredData,
 		isLoading: imagesLoading,
-		isError,
+		isError: imagesError,
 		hasNextPage,
 		fetchNextPage,
 		isFetchingNextPage,
@@ -31,7 +31,6 @@ function ImageSelectionPage() {
 	// Only show tile grid after a type has been selected and data is ready
 	const showGrid = selectedTypeId !== "";
 	const images = showGrid ? filteredImages : [];
-	const isLoading = typesLoading || (showGrid && imagesLoading);
 
 	const stateSlot = (
 		<>
@@ -41,22 +40,10 @@ function ImageSelectionPage() {
 				</Typography>
 			)}
 
-			{isLoading && (
+			{typesLoading && (
 				<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
 					<CircularProgress />
 				</Box>
-			)}
-
-			{showGrid && isError && (
-				<Typography color="error">
-					Failed to load images. Please check the API is running.
-				</Typography>
-			)}
-
-			{showGrid && !isLoading && images.length === 0 && !isError && (
-				<Typography color="text.secondary">
-					No schematic drawings found for this drawing type.
-				</Typography>
 			)}
 		</>
 	);
@@ -77,6 +64,9 @@ function ImageSelectionPage() {
 			onLoadMore={() => fetchNextPage()}
 			showGrid={showGrid}
 			stateSlot={stateSlot}
+			imagesLoading={showGrid && imagesLoading}
+			imagesError={showGrid && imagesError}
+			imagesErrorMessage="Failed to load images. Please check the API is running."
 		/>
 	);
 }

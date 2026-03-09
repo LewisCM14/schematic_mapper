@@ -15,6 +15,13 @@ const MARKERS: CanvasMarker[] = [
 	{ id: "FP-002", x: 300, y: 400, status: "unmapped" },
 ];
 
+// Markers close enough to cluster at default scale
+const CLOSE_MARKERS: CanvasMarker[] = [
+	{ id: "FP-A", x: 100, y: 100, status: "mapped" },
+	{ id: "FP-B", x: 105, y: 105, status: "mapped" },
+	{ id: "FP-C", x: 110, y: 110, status: "mapped" },
+];
+
 function renderCanvas(
 	props: Partial<React.ComponentProps<typeof DiagramCanvasViewport>> = {},
 ) {
@@ -65,5 +72,23 @@ describe("DiagramCanvasViewport", () => {
 	it("renders the canvas container with data-testid", () => {
 		renderCanvas();
 		expect(screen.getByTestId("diagram-canvas")).toBeInTheDocument();
+	});
+
+	it("renders a POIMarkerCluster when markers are close together", () => {
+		renderCanvas({ markers: CLOSE_MARKERS });
+		expect(
+			screen.getByRole("button", { name: /markers clustered/ }),
+		).toBeInTheDocument();
+		// Individual pin buttons should NOT appear when clustered
+		expect(screen.queryByRole("button", { name: "FP-A" })).toBeNull();
+	});
+
+	it("renders individual POIMarkerPins when markers are spread apart", () => {
+		renderCanvas({ markers: MARKERS });
+		expect(screen.getByRole("button", { name: "FP-001" })).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "FP-002" })).toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: /markers clustered/ }),
+		).toBeNull();
 	});
 });

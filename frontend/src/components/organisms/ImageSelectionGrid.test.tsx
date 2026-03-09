@@ -45,4 +45,48 @@ describe("ImageSelectionGrid", () => {
 			screen.getByRole("button", { name: /load more/i }),
 		).toBeInTheDocument();
 	});
+
+	it("renders skeleton placeholders when loading with no images", () => {
+		const { container } = render(
+			<ThemeProvider theme={theme}>
+				<ImageSelectionGrid images={[]} onImageClick={vi.fn()} isLoading />
+			</ThemeProvider>,
+		);
+		const skeletons = container.querySelectorAll(".MuiSkeleton-root");
+		expect(skeletons.length).toBe(3);
+	});
+
+	it("renders an error alert when isError is true", () => {
+		render(
+			<ThemeProvider theme={theme}>
+				<ImageSelectionGrid images={[]} onImageClick={vi.fn()} isError />
+			</ThemeProvider>,
+		);
+		expect(screen.getByRole("alert")).toHaveTextContent(
+			"Failed to load images",
+		);
+	});
+
+	it("renders custom error message", () => {
+		render(
+			<ThemeProvider theme={theme}>
+				<ImageSelectionGrid
+					images={[]}
+					onImageClick={vi.fn()}
+					isError
+					errorMessage="Server down"
+				/>
+			</ThemeProvider>,
+		);
+		expect(screen.getByRole("alert")).toHaveTextContent("Server down");
+	});
+
+	it("renders empty state when images array is empty", () => {
+		render(
+			<ThemeProvider theme={theme}>
+				<ImageSelectionGrid images={[]} onImageClick={vi.fn()} />
+			</ThemeProvider>,
+		);
+		expect(screen.getByText(/no images found/i)).toBeInTheDocument();
+	});
 });
