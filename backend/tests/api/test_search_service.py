@@ -246,6 +246,31 @@ class TestSearchService:
         # WA-002 matched label_text (weight 10); WA-001 matched component_name (weight 5)
         assert ids.index("WA-002") < ids.index("WA-001")
 
+    def test_both_sources_degraded(self) -> None:
+        img, _ = self._setup()
+        with (
+            patch.object(
+                SearchIndexService,
+                "get_searchable_fields",
+                side_effect=RuntimeError("db down"),
+            ),
+            patch("api.search_service.search_assets") as mock_search_assets,
+        ):
+            mock_search_assets.return_value = AssetSearchResult(
+                source_status="degraded"
+            )
+            result = search(
+                image_id=img.image_id,
+                query="pump",
+                sources=["internal", "asset"],
+                limit=25,
+                cursor=None,
+                request_id="req-degraded",
+            )
+        assert result.results == []
+        assert result.source_status["internal"] == "degraded"
+        assert result.source_status["asset"] == "degraded"
+
 
 class TestSearchConfigService:
     def test_known_source_returns_config(self) -> None:

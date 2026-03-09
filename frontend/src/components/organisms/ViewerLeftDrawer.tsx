@@ -55,27 +55,27 @@ function ViewerLeftDrawer({
 					variant="fullWidth"
 				>
 					<Tab
-						icon={<InfoOutlinedIcon fontSize="small" />}
-						iconPosition="start"
-						label="Information"
-						aria-label="information tab"
-					/>
-					<Tab
 						icon={<SearchOutlinedIcon fontSize="small" />}
 						iconPosition="start"
 						label="Search"
 						aria-label="search tab"
 					/>
+					<Tab
+						icon={<InfoOutlinedIcon fontSize="small" />}
+						iconPosition="start"
+						label="Information"
+						aria-label="information tab"
+					/>
 				</Tabs>
 			</Box>
-			{activeTab === 0 && <POIDetailPanel fittingPositionId={selectedFpId} />}
-			{activeTab === 1 && (
+			{activeTab === 0 && (
 				<SearchResultsPanel
 					imageId={imageId}
 					onSelectFp={onSelectFp}
 					onSearchMetadata={onSearchMetadata}
 				/>
 			)}
+			{activeTab === 1 && <POIDetailPanel fittingPositionId={selectedFpId} />}
 		</Drawer>
 	);
 }

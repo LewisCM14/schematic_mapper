@@ -77,7 +77,13 @@ def search(
     config_service = SearchConfigService()
     index_service = SearchIndexService(config_service)
 
-    projection_rows = index_service.get_searchable_fields(image_id)
+    internal_degraded = False
+    try:
+        projection_rows = index_service.get_searchable_fields(image_id)
+    except Exception:
+        projection_rows = []
+        internal_degraded = True
+
     row_by_label: dict[str, SearchProjectionRow] = {
         row.label_text: row for row in projection_rows
     }
@@ -94,55 +100,61 @@ def search(
 
     # ── Internal ──────────────────────────────────────────────────────────────
     if "internal" in sources:
-        source_status["internal"] = "ok"
-        internal_config = config_service.get_config("internal")
-        for proj_row in projection_rows:
-            for col_name in internal_config.searchable_columns:
-                value = str(getattr(proj_row, col_name))
-                mt = _match_type(value, query)
-                if mt:
-                    _upsert(
-                        SearchResultItem(
-                            fitting_position_id=proj_row.fitting_position_id,
-                            label_text=proj_row.label_text,
-                            image_id=image_id,
-                            x_coordinate=proj_row.x_coordinate,
-                            y_coordinate=proj_row.y_coordinate,
-                            component_name=proj_row.component_name,
-                            matched_source="internal",
-                            matched_field=col_name,
-                            match_type=mt,
+        if internal_degraded:
+            source_status["internal"] = "degraded"
+        else:
+            source_status["internal"] = "ok"
+            internal_config = config_service.get_config("internal")
+            for proj_row in projection_rows:
+                for col_name in internal_config.searchable_columns:
+                    value = str(getattr(proj_row, col_name))
+                    mt = _match_type(value, query)
+                    if mt:
+                        _upsert(
+                            SearchResultItem(
+                                fitting_position_id=proj_row.fitting_position_id,
+                                label_text=proj_row.label_text,
+                                image_id=image_id,
+                                x_coordinate=proj_row.x_coordinate,
+                                y_coordinate=proj_row.y_coordinate,
+                                component_name=proj_row.component_name,
+                                matched_source="internal",
+                                matched_field=col_name,
+                                match_type=mt,
+                            )
                         )
-                    )
 
     # ── Asset ─────────────────────────────────────────────────────────────────
-    if "asset" in sources and projection_rows:
-        labels = [row.label_text for row in projection_rows]
-        asset_result = search_assets(labels, query)
-        source_status["asset"] = asset_result.source_status
-        asset_config = config_service.get_config("asset")
-        for asset_row in asset_result.rows:
-            proj_row_maybe = row_by_label.get(asset_row.fitting_position)
-            if proj_row_maybe is None:
-                continue
-            proj_row = proj_row_maybe
-            for col_name in asset_config.searchable_columns:
-                value = str(getattr(asset_row, col_name))
-                mt = _match_type(value, query)
-                if mt:
-                    _upsert(
-                        SearchResultItem(
-                            fitting_position_id=proj_row.fitting_position_id,
-                            label_text=proj_row.label_text,
-                            image_id=image_id,
-                            x_coordinate=proj_row.x_coordinate,
-                            y_coordinate=proj_row.y_coordinate,
-                            component_name=proj_row.component_name,
-                            matched_source="asset",
-                            matched_field=col_name,
-                            match_type=mt,
+    if "asset" in sources:
+        if not projection_rows:
+            source_status["asset"] = "degraded" if internal_degraded else "ok"
+        else:
+            labels = [row.label_text for row in projection_rows]
+            asset_result = search_assets(labels, query)
+            source_status["asset"] = asset_result.source_status
+            asset_config = config_service.get_config("asset")
+            for asset_row in asset_result.rows:
+                proj_row_maybe = row_by_label.get(asset_row.fitting_position)
+                if proj_row_maybe is None:
+                    continue
+                proj_row = proj_row_maybe
+                for col_name in asset_config.searchable_columns:
+                    value = str(getattr(asset_row, col_name))
+                    mt = _match_type(value, query)
+                    if mt:
+                        _upsert(
+                            SearchResultItem(
+                                fitting_position_id=proj_row.fitting_position_id,
+                                label_text=proj_row.label_text,
+                                image_id=image_id,
+                                x_coordinate=proj_row.x_coordinate,
+                                y_coordinate=proj_row.y_coordinate,
+                                component_name=proj_row.component_name,
+                                matched_source="asset",
+                                matched_field=col_name,
+                                match_type=mt,
+                            )
                         )
-                    )
 
     # ── Rank + paginate ───────────────────────────────────────────────────────
     ranked = sorted(

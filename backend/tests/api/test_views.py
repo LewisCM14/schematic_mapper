@@ -448,6 +448,60 @@ class TestUploadChunkView:
         chunk = UploadChunk.objects.get(upload=session, part_number=1)
         assert bytes(chunk.data) == b"world!"
 
+    def test_upload_resume_flow(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        """Upload parts 1 and 2, verify via GET, upload part 3, then complete."""
+        svg_part1 = b"<svg "
+        svg_part2 = b'xmlns="'
+        svg_part3 = b'http://www.w3.org/2000/svg"/>'
+        full_svg = svg_part1 + svg_part2 + svg_part3
+        checksum = hashlib.sha256(full_svg).hexdigest()
+
+        session = ImageUpload.objects.create(
+            drawing_type=drawing_type,
+            component_name="Resume",
+            file_name="resume.svg",
+            file_size=len(full_svg),
+            expected_checksum=checksum,
+            idempotency_key=str(uuid.uuid4()),
+        )
+        upload_id = session.upload_id
+
+        # Upload part 1
+        client.put(
+            f"/api/admin/uploads/{upload_id}/parts/1",
+            data=json.dumps({"chunk_data": base64.b64encode(svg_part1).decode()}),
+            content_type="application/json",
+        )
+        # Upload part 2
+        client.put(
+            f"/api/admin/uploads/{upload_id}/parts/2",
+            data=json.dumps({"chunk_data": base64.b64encode(svg_part2).decode()}),
+            content_type="application/json",
+        )
+
+        # GET session to verify received_parts
+        get_resp = client.get(f"/api/admin/uploads/{upload_id}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["received_parts"] == [1, 2]
+
+        # Upload part 3
+        client.put(
+            f"/api/admin/uploads/{upload_id}/parts/3",
+            data=json.dumps({"chunk_data": base64.b64encode(svg_part3).decode()}),
+            content_type="application/json",
+        )
+
+        # Complete
+        resp = client.post(
+            f"/api/admin/uploads/{upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 201
+        assert resp.json()["state"] == "completed"
+
 
 @pytest.mark.django_db
 class TestCompleteUploadView:

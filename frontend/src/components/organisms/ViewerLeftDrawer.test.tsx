@@ -24,18 +24,17 @@ function renderDrawer() {
 }
 
 describe("ViewerLeftDrawer", () => {
-	it("renders Information and Search tabs", () => {
+	it("renders Search and Information tabs", () => {
 		renderDrawer();
-		expect(
-			screen.getByRole("tab", { name: /information/i }),
-		).toBeInTheDocument();
-		expect(screen.getByRole("tab", { name: /search/i })).toBeInTheDocument();
+		const tabs = screen.getAllByRole("tab");
+		expect(tabs[0]).toHaveAttribute("aria-label", "search tab");
+		expect(tabs[1]).toHaveAttribute("aria-label", "information tab");
 	});
 
-	it("shows placeholder text on Information tab by default", () => {
+	it("shows search input on Search tab by default", () => {
 		renderDrawer();
 		expect(
-			screen.getByText("Click a marker on the diagram to view details."),
+			screen.getByRole("textbox", { name: /search query/i }),
 		).toBeInTheDocument();
 	});
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
 	FittingPositionDetailSchema,
 	FittingPositionSchema,
@@ -235,5 +236,36 @@ describe("FittingPositionDetailSchema", () => {
 	it("throws when source_status is missing", () => {
 		const { source_status: _omit, ...rest } = VALID_DETAIL;
 		expect(() => FittingPositionDetailSchema.parse(rest)).toThrow();
+	});
+});
+
+describe("Zod parse failure integration", () => {
+	it("surfaces a ZodError for malformed image response", () => {
+		const malformed = {
+			image_id: "not-a-uuid",
+			component_name: 123,
+		};
+		expect(() => ImageDetailSchema.parse(malformed)).toThrow(ZodError);
+	});
+
+	it("surfaces a ZodError for malformed search response", () => {
+		const malformed = {
+			query: "pump",
+			results: "not-an-array",
+		};
+		expect(() => SearchResponseSchema.parse(malformed)).toThrow(ZodError);
+	});
+
+	it("ZodError contains structured issue details", () => {
+		const malformed = { image_id: "bad" };
+		try {
+			ImageSchema.parse(malformed);
+			expect.fail("Should have thrown");
+		} catch (err) {
+			expect(err).toBeInstanceOf(ZodError);
+			const zodErr = err as ZodError;
+			expect(zodErr.issues.length).toBeGreaterThan(0);
+			expect(zodErr.issues[0].path).toBeDefined();
+		}
 	});
 });

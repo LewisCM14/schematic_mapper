@@ -15,7 +15,6 @@ httpClient.interceptors.response.use(
 	(error: AxiosError) => {
 		if (error.response?.status === 401 || error.response?.status === 403) {
 			console.warn(`Auth error ${error.response.status}: ${error.config?.url}`);
-			return Promise.resolve(error.response);
 		}
 		return Promise.reject(error);
 	},

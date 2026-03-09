@@ -20,5 +20,5 @@ export const queryKeys = {
 		query: string,
 		sources?: string[],
 		limit?: number,
-	) => ["search", imageId, query, sources, limit] as const,
+	) => ["search", imageId, query.trim().toLowerCase(), sources, limit] as const,
 } as const;

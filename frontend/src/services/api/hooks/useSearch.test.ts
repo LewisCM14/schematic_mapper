@@ -4,6 +4,7 @@ import { HttpResponse, http } from "msw";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { FIXTURES, IMAGE_ID, server } from "../../../test/handlers";
+import { queryKeys } from "../queryKeys";
 import { useSearch } from "./useSearch";
 
 function makeWrapper() {
@@ -81,5 +82,41 @@ describe("useSearch", () => {
 		});
 		await waitFor(() => expect(result.current.isSuccess).toBe(true));
 		expect(result.current.hasNextPage).toBe(true);
+	});
+
+	it("includes sources in the query key", () => {
+		const key = queryKeys.search(IMAGE_ID, "pump", ["internal"], 25);
+		expect(key).toEqual(["search", IMAGE_ID, "pump", ["internal"], 25]);
+	});
+
+	it("normalizes query in query key", () => {
+		const key1 = queryKeys.search(IMAGE_ID, "  Pump ", ["internal"], 25);
+		const key2 = queryKeys.search(IMAGE_ID, "pump", ["internal"], 25);
+		expect(key1).toEqual(key2);
+	});
+
+	it("toggling sources re-triggers the query", async () => {
+		const { wrapper, queryClient } = makeWrapper();
+		const { result, rerender } = renderHook(
+			({ sources }) => useSearch(IMAGE_ID, "pump", sources),
+			{
+				wrapper,
+				initialProps: { sources: ["internal", "asset"] },
+			},
+		);
+		await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+		// Change sources to only internal
+		rerender({ sources: ["internal"] });
+		// The new query key should trigger a new fetch
+		const cache = queryClient.getQueryCache();
+		const keys = cache.getAll().map((q) => q.queryKey);
+		const hasInternalOnly = keys.some(
+			(k) =>
+				Array.isArray(k[3]) &&
+				(k[3] as string[]).length === 1 &&
+				(k[3] as string[])[0] === "internal",
+		);
+		expect(hasInternalOnly).toBe(true);
 	});
 });

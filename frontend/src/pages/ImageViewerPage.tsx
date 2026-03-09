@@ -29,7 +29,7 @@ function ImageViewerPage() {
 
 	const handleMarkerClick = useCallback((fittingPositionId: string) => {
 		setSelectedFpId(fittingPositionId);
-		setActiveTab(0);
+		setActiveTab(1);
 	}, []);
 
 	const handleSearchMetadata = useCallback(
@@ -43,7 +43,7 @@ function ImageViewerPage() {
 
 	const handleSelectFp = useCallback((fpId: string, x: number, y: number) => {
 		setSelectedFpId(fpId);
-		setActiveTab(0);
+		setActiveTab(1);
 		setPanToTarget({ x, y });
 	}, []);
 

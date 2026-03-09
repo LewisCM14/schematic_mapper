@@ -68,7 +68,13 @@ function ImageViewerTemplate({
 }: ImageViewerTemplateProps) {
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-			<TopAppHeader title={title} contextLabel={contextLabel} />
+			<TopAppHeader
+				title={title}
+				contextLabel={contextLabel}
+				sourceStatus={
+					Object.keys(sourceStatus).length > 0 ? sourceStatus : undefined
+				}
+			/>
 			<Box
 				sx={{ display: "flex", flexGrow: 1, overflow: "hidden", minHeight: 0 }}
 			>

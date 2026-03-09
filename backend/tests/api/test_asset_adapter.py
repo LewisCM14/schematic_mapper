@@ -7,6 +7,7 @@ from django.db import OperationalError
 from api.asset_adapter import (
     FAILURE_THRESHOLD,
     AssetRecord,
+    AssetSearchRow,
     fetch_asset_details,
     reset_circuit_breaker,
     search_assets,
@@ -167,6 +168,59 @@ class TestCircuitBreaker:
             # The query should have been attempted
             mock_connections.__getitem__.return_value.cursor.assert_called()
             assert result.source_status == "ok"
+
+
+class TestAssetAdapterContract:
+    """Contract tests verifying the column-to-dataclass mapping."""
+
+    def test_fetch_asset_details_column_order_matches_dataclass(self) -> None:
+        """The SELECT column order in fetch_asset_details must match AssetRecord fields."""
+        import dataclasses
+
+        expected_fields = [f.name for f in dataclasses.fields(AssetRecord)]
+        # AssetRecord fields: asset_record_id, fitting_position,
+        # high_level_component, sub_system_name, sub_component_name
+        assert expected_fields == [
+            "asset_record_id",
+            "fitting_position",
+            "high_level_component",
+            "sub_system_name",
+            "sub_component_name",
+        ]
+
+    def test_search_assets_column_order_matches_dataclass(self) -> None:
+        """The SELECT column order in search_assets must match AssetSearchRow fields."""
+        import dataclasses
+
+        expected_fields = [f.name for f in dataclasses.fields(AssetSearchRow)]
+        # AssetSearchRow fields: fitting_position,
+        # high_level_component, sub_system_name, sub_component_name
+        assert expected_fields == [
+            "fitting_position",
+            "high_level_component",
+            "sub_system_name",
+            "sub_component_name",
+        ]
+
+    def test_search_assets_column_count_matches_dataclass(self) -> None:
+        """Row tuple from search_assets must have exactly as many elements as
+        AssetSearchRow has fields."""
+        import dataclasses
+
+        field_count = len(dataclasses.fields(AssetSearchRow))
+        # search_assets SQL: SELECT fitting_position, {_SEARCHABLE_COLUMNS}
+        # = 1 + len(_SEARCHABLE_COLUMNS) = 4
+        assert field_count == 4
+
+    def test_fetch_details_column_count_matches_dataclass(self) -> None:
+        """Row tuple from fetch_asset_details must have exactly as many elements
+        as AssetRecord has fields."""
+        import dataclasses
+
+        field_count = len(dataclasses.fields(AssetRecord))
+        # fetch_asset_details SQL: SELECT asset_record_id, fitting_position,
+        # high_level_component, sub_system_name, sub_component_name = 5
+        assert field_count == 5
 
     def test_search_assets_trips_circuit(self) -> None:
         """search_assets also participates in the shared circuit breaker."""

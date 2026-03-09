@@ -47,8 +47,7 @@ describe("AdminPage", () => {
 		renderPage();
 
 		// Step 1 — select drawing type
-		await waitFor(() => screen.getByText("Select Type"));
-		const select = screen.getByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", { name: /drawing type/i });
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -102,22 +101,14 @@ describe("AdminPage", () => {
 
 	it("Next button is disabled until a drawing type is selected", async () => {
 		renderPage();
-		await waitFor(() => {
-			expect(
-				screen.getByRole("combobox", { name: /drawing type/i }),
-			).toBeInTheDocument();
-		});
+		await screen.findByRole("combobox", { name: /drawing type/i });
 		expect(screen.getByRole("button", { name: /next/i })).toBeDisabled();
 	});
 
 	it("advances to Upload step after selecting a drawing type", async () => {
 		renderPage();
 
-		await waitFor(() => {
-			expect(screen.getByText("Select Type")).toBeInTheDocument();
-		});
-
-		const select = screen.getByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", { name: /drawing type/i });
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -136,8 +127,7 @@ describe("AdminPage", () => {
 	it("Upload button is disabled when no file is selected", async () => {
 		renderPage();
 
-		await waitFor(() => screen.getByText("Select Type"));
-		const select = screen.getByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", { name: /drawing type/i });
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -195,8 +185,7 @@ describe("AdminPage", () => {
 		renderPage();
 
 		// Navigate to the upload step
-		await waitFor(() => screen.getByText("Select Type"));
-		const select = screen.getByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", { name: /drawing type/i });
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -248,8 +237,7 @@ describe("AdminPage", () => {
 		renderPage();
 
 		// Navigate to the upload step
-		await waitFor(() => screen.getByText("Select Type"));
-		const select = screen.getByRole("combobox", { name: /drawing type/i });
+		const select = await screen.findByRole("combobox", { name: /drawing type/i });
 		await userEvent.click(select);
 		const option = await screen.findByRole("option", { name: "composite" });
 		await userEvent.click(option);
@@ -300,5 +288,53 @@ describe("AdminPage", () => {
 				(a) => !/request failed/i.test(a.textContent ?? ""),
 			),
 		).toBe(true);
+	});
+
+	it("Step 1 shows loading state while fetching drawing types", async () => {
+		server.use(
+			http.get("/api/images", async () => {
+				await new Promise(() => {}); // never resolves
+			}),
+		);
+		renderPage();
+		await waitFor(() => {
+			expect(screen.getByLabelText("loading drawing types")).toBeInTheDocument();
+		});
+	});
+
+	it("Step 1 shows error state when fetching drawing types fails", async () => {
+		server.use(
+			http.get(
+				"/api/images",
+				() => new HttpResponse(null, { status: 500 }),
+			),
+		);
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByText("Failed to load drawing types."),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("Step 1 shows empty state when no drawing types available", async () => {
+		server.use(
+			http.get("/api/images", () =>
+				HttpResponse.json({
+					count: 0,
+					next: null,
+					previous: null,
+					results: [],
+					has_more: false,
+					next_cursor: null,
+				}),
+			),
+		);
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByText("No drawing types available."),
+			).toBeInTheDocument();
+		});
 	});
 });

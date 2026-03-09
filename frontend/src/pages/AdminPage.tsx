@@ -64,7 +64,7 @@ function AdminPage() {
 	const [selectedDrawingTypeId, setSelectedDrawingTypeId] = useState<
 		number | ""
 	>("");
-	const { data: imagesData } = useImages();
+	const { data: imagesData, isLoading: drawingTypesLoading, isError: drawingTypesError } = useImages();
 	const images = imagesData?.pages.flatMap((p) => p.results) ?? [];
 
 	// Derive unique drawing types from available images
@@ -234,25 +234,42 @@ function AdminPage() {
 					<Typography variant="h6" gutterBottom>
 						Select Drawing Type
 					</Typography>
-					<Select
-						fullWidth
-						displayEmpty
-						value={selectedDrawingTypeId}
-						onChange={(e) =>
-							setSelectedDrawingTypeId(e.target.value as number | "")
-						}
-						size="small"
-						inputProps={{ "aria-label": "drawing type" }}
-					>
-						<MenuItem value="" disabled>
-							— select drawing type —
-						</MenuItem>
-						{drawingTypes.map((dt) => (
-							<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
-								{dt.type_name}
+					{drawingTypesLoading && (
+						<Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+							<CircularProgress size={24} aria-label="loading drawing types" />
+						</Box>
+					)}
+					{drawingTypesError && (
+						<Alert severity="error" sx={{ mb: 2 }}>
+							Failed to load drawing types.
+						</Alert>
+					)}
+					{!drawingTypesLoading && !drawingTypesError && drawingTypes.length === 0 && (
+						<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+							No drawing types available.
+						</Typography>
+					)}
+					{!drawingTypesLoading && !drawingTypesError && drawingTypes.length > 0 && (
+						<Select
+							fullWidth
+							displayEmpty
+							value={selectedDrawingTypeId}
+							onChange={(e) =>
+								setSelectedDrawingTypeId(e.target.value as number | "")
+							}
+							size="small"
+							inputProps={{ "aria-label": "drawing type" }}
+						>
+							<MenuItem value="" disabled>
+								— select drawing type —
 							</MenuItem>
-						))}
-					</Select>
+							{drawingTypes.map((dt) => (
+								<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
+									{dt.type_name}
+								</MenuItem>
+							))}
+						</Select>
+					)}
 					<Box sx={{ mt: 2 }}>
 						<Button
 							variant="contained"

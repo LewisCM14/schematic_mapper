@@ -38,7 +38,7 @@ describe("httpClient", () => {
 			warnSpy.mockRestore();
 		});
 
-		it("warns and resolves (does not throw) on 401 response", async () => {
+		it("warns and rejects on 401 response", async () => {
 			const adapter = vi.fn().mockRejectedValue(
 				Object.assign(new Error("Unauthorized"), {
 					isAxiosError: true,
@@ -54,15 +54,13 @@ describe("httpClient", () => {
 						console.warn(
 							`Auth error ${err.response.status}: ${err.config?.url}`,
 						);
-						return Promise.resolve(err.response);
 					}
 					return Promise.reject(err);
 				},
 			);
 			client.defaults.adapter = adapter;
 
-			const response = await client.get("/protected");
-			expect(response.status).toBe(401);
+			await expect(client.get("/protected")).rejects.toThrow();
 			expect(warnSpy).toHaveBeenCalledWith("Auth error 401: /api/protected");
 		});
 
@@ -82,7 +80,6 @@ describe("httpClient", () => {
 						console.warn(
 							`Auth error ${err.response.status}: ${err.config?.url}`,
 						);
-						return Promise.resolve(err.response);
 					}
 					return Promise.reject(err);
 				},

@@ -1,14 +1,18 @@
 import {
 	Alert,
 	Box,
+	Chip,
 	CircularProgress,
 	List,
 	TextField,
+	Tooltip,
 	Typography,
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useSearch } from "../../services/api/hooks/useSearch";
 import SearchResultItemComponent from "../molecules/SearchResultItem";
+
+const AVAILABLE_SOURCES = ["internal", "asset"] as const;
 
 interface SearchResultsPanelProps {
 	imageId: string;
@@ -26,7 +30,18 @@ function SearchResultsPanel({
 	onSearchMetadata,
 }: SearchResultsPanelProps) {
 	const [query, setQuery] = useState("");
+	const [activeSources, setActiveSources] = useState<string[]>([
+		...AVAILABLE_SOURCES,
+	]);
 	const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+	const toggleSource = (source: string) => {
+		setActiveSources((prev) =>
+			prev.includes(source)
+				? prev.filter((s) => s !== source)
+				: [...prev, source],
+		);
+	};
 
 	const {
 		data,
@@ -35,7 +50,7 @@ function SearchResultsPanel({
 		hasNextPage,
 		fetchNextPage,
 		isError,
-	} = useSearch(imageId, query);
+	} = useSearch(imageId, query, activeSources);
 
 	// Infinite scroll: observe sentinel element
 	useEffect(() => {
@@ -74,6 +89,25 @@ function SearchResultsPanel({
 					onChange={(e) => setQuery(e.target.value)}
 					inputProps={{ "aria-label": "search query" }}
 				/>
+			</Box>
+
+			<Box sx={{ display: "flex", gap: 0.5, px: 1.5, pb: 1 }}>
+				{AVAILABLE_SOURCES.map((source) => (
+					<Chip
+						key={source}
+						label={source}
+						size="small"
+						variant={activeSources.includes(source) ? "filled" : "outlined"}
+						color={activeSources.includes(source) ? "primary" : "default"}
+						onClick={() => toggleSource(source)}
+						aria-pressed={activeSources.includes(source)}
+					/>
+				))}
+				<Tooltip title="Sensor source is unavailable in the prototype">
+					<span>
+						<Chip label="sensor" size="small" variant="outlined" disabled />
+					</span>
+				</Tooltip>
 			</Box>
 
 			{isDegraded && (

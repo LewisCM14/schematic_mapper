@@ -81,6 +81,10 @@ describe("ImageViewerPage", () => {
 
 	it("shows default drawer instruction text before any marker is clicked", async () => {
 		renderPage();
+
+		const infoTab = await screen.findByRole("tab", { name: /information/i });
+		await userEvent.click(infoTab);
+
 		await waitFor(() => {
 			expect(
 				screen.getByText("Click a marker on the diagram to view details."),
@@ -161,10 +165,7 @@ describe("ImageViewerPage", () => {
 	it("shows min-chars hint when query is 1 char", async () => {
 		renderPage();
 
-		const searchTab = await screen.findByRole("tab", { name: /search/i });
-		await userEvent.click(searchTab);
-
-		const input = screen.getByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", { name: /search query/i });
 		await userEvent.type(input, "p");
 
 		await waitFor(() => {
@@ -203,10 +204,7 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const searchTab = await screen.findByRole("tab", { name: /search/i });
-		await userEvent.click(searchTab);
-
-		const input = screen.getByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", { name: /search query/i });
 		await userEvent.type(input, "pump");
 
 		await waitFor(() => {
@@ -243,9 +241,7 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const searchTab = await screen.findByRole("tab", { name: /search/i });
-		await userEvent.click(searchTab);
-		const input = screen.getByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", { name: /search query/i });
 		await userEvent.type(input, "pump");
 
 		const resultItem = await screen.findByText("PUMP-01");
@@ -263,17 +259,17 @@ describe("ImageViewerPage", () => {
 
 	it("Tab key cycles between Search and Information tabs", async () => {
 		renderPage();
-		const infoTab = await screen.findByRole("tab", { name: /information/i });
-		const searchTab = screen.getByRole("tab", { name: /search/i });
+		const searchTab = await screen.findByRole("tab", { name: /search/i });
+		const infoTab = screen.getByRole("tab", { name: /information/i });
 
-		infoTab.focus();
-		expect(document.activeElement).toBe(infoTab);
-
-		await userEvent.keyboard("{ArrowRight}");
+		searchTab.focus();
 		expect(document.activeElement).toBe(searchTab);
 
-		await userEvent.keyboard("{ArrowLeft}");
+		await userEvent.keyboard("{ArrowRight}");
 		expect(document.activeElement).toBe(infoTab);
+
+		await userEvent.keyboard("{ArrowLeft}");
+		expect(document.activeElement).toBe(searchTab);
 	});
 
 	it("Enter on a POI marker triggers selection (same as click)", async () => {
@@ -331,9 +327,7 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const searchTab = await screen.findByRole("tab", { name: /search/i });
-		await userEvent.click(searchTab);
-		const input = screen.getByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", { name: /search query/i });
 		await userEvent.type(input, "pump");
 
 		// Wait for the result to appear, then find the ListItemButton within the list
@@ -382,5 +376,50 @@ describe("ImageViewerPage", () => {
 		const searchTab = screen.getByRole("tab", { name: /search/i });
 		expect(infoTab).toHaveAttribute("aria-label", "information tab");
 		expect(searchTab).toHaveAttribute("aria-label", "search tab");
+	});
+
+	it("Search tab is rendered first", async () => {
+		renderPage();
+		const tabs = await screen.findAllByRole("tab");
+		expect(tabs[0]).toHaveAttribute("aria-label", "search tab");
+		expect(tabs[1]).toHaveAttribute("aria-label", "information tab");
+	});
+
+	it("source status chips appear in header after search completes", async () => {
+		server.use(
+			http.get("/api/search", () =>
+				HttpResponse.json({
+					query: "pump",
+					image_id: IMAGE_ID,
+					limit: 25,
+					results: [
+						{
+							fitting_position_id: "FP-001",
+							label_text: "PUMP-01",
+							image_id: IMAGE_ID,
+							x_coordinate: 100,
+							y_coordinate: 200,
+							component_name: "Cooling System",
+							matched_source: "internal",
+							matched_field: "label_text",
+							match_type: "prefix",
+						},
+					],
+					source_status: { internal: "ok", asset: "degraded" },
+					has_more: false,
+					next_cursor: null,
+					request_id: "req-status-1",
+				}),
+			),
+		);
+		renderPage();
+
+		const input = await screen.findByRole("textbox", { name: /search query/i });
+		await userEvent.type(input, "pump");
+
+		await waitFor(() => {
+			expect(screen.getByText("ok")).toBeInTheDocument();
+			expect(screen.getByText("degraded")).toBeInTheDocument();
+		});
 	});
 });

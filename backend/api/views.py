@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import logging
+import time
 import uuid
 
 from django.db import OperationalError, connections
@@ -39,6 +41,8 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset({"image/svg+xml"})
 MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
 
 VALID_SEARCH_SOURCES: frozenset[str] = frozenset({"internal", "asset", "sensor"})
+
+logger = logging.getLogger("api")
 
 
 @api_view(["GET"])
@@ -170,6 +174,13 @@ def create_upload_session(request: Request) -> Response:
         expected_checksum=data["expected_checksum"],
         idempotency_key=idempotency_key,
     )
+    request_id = request.META.get("HTTP_X_REQUEST_ID", "-")
+    logger.info(
+        "upload_session_created upload_id=%s file_name=%s request_id=%s",
+        session.upload_id,
+        session.file_name,
+        request_id,
+    )
     return Response(UploadSessionSerializer(session).data, status=201)
 
 
@@ -202,6 +213,13 @@ def upload_chunk(request: Request, upload_id: uuid.UUID, part_number: int) -> Re
         part_number=part_number,
         defaults={"data": chunk_bytes},
     )
+    request_id = request.META.get("HTTP_X_REQUEST_ID", "-")
+    logger.info(
+        "upload_chunk_received upload_id=%s part_number=%d request_id=%s",
+        session.upload_id,
+        part_number,
+        request_id,
+    )
 
     if session.state == "initiated":
         session.state = UPLOAD_STATE_UPLOADING
@@ -219,6 +237,8 @@ def upload_chunk(request: Request, upload_id: uuid.UUID, part_number: int) -> Re
 
 @api_view(["POST"])
 def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
+    t_start = time.monotonic()
+    request_id = request.META.get("HTTP_X_REQUEST_ID", "-")
     session = get_object_or_404(ImageUpload, pk=upload_id)
     if session.state == UPLOAD_STATE_COMPLETED:
         # Idempotent: already done
@@ -259,6 +279,13 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
         session.state = UPLOAD_STATE_FAILED
         session.error_message = "Checksum mismatch"
         session.save(update_fields=["state", "error_message", "updated_at"])
+        duration_ms = int((time.monotonic() - t_start) * 1000)
+        logger.warning(
+            "upload_complete_failed upload_id=%s reason=checksum_mismatch duration_ms=%d request_id=%s",
+            upload_id,
+            duration_ms,
+            request_id,
+        )
         return Response(
             {"error": "Checksum mismatch", "code": "checksum_mismatch"}, status=422
         )
@@ -295,6 +322,15 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
     # Clean up chunks
     session.chunks.all().delete()
 
+    duration_ms = int((time.monotonic() - t_start) * 1000)
+    logger.info(
+        "upload_complete_success upload_id=%s image_id=%s duration_ms=%d checksum_match=True request_id=%s",
+        session.upload_id,
+        image.image_id,
+        duration_ms,
+        request_id,
+    )
+
     return Response(
         {
             "upload_id": str(session.upload_id),
@@ -325,6 +361,12 @@ def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
     session.chunks.all().delete()
     session.state = UPLOAD_STATE_ABORTED
     session.save(update_fields=["state", "updated_at"])
+    request_id = request.META.get("HTTP_X_REQUEST_ID", "-")
+    logger.info(
+        "upload_aborted upload_id=%s request_id=%s",
+        upload_id,
+        request_id,
+    )
     return Response(status=204)
 
 
@@ -396,7 +438,11 @@ def search_view(request: Request) -> Response:
     query = request.query_params.get("query", "").strip()
     if len(query) < 2:
         return Response(
-            {"error": "query must be at least 2 characters", "code": "query_too_short"},
+            {
+                "error": "query must be at least 2 characters",
+                "code": "query_too_short",
+                "status": 400,
+            },
             status=400,
         )
 
