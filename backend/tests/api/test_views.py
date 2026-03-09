@@ -422,6 +422,89 @@ class TestCreateUploadSessionView:
         )
         assert response.status_code == 400
 
+    def test_returns_429_when_concurrent_limit_reached(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        # Create MAX_CONCURRENT_UPLOADS active sessions
+        for i in range(3):
+            ImageUpload.objects.create(
+                drawing_type=drawing_type,
+                component_name=f"Session {i}",
+                file_name=f"s{i}.svg",
+                file_size=100,
+                expected_checksum="a" * 64,
+                idempotency_key=f"concurrent-{i}",
+                state="initiated",
+            )
+
+        # The next one should be rejected
+        payload = _upload_payload(drawing_type, key="concurrent-overflow")
+        response = client.post(
+            "/api/admin/uploads",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 429
+        assert response.json()["code"] == "upload_limit_reached"
+
+    def test_completing_session_frees_slot(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        sessions = []
+        for i in range(3):
+            sessions.append(
+                ImageUpload.objects.create(
+                    drawing_type=drawing_type,
+                    component_name=f"Session {i}",
+                    file_name=f"s{i}.svg",
+                    file_size=100,
+                    expected_checksum="a" * 64,
+                    idempotency_key=f"free-slot-{i}",
+                    state="initiated",
+                )
+            )
+
+        # Complete one session to free a slot
+        sessions[0].state = "completed"
+        sessions[0].save(update_fields=["state"])
+
+        payload = _upload_payload(drawing_type, key="free-slot-new")
+        response = client.post(
+            "/api/admin/uploads",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
+    def test_aborting_session_frees_slot(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        sessions = []
+        for i in range(3):
+            sessions.append(
+                ImageUpload.objects.create(
+                    drawing_type=drawing_type,
+                    component_name=f"Session {i}",
+                    file_name=f"s{i}.svg",
+                    file_size=100,
+                    expected_checksum="a" * 64,
+                    idempotency_key=f"abort-slot-{i}",
+                    state="uploading",
+                )
+            )
+
+        # Abort one session to free a slot
+        sessions[0].state = "aborted"
+        sessions[0].save(update_fields=["state"])
+
+        payload = _upload_payload(drawing_type, key="abort-slot-new")
+        response = client.post(
+            "/api/admin/uploads",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
 
 @pytest.mark.django_db
 class TestUploadChunkView:
@@ -709,6 +792,20 @@ class TestCompleteUploadView:
         assert img.width_px == 800
         assert img.height_px == 600
 
+    def test_generates_thumbnail_on_complete(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="green"/></svg>'
+        session = self._create_session_with_chunk(drawing_type, svg)
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        img = Image.objects.get(pk=response.json()["image_id"])
+        assert img.thumbnail is not None
+
 
 @pytest.mark.django_db
 class TestAbortUploadView:
@@ -911,6 +1008,37 @@ class TestAdminUploadImageView:
         img = Image.objects.get(pk=response.json()["image_id"])
         assert img.width_px == 640
         assert img.height_px == 480
+
+    def test_generates_thumbnail_for_svg(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>'
+        payload = self._svg_payload(drawing_type, svg)
+        response = client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        img = Image.objects.get(pk=response.json()["image_id"])
+        assert img.thumbnail is not None
+
+    def test_serializer_returns_data_uri_for_thumbnail(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="blue"/></svg>'
+        payload = self._svg_payload(drawing_type, svg)
+        client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        response = client.get("/api/images")
+        results = response.json()["results"]
+        assert len(results) >= 1
+        thumb = results[0]["thumbnail_url"]
+        assert thumb is not None
+        assert thumb.startswith("data:image/png;base64,")
 
 
 # ── Admin bulk fitting positions ──────────────────────────────────────────────

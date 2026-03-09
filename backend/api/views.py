@@ -17,6 +17,7 @@ from .models import (
     UPLOAD_STATE_ABORTED,
     UPLOAD_STATE_COMPLETED,
     UPLOAD_STATE_FAILED,
+    UPLOAD_STATE_INITIATED,
     UPLOAD_STATE_UPLOADING,
     UPLOAD_STATE_VERIFYING,
     DrawingType,
@@ -43,6 +44,9 @@ from .serializers import (
 
 ALLOWED_MIME_TYPES: frozenset[str] = frozenset({"image/svg+xml"})
 MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
+MAX_CONCURRENT_UPLOADS: int = 3
+
+THUMBNAIL_WIDTH = 240
 
 VALID_SEARCH_SOURCES: frozenset[str] = frozenset({"internal", "asset", "sensor"})
 
@@ -52,6 +56,20 @@ _NUMERIC_RE = re.compile(r"^(\d+(?:\.\d+)?)")
 
 DEFAULT_WIDTH = 800
 DEFAULT_HEIGHT = 600
+
+
+def _generate_thumbnail(svg_data: bytes) -> bytes | None:
+    """Generate a PNG thumbnail from SVG content.
+
+    Returns PNG bytes or None if generation fails.
+    """
+    try:
+        import cairosvg
+
+        return cairosvg.svg2png(bytestring=svg_data, output_width=THUMBNAIL_WIDTH)  # type: ignore[no-any-return]
+    except Exception:
+        logger.warning("thumbnail_generation_failed", exc_info=True)
+        return None
 
 
 def _parse_svg_dimensions(data: bytes) -> tuple[int, int]:
@@ -215,6 +233,23 @@ def create_upload_session(request: Request) -> Response:
     if existing is not None:
         return Response(UploadSessionSerializer(existing).data, status=200)
 
+    # Concurrent upload limit
+    active_states = [
+        UPLOAD_STATE_INITIATED,
+        UPLOAD_STATE_UPLOADING,
+        UPLOAD_STATE_VERIFYING,
+    ]
+    active_count = ImageUpload.objects.filter(state__in=active_states).count()
+    if active_count >= MAX_CONCURRENT_UPLOADS:
+        return Response(
+            {
+                "error": "Maximum concurrent upload sessions reached",
+                "code": "upload_limit_reached",
+                "status": 429,
+            },
+            status=429,
+        )
+
     drawing_type = get_object_or_404(DrawingType, pk=data["drawing_type_id"])
     session = ImageUpload.objects.create(
         drawing_type=drawing_type,
@@ -362,6 +397,7 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
         content_hash=actual_checksum,
         width_px=width_px,
         height_px=height_px,
+        thumbnail=_generate_thumbnail(assembled),
     )
 
     session.state = UPLOAD_STATE_COMPLETED
@@ -474,6 +510,7 @@ def admin_upload_image(request: Request) -> Response:
         content_hash=actual_checksum,
         width_px=width_px,
         height_px=height_px,
+        thumbnail=_generate_thumbnail(file_bytes),
     )
 
     return Response(

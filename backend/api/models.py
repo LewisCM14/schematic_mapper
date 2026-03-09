@@ -43,6 +43,7 @@ class Image(models.Model):
     content_hash = models.CharField(max_length=64)
     width_px = models.IntegerField()
     height_px = models.IntegerField()
+    thumbnail = models.BinaryField(null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

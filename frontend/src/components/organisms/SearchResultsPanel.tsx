@@ -1,16 +1,9 @@
-import {
-	Alert,
-	Box,
-	Chip,
-	CircularProgress,
-	List,
-	Tooltip,
-	Typography,
-} from "@mui/material";
+import { Alert, Box, CircularProgress, List, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useSearch } from "../../services/api/hooks/useSearch";
 import SearchInput from "../atoms/SearchInput";
 import SearchResultItemComponent from "../molecules/SearchResultItem";
+import SourceFilterChips from "../molecules/SourceFilterChips";
 
 const AVAILABLE_SOURCES = ["internal", "asset"] as const;
 
@@ -90,22 +83,12 @@ function SearchResultsPanel({
 			</Box>
 
 			<Box sx={{ display: "flex", gap: 0.5, px: 1.5, pb: 1 }}>
-				{AVAILABLE_SOURCES.map((source) => (
-					<Chip
-						key={source}
-						label={source}
-						size="small"
-						variant={activeSources.includes(source) ? "filled" : "outlined"}
-						color={activeSources.includes(source) ? "primary" : "default"}
-						onClick={() => toggleSource(source)}
-						aria-pressed={activeSources.includes(source)}
-					/>
-				))}
-				<Tooltip title="Sensor source is unavailable in the prototype">
-					<span>
-						<Chip label="sensor" size="small" variant="outlined" disabled />
-					</span>
-				</Tooltip>
+				<SourceFilterChips
+					availableSources={[...AVAILABLE_SOURCES]}
+					selectedSources={activeSources}
+					onToggle={toggleSource}
+					disabledSources={["sensor"]}
+				/>
 			</Box>
 
 			{isDegraded && (

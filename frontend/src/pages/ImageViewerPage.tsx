@@ -8,10 +8,13 @@ import { useFittingPositions } from "../services/api/hooks/useFittingPositions";
 import { useImage } from "../services/api/hooks/useImages";
 
 const DRAWER_WIDTH = 320;
+const UUID_RE =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function ImageViewerPage() {
 	const { imageId } = useParams<{ imageId: string }>();
 	const navigate = useNavigate();
+	const isValidUuid = imageId != null && UUID_RE.test(imageId);
 
 	const [selectedFpId, setSelectedFpId] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState(0);
@@ -24,8 +27,12 @@ function ImageViewerPage() {
 		y: number;
 	} | null>(null);
 
-	const { data: image, isLoading, isError } = useImage(imageId ?? "");
-	const { data: positions } = useFittingPositions(imageId ?? "");
+	const {
+		data: image,
+		isLoading,
+		isError,
+	} = useImage(isValidUuid ? imageId : "");
+	const { data: positions } = useFittingPositions(isValidUuid ? imageId : "");
 
 	const handleMarkerClick = useCallback((fittingPositionId: string) => {
 		setSelectedFpId(fittingPositionId);
@@ -86,8 +93,14 @@ function ImageViewerPage() {
 	useEffect(() => {
 		if (!imageId) {
 			navigate("/", { replace: true });
+		} else if (!isValidUuid) {
+			setNoticeOpen(true);
+			const timer = setTimeout(() => {
+				navigate("/", { replace: true });
+			}, 3000);
+			return () => clearTimeout(timer);
 		}
-	}, [imageId, navigate]);
+	}, [imageId, isValidUuid, navigate]);
 
 	useEffect(() => {
 		if (isError && imageId) {

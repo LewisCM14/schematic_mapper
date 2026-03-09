@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Django REST Framework backend for the schematic mapper application"
 requires-python = ">=3.13"
 dependencies = [
+    "cairosvg>=2.8.2",
     "django>=6.0.3",
     "django-cors-headers>=4.9.0",
     "django-environ>=0.13.0",
@@ -31,6 +32,10 @@ warn_unreachable = true
 
 [[tool.mypy.overrides]]
 module = "environ"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "cairosvg"
 ignore_missing_imports = true
 
 [tool.django-stubs]

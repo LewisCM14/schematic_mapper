@@ -87,13 +87,7 @@ describe("ImageViewerPage", () => {
 		});
 	});
 
-	it("shows notice and redirects to / when imageId is invalid", async () => {
-		server.use(
-			http.get(
-				"/api/images/:imageId",
-				() => new HttpResponse(null, { status: 404 }),
-			),
-		);
+	it("shows notice and redirects to / when imageId is invalid UUID format", async () => {
 		renderPage("not-a-real-uuid");
 
 		await waitFor(() => {

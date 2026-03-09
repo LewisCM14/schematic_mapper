@@ -28,6 +28,11 @@ class ImageSerializer(serializers.ModelSerializer[Image]):
         ]
 
     def get_thumbnail_url(self, obj: Image) -> str | None:
+        if obj.thumbnail:
+            import base64
+
+            encoded = base64.b64encode(bytes(obj.thumbnail)).decode("ascii")
+            return f"data:image/png;base64,{encoded}"
         return None
 
 
