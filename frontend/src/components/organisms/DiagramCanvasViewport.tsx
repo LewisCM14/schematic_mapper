@@ -1,10 +1,11 @@
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import { Box, IconButton, Tooltip } from "@mui/material";
+import { Box, IconButton } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import Panzoom, { type PanzoomObject } from "@panzoom/panzoom";
 import { useCallback, useEffect, useRef, useState } from "react";
+import IconButtonAction from "../atoms/IconButtonAction";
 import POIMarkerPin from "../atoms/POIMarkerPin";
 
 export interface CanvasMarker {
@@ -168,7 +169,6 @@ function DiagramCanvasViewport({
 			}}
 			data-testid="diagram-canvas"
 		>
-			{/* Zoom controls overlay */}
 			<Box
 				sx={{
 					position: "absolute",
@@ -183,33 +183,24 @@ function DiagramCanvasViewport({
 					p: 0.5,
 				}}
 			>
-				<Tooltip title="Zoom in">
-					<IconButton
-						size="small"
-						onClick={() => panzoomRef.current?.zoomIn()}
-						aria-label="zoom in"
-					>
-						<ZoomInIcon fontSize="small" />
-					</IconButton>
-				</Tooltip>
-				<Tooltip title="Zoom out">
-					<IconButton
-						size="small"
-						onClick={() => panzoomRef.current?.zoomOut()}
-						aria-label="zoom out"
-					>
-						<ZoomOutIcon fontSize="small" />
-					</IconButton>
-				</Tooltip>
-				<Tooltip title="Reset view">
-					<IconButton
-						size="small"
-						onClick={() => panzoomRef.current?.reset()}
-						aria-label="reset view"
-					>
-						<RestartAltIcon fontSize="small" />
-					</IconButton>
-				</Tooltip>
+				<IconButtonAction
+					icon={<ZoomInIcon fontSize="small" />}
+					onClick={() => panzoomRef.current?.zoomIn()}
+					ariaLabel="zoom in"
+					tooltip="Zoom in"
+				/>
+				<IconButtonAction
+					icon={<ZoomOutIcon fontSize="small" />}
+					onClick={() => panzoomRef.current?.zoomOut()}
+					ariaLabel="zoom out"
+					tooltip="Zoom out"
+				/>
+				<IconButtonAction
+					icon={<RestartAltIcon fontSize="small" />}
+					onClick={() => panzoomRef.current?.reset()}
+					ariaLabel="reset view"
+					tooltip="Reset view"
+				/>
 			</Box>
 
 			{/* Panzoom host — wraps SVG image and markers together */}

@@ -120,4 +120,48 @@ describe("App", () => {
 		await user.click(screen.getByRole("button", { name: /retry/i }));
 		expect(screen.getByText("Recovered")).toBeInTheDocument();
 	});
+
+	it("focuses retry button after error boundary fallback renders", () => {
+		function ThrowingComponent(): never {
+			throw new Error("Focus test error");
+		}
+
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: false, gcTime: 0 } },
+		});
+		const consoleError = console.error;
+		console.error = () => {};
+
+		render(
+			<ThemeProvider theme={theme}>
+				<MemoryRouter>
+					<QueryClientProvider client={client}>
+						<ErrorBoundary
+							fallbackRender={({ resetErrorBoundary }) => {
+								return (
+									<div>
+										<div role="alert">Something went wrong</div>
+										<button
+											type="button"
+											onClick={resetErrorBoundary}
+											ref={(el) => el?.focus()}
+										>
+											Retry
+										</button>
+									</div>
+								);
+							}}
+						>
+							<ThrowingComponent />
+						</ErrorBoundary>
+					</QueryClientProvider>
+				</MemoryRouter>
+			</ThemeProvider>,
+		);
+
+		console.error = consoleError;
+
+		const retryBtn = screen.getByRole("button", { name: /retry/i });
+		expect(retryBtn).toHaveFocus();
+	});
 });

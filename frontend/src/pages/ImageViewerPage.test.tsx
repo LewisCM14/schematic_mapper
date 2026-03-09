@@ -258,4 +258,129 @@ describe("ImageViewerPage", () => {
 			);
 		});
 	});
+
+	// ── Keyboard Navigation Tests (Phase 10i) ──
+
+	it("Tab key cycles between Search and Information tabs", async () => {
+		renderPage();
+		const infoTab = await screen.findByRole("tab", { name: /information/i });
+		const searchTab = screen.getByRole("tab", { name: /search/i });
+
+		infoTab.focus();
+		expect(document.activeElement).toBe(infoTab);
+
+		await userEvent.keyboard("{ArrowRight}");
+		expect(document.activeElement).toBe(searchTab);
+
+		await userEvent.keyboard("{ArrowLeft}");
+		expect(document.activeElement).toBe(infoTab);
+	});
+
+	it("Enter on a POI marker triggers selection (same as click)", async () => {
+		renderPage();
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		marker.focus();
+		await userEvent.keyboard("{Enter}");
+
+		await waitFor(() => {
+			expect(screen.getByText("Cooling Pump")).toBeInTheDocument();
+		});
+	});
+
+	it("Space on a POI marker triggers selection (same as click)", async () => {
+		renderPage();
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		marker.focus();
+		await userEvent.keyboard(" ");
+
+		await waitFor(() => {
+			expect(screen.getByText("Cooling Pump")).toBeInTheDocument();
+		});
+	});
+
+	it("Enter on a search result item triggers selection", async () => {
+		server.use(
+			http.get("/api/search", () =>
+				HttpResponse.json({
+					query: "pump",
+					image_id: IMAGE_ID,
+					limit: 25,
+					results: [
+						{
+							fitting_position_id: "FP-001",
+							label_text: "PUMP-01",
+							image_id: IMAGE_ID,
+							x_coordinate: 100,
+							y_coordinate: 200,
+							component_name: "Cooling System",
+							matched_source: "internal",
+							matched_field: "label_text",
+							match_type: "exact",
+						},
+					],
+					source_status: { internal: "ok", asset: "ok" },
+					has_more: false,
+					next_cursor: null,
+					request_id: "req-kb-1",
+				}),
+			),
+		);
+		renderPage();
+
+		const searchTab = await screen.findByRole("tab", { name: /search/i });
+		await userEvent.click(searchTab);
+		const input = screen.getByRole("textbox", { name: /search query/i });
+		await userEvent.type(input, "pump");
+
+		// Wait for the result to appear, then find the ListItemButton within the list
+		const resultText = await screen.findByText("PUMP-01");
+		// Walk up to the closest ListItemButton ancestor
+		const listItemButton = resultText.closest('[role="button"]') as HTMLElement;
+		listItemButton.focus();
+		await userEvent.keyboard("{Enter}");
+
+		await waitFor(() => {
+			expect(screen.getByRole("tab", { name: /information/i })).toHaveAttribute(
+				"aria-selected",
+				"true",
+			);
+		});
+	});
+
+	// ── Accessibility Assertion Tests (Phase 10i) ──
+
+	it("POI markers have aria-label attributes with fitting position IDs", async () => {
+		renderPage();
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		expect(marker).toHaveAttribute("aria-label", "FP-PUMP-01-INLET");
+	});
+
+	it("all IconButton zoom controls have aria-label props", async () => {
+		renderPage();
+		await waitFor(() => {
+			expect(
+				screen.getByRole("button", { name: "zoom in" }),
+			).toBeInTheDocument();
+			expect(
+				screen.getByRole("button", { name: "zoom out" }),
+			).toBeInTheDocument();
+			expect(
+				screen.getByRole("button", { name: "reset view" }),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("tabs have accessible aria-label attributes", async () => {
+		renderPage();
+		const infoTab = await screen.findByRole("tab", { name: /information/i });
+		const searchTab = screen.getByRole("tab", { name: /search/i });
+		expect(infoTab).toHaveAttribute("aria-label", "information tab");
+		expect(searchTab).toHaveAttribute("aria-label", "search tab");
+	});
 });

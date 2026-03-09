@@ -1,27 +1,19 @@
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import {
 	Alert,
 	Box,
 	Button,
 	CircularProgress,
 	Grid,
-	LinearProgress,
 	MenuItem,
 	Paper,
 	Select,
-	Step,
-	StepLabel,
-	Stepper,
-	Tab,
-	Tabs,
-	TextField,
 	Typography,
 } from "@mui/material";
 import { useState } from "react";
 import ImageTileCard from "../components/molecules/ImageTileCard";
-import type { CanvasMarker } from "../components/organisms/DiagramCanvasViewport";
-import DiagramCanvasViewport from "../components/organisms/DiagramCanvasViewport";
-import TopAppHeader from "../components/TopAppHeader";
+import MappingWorkbench from "../components/organisms/MappingWorkbench";
+import UploadSessionPanel from "../components/organisms/UploadSessionPanel";
+import AdminMappingTemplate from "../components/templates/AdminMappingTemplate";
 import type { BulkFittingPositionItem } from "../services/api/endpoints";
 import {
 	useAbortUpload,
@@ -229,429 +221,261 @@ function AdminPage() {
 	// ── Render ────────────────────────────────────────────────────────────────
 
 	return (
-		<>
-			<TopAppHeader title="Admin Panel" />
-			{showDisclaimer && (
-				<Alert
-					severity="warning"
-					onClose={() => setShowDisclaimer(false)}
-					sx={{ borderRadius: 0 }}
-				>
-					Admin area — this section is unprotected in the prototype build.
-					Authentication will be enforced in the enterprise deployment.
-				</Alert>
-			)}
-			<Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
-				<Typography variant="h5" gutterBottom>
-					Admin — Upload &amp; Map
-				</Typography>
-
-				<Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-					{STEPS.map((label) => (
-						<Step key={label}>
-							<StepLabel>{label}</StepLabel>
-						</Step>
-					))}
-				</Stepper>
-
-				{/* ── Step 1: Select drawing type ── */}
-				{activeStep === 0 && (
-					<Paper sx={{ p: 3 }}>
-						<Typography variant="h6" gutterBottom>
-							Select Drawing Type
-						</Typography>
-						<Select
-							fullWidth
-							displayEmpty
-							value={selectedDrawingTypeId}
-							onChange={(e) =>
-								setSelectedDrawingTypeId(e.target.value as number | "")
-							}
-							size="small"
-							inputProps={{ "aria-label": "drawing type" }}
-						>
-							<MenuItem value="" disabled>
-								— select drawing type —
+		<AdminMappingTemplate
+			title="Admin Panel"
+			steps={STEPS}
+			activeStep={activeStep}
+			showDisclaimer={showDisclaimer}
+			onDismissDisclaimer={() => setShowDisclaimer(false)}
+		>
+			{/* ── Step 1: Select drawing type ── */}
+			{activeStep === 0 && (
+				<Paper sx={{ p: 3 }}>
+					<Typography variant="h6" gutterBottom>
+						Select Drawing Type
+					</Typography>
+					<Select
+						fullWidth
+						displayEmpty
+						value={selectedDrawingTypeId}
+						onChange={(e) =>
+							setSelectedDrawingTypeId(e.target.value as number | "")
+						}
+						size="small"
+						inputProps={{ "aria-label": "drawing type" }}
+					>
+						<MenuItem value="" disabled>
+							— select drawing type —
+						</MenuItem>
+						{drawingTypes.map((dt) => (
+							<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
+								{dt.type_name}
 							</MenuItem>
-							{drawingTypes.map((dt) => (
-								<MenuItem key={dt.drawing_type_id} value={dt.drawing_type_id}>
-									{dt.type_name}
-								</MenuItem>
-							))}
-						</Select>
-						<Box sx={{ mt: 2 }}>
-							<Button
-								variant="contained"
-								disabled={!selectedDrawingTypeId}
-								onClick={() => setActiveStep(1)}
-							>
-								Next
-							</Button>
+						))}
+					</Select>
+					<Box sx={{ mt: 2 }}>
+						<Button
+							variant="contained"
+							disabled={!selectedDrawingTypeId}
+							onClick={() => setActiveStep(1)}
+						>
+							Next
+						</Button>
+					</Box>
+				</Paper>
+			)}
+
+			{/* ── Step 2: Upload ── */}
+			{activeStep === 1 && (
+				<Paper sx={{ p: 3 }}>
+					<Typography variant="h6" gutterBottom>
+						Upload Image
+					</Typography>
+					<UploadSessionPanel
+						componentName={componentName}
+						onComponentNameChange={setComponentName}
+						fileName={file ? file.name : null}
+						onFileChange={handleFileChange}
+						uploadProgress={uploadProgress}
+						uploadError={uploadError}
+						isUploading={
+							createSession.isPending ||
+							uploadChunkMut.isPending ||
+							completeUploadMut.isPending
+						}
+						showAbort={!!uploadId}
+						onUpload={handleUpload}
+						onAbort={handleAbort}
+						onBack={() => setActiveStep(0)}
+						uploadDisabled={
+							!file ||
+							!componentName.trim() ||
+							createSession.isPending ||
+							uploadChunkMut.isPending ||
+							completeUploadMut.isPending
+						}
+						abortDisabled={abortUploadMut.isPending}
+					/>
+				</Paper>
+			)}
+
+			{/* ── Step 3: Select image ── */}
+			{activeStep === 2 && (
+				<Paper sx={{ p: 3 }}>
+					{completedImageId && (
+						<Alert severity="success" sx={{ mb: 2 }}>
+							Upload complete — select an image to map.
+						</Alert>
+					)}
+					<Typography variant="h6" gutterBottom>
+						Select Image
+					</Typography>
+					<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+						Choose an image from the available schematics for this drawing type.
+					</Typography>
+
+					{selectableImagesLoading && (
+						<Box
+							sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}
+						>
+							<CircularProgress size={28} />
 						</Box>
-					</Paper>
-				)}
+					)}
 
-				{/* ── Step 2: Upload ── */}
-				{activeStep === 1 && (
-					<Paper sx={{ p: 3 }}>
-						<Typography variant="h6" gutterBottom>
-							Upload Image
-						</Typography>
-						<Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-							<TextField
-								label="Component Name"
-								value={componentName}
-								onChange={(e) => setComponentName(e.target.value)}
-								size="small"
-								fullWidth
-								inputProps={{ "aria-label": "component name" }}
-							/>
-							<Button
-								component="label"
-								variant="outlined"
-								startIcon={<CloudUploadIcon />}
-							>
-								{file ? file.name : "Choose file"}
-								<input
-									type="file"
-									hidden
-									accept=".svg,.png,.jpg,.jpeg"
-									onChange={handleFileChange}
-									aria-label="file input"
-								/>
-							</Button>
+					{(() => {
+						const selectableImages =
+							selectableImagesData?.pages.flatMap((p) => p.results) ?? [];
+						if (!selectableImagesLoading && selectableImages.length === 0) {
+							return (
+								<Typography color="text.secondary">
+									No images available for this drawing type.
+								</Typography>
+							);
+						}
+						return (
+							<Grid container spacing={2}>
+								{selectableImages.map((img) => (
+									<Grid key={img.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
+										<ImageTileCard
+											image={img}
+											onClick={(imageId) => {
+												setCompletedImageId(imageId);
+												setActiveStep(3);
+											}}
+										/>
+									</Grid>
+								))}
+							</Grid>
+						);
+					})()}
 
-							{uploadProgress > 0 && uploadProgress < 100 && (
-								<Box>
-									<Typography variant="caption">
-										Uploading… {uploadProgress}%
-									</Typography>
-									<LinearProgress
-										variant="determinate"
-										value={uploadProgress}
-									/>
-								</Box>
-							)}
+					<Box sx={{ mt: 2 }}>
+						<Button variant="outlined" onClick={() => setActiveStep(1)}>
+							Back
+						</Button>
+					</Box>
+				</Paper>
+			)}
 
-							{uploadError && <Alert severity="error">{uploadError}</Alert>}
+			{/* ── Step 4: Map positions ── */}
+			{activeStep === 3 && (
+				<Paper sx={{ p: 3 }}>
+					<Typography variant="h6" gutterBottom>
+						Map Fitting Positions
+					</Typography>
+					<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+						Click anywhere on the canvas to place a marker, then enter its
+						label.
+					</Typography>
 
-							<Box sx={{ display: "flex", gap: 1 }}>
-								<Button
-									variant="outlined"
-									onClick={() => setActiveStep(0)}
-									disabled={createSession.isPending || uploadChunkMut.isPending}
-								>
+					{selectedImage ? (
+						<MappingWorkbench
+							imageSvgUrl={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(selectedImage.image_svg)}`}
+							mappedPositions={mappedPositions}
+							pendingPos={pendingPos}
+							editingLabel={editingLabel}
+							mappingTab={mappingTab}
+							onMappingTabChange={setMappingTab}
+							onCanvasClick={(x, y) => {
+								setPendingPos({ x, y });
+								setEditingLabel("");
+								setMappingTab(0);
+							}}
+							onMarkerDrag={(id, x, y) => {
+								setMappedPositions((prev) =>
+									prev.map((p) => (p.id === id ? { ...p, x, y } : p)),
+								);
+							}}
+							onEditingLabelChange={setEditingLabel}
+							onConfirmMarker={confirmMarker}
+							onCancelMarker={() => {
+								setPendingPos(null);
+								setEditingLabel("");
+							}}
+						/>
+					) : (
+						<Box
+							sx={{
+								minWidth: 400,
+								height: 400,
+								display: "flex",
+								justifyContent: "center",
+								alignItems: "center",
+								border: "1px dashed",
+								borderColor: "divider",
+								borderRadius: 1,
+								bgcolor: "grey.50",
+							}}
+							role="button"
+							aria-label="mapping canvas"
+						>
+							<CircularProgress size={28} />
+						</Box>
+					)}
+
+					<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+						<Button variant="outlined" onClick={() => setActiveStep(2)}>
+							Back
+						</Button>
+						<Button
+							variant="contained"
+							disabled={mappedPositions.length === 0}
+							onClick={() => setActiveStep(4)}
+						>
+							Review &amp; Save
+						</Button>
+					</Box>
+				</Paper>
+			)}
+
+			{/* ── Step 5: Save ── */}
+			{activeStep === 4 && (
+				<Paper sx={{ p: 3 }}>
+					<Typography variant="h6" gutterBottom>
+						Validate &amp; Save
+					</Typography>
+
+					{saveResult ? (
+						<Alert severity="success">
+							Saved — {saveResult.created} created, {saveResult.updated}{" "}
+							updated.
+						</Alert>
+					) : (
+						<>
+							<Typography variant="body2" sx={{ mb: 2 }}>
+								{mappedPositions.length} fitting position(s) ready to save for
+								image <code>{completedImageId}</code>.
+							</Typography>
+							{mappedPositions.map((p) => (
+								<Typography key={p.id} variant="caption" display="block">
+									{p.label} — ({p.x}, {p.y})
+								</Typography>
+							))}
+							<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+								<Button variant="outlined" onClick={() => setActiveStep(3)}>
 									Back
 								</Button>
-								{uploadId && (
-									<Button
-										variant="outlined"
-										color="warning"
-										onClick={handleAbort}
-										disabled={abortUploadMut.isPending}
-									>
-										Abort
-									</Button>
-								)}
 								<Button
 									variant="contained"
-									onClick={handleUpload}
-									disabled={
-										!file ||
-										!componentName.trim() ||
-										createSession.isPending ||
-										uploadChunkMut.isPending ||
-										completeUploadMut.isPending
-									}
+									onClick={handleSave}
+									disabled={saveBulk.isPending}
 									startIcon={
-										(createSession.isPending ||
-											uploadChunkMut.isPending ||
-											completeUploadMut.isPending) && (
-											<CircularProgress size={16} />
-										)
+										saveBulk.isPending && <CircularProgress size={16} />
 									}
 								>
-									Upload
+									Save
 								</Button>
 							</Box>
-						</Box>
-					</Paper>
-				)}
-
-				{/* ── Step 3: Select image ── */}
-				{activeStep === 2 && (
-					<Paper sx={{ p: 3 }}>
-						{completedImageId && (
-							<Alert severity="success" sx={{ mb: 2 }}>
-								Upload complete — select an image to map.
-							</Alert>
-						)}
-						<Typography variant="h6" gutterBottom>
-							Select Image
-						</Typography>
-						<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-							Choose an image from the available schematics for this drawing
-							type.
-						</Typography>
-
-						{selectableImagesLoading && (
-							<Box
-								sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}
-							>
-								<CircularProgress size={28} />
-							</Box>
-						)}
-
-						{(() => {
-							const selectableImages =
-								selectableImagesData?.pages.flatMap((p) => p.results) ?? [];
-							if (!selectableImagesLoading && selectableImages.length === 0) {
-								return (
-									<Typography color="text.secondary">
-										No images available for this drawing type.
-									</Typography>
-								);
-							}
-							return (
-								<Grid container spacing={2}>
-									{selectableImages.map((img) => (
-										<Grid key={img.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
-											<ImageTileCard
-												image={img}
-												onClick={(imageId) => {
-													setCompletedImageId(imageId);
-													setActiveStep(3);
-												}}
-											/>
-										</Grid>
-									))}
-								</Grid>
-							);
-						})()}
-
-						<Box sx={{ mt: 2 }}>
-							<Button variant="outlined" onClick={() => setActiveStep(1)}>
-								Back
-							</Button>
-						</Box>
-					</Paper>
-				)}
-
-				{/* ── Step 4: Map positions ── */}
-				{activeStep === 3 && (
-					<Paper sx={{ p: 3 }}>
-						<Typography variant="h6" gutterBottom>
-							Map Fitting Positions
-						</Typography>
-						<Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-							Click anywhere on the canvas to place a marker, then enter its
-							label.
-						</Typography>
-
-						<Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-							{/* LHS tabs for Unmapped / Mapped */}
-							<Box
-								sx={{
-									width: 260,
-									flexShrink: 0,
-									border: "1px solid",
-									borderColor: "divider",
-									borderRadius: 1,
-									overflow: "hidden",
-								}}
-							>
-								<Tabs
-									value={mappingTab}
-									onChange={(_e, v: number) => setMappingTab(v)}
-									variant="fullWidth"
-								>
-									<Tab label="Unmapped" aria-label="unmapped tab" />
-									<Tab label="Mapped" aria-label="mapped tab" />
-								</Tabs>
-								<Box sx={{ p: 1.5, maxHeight: 400, overflow: "auto" }}>
-									{mappingTab === 0 &&
-										(pendingPos ? (
-											<Box
-												sx={{
-													display: "flex",
-													flexDirection: "column",
-													gap: 1,
-												}}
-											>
-												<Typography variant="body2">
-													New marker at ({pendingPos.x}, {pendingPos.y})
-												</Typography>
-												<TextField
-													label="Label (fitting position ID)"
-													size="small"
-													value={editingLabel}
-													onChange={(e) => setEditingLabel(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === "Enter") confirmMarker();
-														if (e.key === "Escape") {
-															setPendingPos(null);
-															setEditingLabel("");
-														}
-													}}
-													autoFocus
-													inputProps={{ "aria-label": "marker label" }}
-												/>
-												<Box sx={{ display: "flex", gap: 1 }}>
-													<Button
-														variant="contained"
-														size="small"
-														onClick={confirmMarker}
-														disabled={!editingLabel.trim()}
-													>
-														Confirm
-													</Button>
-													<Button
-														size="small"
-														onClick={() => {
-															setPendingPos(null);
-															setEditingLabel("");
-														}}
-													>
-														Cancel
-													</Button>
-												</Box>
-											</Box>
-										) : (
-											<Typography variant="body2" color="text.secondary">
-												{mappedPositions.length === 0
-													? "Click the canvas to place the first marker."
-													: "Click the canvas to add another marker."}
-											</Typography>
-										))}
-									{mappingTab === 1 &&
-										(mappedPositions.length === 0 ? (
-											<Typography variant="body2" color="text.secondary">
-												No markers placed yet.
-											</Typography>
-										) : (
-											mappedPositions.map((p) => (
-												<Typography
-													key={p.id}
-													variant="caption"
-													display="block"
-													sx={{ py: 0.5 }}
-												>
-													{p.label} — ({p.x}, {p.y})
-												</Typography>
-											))
-										))}
-								</Box>
-							</Box>
-
-							{/* Canvas area */}
-							{selectedImage ? (
-								<Box sx={{ flexGrow: 1, minWidth: 400 }}>
-									<DiagramCanvasViewport
-										imageSvgUrl={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(selectedImage.image_svg)}`}
-										markers={mappedPositions.map<CanvasMarker>((p) => ({
-											id: p.id,
-											x: p.x,
-											y: p.y,
-											status: "unmapped",
-										}))}
-										onCanvasClick={(x, y) => {
-											setPendingPos({ x, y });
-											setEditingLabel("");
-											setMappingTab(0); // switch to Unmapped tab
-										}}
-										onMarkerDrag={(id, x, y) => {
-											setMappedPositions((prev) =>
-												prev.map((p) => (p.id === id ? { ...p, x, y } : p)),
-											);
-										}}
-									/>
-								</Box>
-							) : (
-								<Box
-									sx={{
-										flexGrow: 1,
-										minWidth: 400,
-										height: 400,
-										display: "flex",
-										justifyContent: "center",
-										alignItems: "center",
-										border: "1px dashed",
-										borderColor: "divider",
-										borderRadius: 1,
-										bgcolor: "grey.50",
-									}}
-									role="button"
-									aria-label="mapping canvas"
-								>
-									<CircularProgress size={28} />
-								</Box>
+							{saveBulk.isError && (
+								<Alert severity="error" sx={{ mt: 2 }}>
+									Save failed. Please try again.
+								</Alert>
 							)}
-						</Box>
-
-						<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-							<Button variant="outlined" onClick={() => setActiveStep(2)}>
-								Back
-							</Button>
-							<Button
-								variant="contained"
-								disabled={mappedPositions.length === 0}
-								onClick={() => setActiveStep(4)}
-							>
-								Review &amp; Save
-							</Button>
-						</Box>
-					</Paper>
-				)}
-
-				{/* ── Step 5: Save ── */}
-				{activeStep === 4 && (
-					<Paper sx={{ p: 3 }}>
-						<Typography variant="h6" gutterBottom>
-							Validate &amp; Save
-						</Typography>
-
-						{saveResult ? (
-							<Alert severity="success">
-								Saved — {saveResult.created} created, {saveResult.updated}{" "}
-								updated.
-							</Alert>
-						) : (
-							<>
-								<Typography variant="body2" sx={{ mb: 2 }}>
-									{mappedPositions.length} fitting position(s) ready to save for
-									image <code>{completedImageId}</code>.
-								</Typography>
-								{mappedPositions.map((p) => (
-									<Typography key={p.id} variant="caption" display="block">
-										{p.label} — ({p.x}, {p.y})
-									</Typography>
-								))}
-								<Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-									<Button variant="outlined" onClick={() => setActiveStep(3)}>
-										Back
-									</Button>
-									<Button
-										variant="contained"
-										onClick={handleSave}
-										disabled={saveBulk.isPending}
-										startIcon={
-											saveBulk.isPending && <CircularProgress size={16} />
-										}
-									>
-										Save
-									</Button>
-								</Box>
-								{saveBulk.isError && (
-									<Alert severity="error" sx={{ mt: 2 }}>
-										Save failed. Please try again.
-									</Alert>
-								)}
-							</>
-						)}
-					</Paper>
-				)}
-			</Box>
-		</>
+						</>
+					)}
+				</Paper>
+			)}
+		</AdminMappingTemplate>
 	);
 }
 

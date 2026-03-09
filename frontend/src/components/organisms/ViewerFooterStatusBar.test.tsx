@@ -1,7 +1,7 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import theme from "../theme";
+import theme from "../../theme";
 import ViewerFooterStatusBar from "./ViewerFooterStatusBar";
 
 function renderFooter(

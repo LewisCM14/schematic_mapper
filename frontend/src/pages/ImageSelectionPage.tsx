@@ -1,16 +1,7 @@
-import {
-	Box,
-	Button,
-	CircularProgress,
-	Container,
-	Grid,
-	Typography,
-} from "@mui/material";
+import { Box, CircularProgress, Typography } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import FilterBar from "../components/molecules/FilterBar";
-import ImageTileCard from "../components/molecules/ImageTileCard";
-import TopAppHeader from "../components/TopAppHeader";
+import ImageSelectionTemplate from "../components/templates/ImageSelectionTemplate";
 import { useImages } from "../services/api/hooks/useImages";
 
 function ImageSelectionPage() {
@@ -51,80 +42,51 @@ function ImageSelectionPage() {
 	const images = showGrid ? filteredImages : [];
 	const isLoading = typesLoading || (showGrid && imagesLoading);
 
-	return (
+	const stateSlot = (
 		<>
-			<TopAppHeader title="Schematic Mapper" />
-			<Container maxWidth="lg" sx={{ mt: 3 }}>
-				<Typography variant="body1" color="text.secondary" gutterBottom>
-					Select a drawing type to browse available schematics.
+			{!showGrid && !typesLoading && (
+				<Typography color="text.secondary">
+					Select a drawing type above to view available schematics.
 				</Typography>
+			)}
 
-				<Box sx={{ mt: 3 }}>
-					<FilterBar
-						drawingTypes={drawingTypes}
-						selectedTypeId={
-							selectedTypeId !== "" ? String(selectedTypeId) : null
-						}
-						onTypeChange={(id) => setSelectedTypeId(Number(id))}
-						searchValue={searchText}
-						onSearchChange={setSearchText}
-					/>
+			{isLoading && (
+				<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
+					<CircularProgress />
 				</Box>
+			)}
 
-				<Box sx={{ mt: 4 }}>
-					{!showGrid && !typesLoading && (
-						<Typography color="text.secondary">
-							Select a drawing type above to view available schematics.
-						</Typography>
-					)}
+			{showGrid && isError && (
+				<Typography color="error">
+					Failed to load images. Please check the API is running.
+				</Typography>
+			)}
 
-					{isLoading && (
-						<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
-							<CircularProgress />
-						</Box>
-					)}
-
-					{showGrid && isError && (
-						<Typography color="error">
-							Failed to load images. Please check the API is running.
-						</Typography>
-					)}
-
-					{showGrid && !isLoading && images.length === 0 && !isError && (
-						<Typography color="text.secondary">
-							No schematic drawings found for this drawing type.
-						</Typography>
-					)}
-
-					{showGrid && images.length > 0 && (
-						<>
-							<Grid container spacing={3}>
-								{images.map((image) => (
-									<Grid key={image.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
-										<ImageTileCard
-											image={image}
-											onClick={(id) => navigate(`/viewer/${id}`)}
-										/>
-									</Grid>
-								))}
-							</Grid>
-
-							{hasNextPage && (
-								<Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
-									<Button
-										variant="outlined"
-										onClick={() => fetchNextPage()}
-										disabled={isFetchingNextPage}
-									>
-										{isFetchingNextPage ? "Loading…" : "Load more"}
-									</Button>
-								</Box>
-							)}
-						</>
-					)}
-				</Box>
-			</Container>
+			{showGrid && !isLoading && images.length === 0 && !isError && (
+				<Typography color="text.secondary">
+					No schematic drawings found for this drawing type.
+				</Typography>
+			)}
 		</>
+	);
+
+	return (
+		<ImageSelectionTemplate
+			title="Schematic Mapper"
+			description="Select a drawing type to browse available schematics."
+			drawingTypes={drawingTypes}
+			selectedTypeId={selectedTypeId !== "" ? String(selectedTypeId) : null}
+			onTypeChange={(id) => setSelectedTypeId(Number(id))}
+			searchValue={searchText}
+			onSearchChange={setSearchText}
+			images={images}
+			onImageClick={(id) => navigate(`/viewer/${id}`)}
+			hasNextPage={hasNextPage}
+			isFetchingNextPage={isFetchingNextPage}
+			onLoadMore={() => fetchNextPage()}
+			showGrid={showGrid}
+			stateSlot={stateSlot}
+		/>
 	);
 }
 

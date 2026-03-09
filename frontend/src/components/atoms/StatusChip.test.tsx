@@ -45,4 +45,12 @@ describe("StatusChip", () => {
 		const chip = screen.getByText("error").closest(".MuiChip-root");
 		expect(chip).toHaveClass("MuiChip-colorError");
 	});
+
+	it("has visible text label (not colour alone)", () => {
+		for (const status of ["ok", "degraded", "error"] as const) {
+			const { unmount } = renderChip(status);
+			expect(screen.getByText(status)).toBeVisible();
+			unmount();
+		}
+	});
 });

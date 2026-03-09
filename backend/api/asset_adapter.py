@@ -1,5 +1,7 @@
 """Asset adapter: queries the mock asset database for fitting position details."""
 
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -43,6 +45,47 @@ _SEARCHABLE_COLUMNS: list[str] = [
     "sub_component_name",
 ]
 
+# ── Query timeout (seconds) ──────────────────────────────────────────────────
+QUERY_TIMEOUT_SECONDS = 5
+
+# ── Circuit breaker settings ─────────────────────────────────────────────────
+FAILURE_THRESHOLD = 3
+COOLDOWN_SECONDS = 30
+
+_cb_lock = threading.Lock()
+_cb_consecutive_failures = 0
+_cb_open_until: float = 0.0
+
+
+def _circuit_is_open() -> bool:
+    """Return True if the circuit breaker is currently open (tripped)."""
+    with _cb_lock:
+        if _cb_consecutive_failures >= FAILURE_THRESHOLD:
+            return time.monotonic() < _cb_open_until
+    return False
+
+
+def _record_success() -> None:
+    global _cb_consecutive_failures  # noqa: PLW0603
+    with _cb_lock:
+        _cb_consecutive_failures = 0
+
+
+def _record_failure() -> None:
+    global _cb_consecutive_failures, _cb_open_until  # noqa: PLW0603
+    with _cb_lock:
+        _cb_consecutive_failures += 1
+        if _cb_consecutive_failures >= FAILURE_THRESHOLD:
+            _cb_open_until = time.monotonic() + COOLDOWN_SECONDS
+
+
+def reset_circuit_breaker() -> None:
+    """Reset the circuit breaker — intended for tests."""
+    global _cb_consecutive_failures, _cb_open_until  # noqa: PLW0603
+    with _cb_lock:
+        _cb_consecutive_failures = 0
+        _cb_open_until = 0.0
+
 
 def search_assets(labels: list[str], query: str) -> AssetSearchResult:
     """Search asset_information rows whose fitting_position is in *labels*
@@ -51,6 +94,9 @@ def search_assets(labels: list[str], query: str) -> AssetSearchResult:
     Returns ``source_status="degraded"`` with an empty row list if the asset
     database is unreachable or the query fails.
     """
+    if _circuit_is_open():
+        return AssetSearchResult(source_status="degraded")
+
     like_query = f"%{query.lower()}%"
     col_list = ", ".join(_SEARCHABLE_COLUMNS)
     like_clauses = " OR ".join(f"LOWER({col}) LIKE %s" for col in _SEARCHABLE_COLUMNS)
@@ -63,11 +109,16 @@ def search_assets(labels: list[str], query: str) -> AssetSearchResult:
     params: list[Any] = [labels] + [like_query] * len(_SEARCHABLE_COLUMNS)
     try:
         with connections["asset"].cursor() as cursor:
+            cursor.execute(
+                f"SET LOCAL statement_timeout = '{QUERY_TIMEOUT_SECONDS * 1000}'"  # noqa: S608
+            )
             cursor.execute(sql, params)
             raw_rows = cursor.fetchall()
     except (OperationalError, ProgrammingError):
+        _record_failure()
         return AssetSearchResult(source_status="degraded")
 
+    _record_success()
     return AssetSearchResult(
         source_status="ok",
         rows=[
@@ -88,8 +139,14 @@ def fetch_asset_details(fitting_position_id: str) -> AssetResult:
     Returns ``source_status="degraded"`` with ``record=None`` if the asset
     database is unreachable or the query fails.
     """
+    if _circuit_is_open():
+        return AssetResult(source_status="degraded", record=None)
+
     try:
         with connections["asset"].cursor() as cursor:
+            cursor.execute(
+                f"SET LOCAL statement_timeout = '{QUERY_TIMEOUT_SECONDS * 1000}'"  # noqa: S608
+            )
             cursor.execute(
                 """
                 SELECT
@@ -106,7 +163,10 @@ def fetch_asset_details(fitting_position_id: str) -> AssetResult:
             )
             row = cursor.fetchone()
     except (OperationalError, ProgrammingError):
+        _record_failure()
         return AssetResult(source_status="degraded", record=None)
+
+    _record_success()
 
     if row is None:
         return AssetResult(source_status="ok", record=None)

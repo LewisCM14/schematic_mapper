@@ -1,6 +1,7 @@
-import { Box, Paper, Typography } from "@mui/material";
+import { Box, Paper } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import SourceHealthGroup from "./molecules/SourceHealthGroup";
+import MetricText from "../atoms/MetricText";
+import SourceHealthGroup from "../molecules/SourceHealthGroup";
 
 interface ViewerFooterStatusBarProps {
 	sourceStatus: Record<string, string>;
@@ -54,34 +55,16 @@ export default function ViewerFooterStatusBar({
 
 			<Box sx={{ flex: 1 }} />
 
-			{requestId && (
-				<Typography
-					variant="caption"
-					sx={{
-						fontFamily: theme.typography.monoFontFamily,
-						color: theme.palette.footer.text,
-						opacity: 0.7,
-					}}
-				>
-					req: {requestId}
-				</Typography>
-			)}
+			{requestId && <MetricText label="req:" value={requestId} />}
 
 			{lastRefreshed && (
-				<Typography
-					variant="caption"
-					sx={{ color: theme.palette.footer.text, opacity: 0.7 }}
-				>
-					refreshed {formatRelativeTime(lastRefreshed)}
-				</Typography>
+				<MetricText
+					label="refreshed"
+					value={formatRelativeTime(lastRefreshed)}
+				/>
 			)}
 
-			<Typography
-				variant="caption"
-				sx={{ color: theme.palette.footer.text, opacity: 0.7 }}
-			>
-				{zoomLevel.toFixed(1)}×
-			</Typography>
+			<MetricText label="" value={`${zoomLevel.toFixed(1)}×`} />
 		</Paper>
 	);
 }
