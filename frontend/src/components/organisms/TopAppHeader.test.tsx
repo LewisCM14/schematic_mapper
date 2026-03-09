@@ -39,4 +39,9 @@ describe("TopAppHeader", () => {
 		renderHeader();
 		expect(screen.queryByLabelText(/ok|degraded|error/)).toBeNull();
 	});
+
+	it("renders the user menu trigger", () => {
+		renderHeader();
+		expect(screen.getByLabelText("user menu")).toBeInTheDocument();
+	});
 });

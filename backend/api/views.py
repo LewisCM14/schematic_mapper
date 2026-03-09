@@ -1,8 +1,10 @@
 import base64
 import hashlib
 import logging
+import re
 import time
 import uuid
+import xml.etree.ElementTree as ET
 
 from django.db import OperationalError, connections
 from django.shortcuts import get_object_or_404
@@ -44,6 +46,45 @@ MAX_UPLOAD_SIZE_BYTES: int = 50 * 1024 * 1024  # 50 MB
 VALID_SEARCH_SOURCES: frozenset[str] = frozenset({"internal", "asset", "sensor"})
 
 logger = logging.getLogger("api")
+
+_NUMERIC_RE = re.compile(r"^(\d+(?:\.\d+)?)")
+
+DEFAULT_WIDTH = 800
+DEFAULT_HEIGHT = 600
+
+
+def _parse_svg_dimensions(data: bytes) -> tuple[int, int]:
+    """Extract width/height from an SVG's attributes or viewBox.
+
+    Returns (width, height) as integers, falling back to
+    DEFAULT_WIDTH × DEFAULT_HEIGHT when dimensions cannot be determined.
+    """
+    try:
+        root = ET.fromstring(data)  # noqa: S314
+    except ET.ParseError:
+        return DEFAULT_WIDTH, DEFAULT_HEIGHT
+
+    def _num(val: str | None) -> int | None:
+        if not val:
+            return None
+        m = _NUMERIC_RE.match(val.strip())
+        return int(float(m.group(1))) if m else None
+
+    w = _num(root.get("width"))
+    h = _num(root.get("height"))
+    if w and h:
+        return w, h
+
+    vb = root.get("viewBox") or root.get("viewbox")
+    if vb:
+        parts = vb.replace(",", " ").split()
+        if len(parts) == 4:
+            vw = _num(parts[2])
+            vh = _num(parts[3])
+            if vw and vh:
+                return vw, vh
+
+    return DEFAULT_WIDTH, DEFAULT_HEIGHT
 
 
 @api_view(["GET"])
@@ -310,9 +351,8 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
             status=422,
         )
 
-    # Detect image dimensions (SVG: use fixed 800×600 for prototype)
-    width_px = 800
-    height_px = 600
+    # Detect image dimensions from SVG content
+    width_px, height_px = _parse_svg_dimensions(assembled)
 
     image = Image.objects.create(
         drawing_type=session.drawing_type,

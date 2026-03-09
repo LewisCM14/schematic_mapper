@@ -1,6 +1,7 @@
 import { AppBar, Box, Toolbar } from "@mui/material";
 import StatusChip from "../atoms/StatusChip";
 import HeaderIdentity from "../molecules/HeaderIdentity";
+import UserMenuTrigger from "../molecules/UserMenuTrigger";
 
 interface TopAppHeaderProps {
 	title: string;
@@ -25,6 +26,7 @@ function TopAppHeader({
 							<StatusChip status={status as "ok" | "degraded" | "error"} />
 						</Box>
 					))}
+				<UserMenuTrigger />
 			</Toolbar>
 		</AppBar>
 	);

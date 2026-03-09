@@ -58,7 +58,7 @@ interface MappedPos {
 	label: string;
 }
 
-function AdminPage() {
+function AdminUploadMappingPage() {
 	const [showDisclaimer, setShowDisclaimer] = useState(true);
 	const [activeStep, setActiveStep] = useState(0);
 
@@ -542,4 +542,4 @@ function AdminPage() {
 	);
 }
 
-export default AdminPage;
+export default AdminUploadMappingPage;

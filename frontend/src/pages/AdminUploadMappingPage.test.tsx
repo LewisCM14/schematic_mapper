@@ -7,7 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { server } from "../test/handlers";
 import theme from "../theme";
-import AdminPage from "./AdminPage";
+import AdminUploadMappingPage from "./AdminUploadMappingPage";
 
 function renderPage() {
 	const client = new QueryClient({
@@ -20,14 +20,14 @@ function renderPage() {
 		<ThemeProvider theme={theme}>
 			<MemoryRouter>
 				<QueryClientProvider client={client}>
-					<AdminPage />
+					<AdminUploadMappingPage />
 				</QueryClientProvider>
 			</MemoryRouter>
 		</ThemeProvider>,
 	);
 }
 
-describe("AdminPage", () => {
+describe("AdminUploadMappingPage", () => {
 	afterEach(() => vi.restoreAllMocks());
 
 	it("renders stepper with all 5 steps", async () => {

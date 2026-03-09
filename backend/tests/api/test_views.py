@@ -661,6 +661,54 @@ class TestCompleteUploadView:
         assert response.status_code == 201
         assert response.json()["state"] == "completed"
 
+    def test_extracts_dimensions_from_viewbox(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900"></svg>'
+        session = self._create_session_with_chunk(drawing_type, svg)
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        image_id = response.json()["image_id"]
+        img = Image.objects.get(pk=image_id)
+        assert img.width_px == 1200
+        assert img.height_px == 900
+
+    def test_extracts_dimensions_from_width_height_attrs(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"></svg>'
+        session = self._create_session_with_chunk(drawing_type, svg)
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        image_id = response.json()["image_id"]
+        img = Image.objects.get(pk=image_id)
+        assert img.width_px == 640
+        assert img.height_px == 480
+
+    def test_falls_back_to_default_dimensions(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        svg = b"<svg/>"
+        session = self._create_session_with_chunk(drawing_type, svg)
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        image_id = response.json()["image_id"]
+        img = Image.objects.get(pk=image_id)
+        assert img.width_px == 800
+        assert img.height_px == 600
+
 
 @pytest.mark.django_db
 class TestAbortUploadView:
