@@ -22,10 +22,11 @@ function renderPanel() {
 }
 
 describe("SearchResultsPanel", () => {
-	it("renders the search input", () => {
+	it("renders the search input with search icon", () => {
 		renderPanel();
 		expect(
-			screen.getByRole("textbox", { name: /search query/i }),
+			screen.getByRole("textbox", { name: /search fitting positions/i }),
 		).toBeInTheDocument();
+		expect(document.querySelector("[data-testid='SearchIcon']")).toBeTruthy();
 	});
 });

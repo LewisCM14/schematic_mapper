@@ -1,13 +1,6 @@
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import {
-	Alert,
-	Box,
-	Button,
-	CircularProgress,
-	LinearProgress,
-	TextField,
-	Typography,
-} from "@mui/material";
+import { Alert, Box, Button, CircularProgress, TextField } from "@mui/material";
+import UploadProgressRow from "../molecules/UploadProgressRow";
 
 interface UploadSessionPanelProps {
 	componentName: string;
@@ -66,12 +59,10 @@ function UploadSessionPanel({
 			</Button>
 
 			{uploadProgress > 0 && uploadProgress < 100 && (
-				<Box>
-					<Typography variant="caption">
-						Uploading… {uploadProgress}%
-					</Typography>
-					<LinearProgress variant="determinate" value={uploadProgress} />
-				</Box>
+				<UploadProgressRow
+					fileName={fileName ?? "file"}
+					progress={uploadProgress}
+				/>
 			)}
 
 			{uploadError && <Alert severity="error">{uploadError}</Alert>}

@@ -195,7 +195,9 @@ describe("ImageViewerPage", () => {
 	it("shows min-chars hint when query is 1 char", async () => {
 		renderPage();
 
-		const input = await screen.findByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
 		await userEvent.type(input, "p");
 
 		await waitFor(() => {
@@ -234,7 +236,9 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const input = await screen.findByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
 		await userEvent.type(input, "pump");
 
 		await waitFor(() => {
@@ -271,7 +275,9 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const input = await screen.findByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
 		await userEvent.type(input, "pump");
 
 		const resultItem = await screen.findByText("PUMP-01");
@@ -357,7 +363,9 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const input = await screen.findByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
 		await userEvent.type(input, "pump");
 
 		// Wait for the result to appear, then find the ListItemButton within the list
@@ -444,7 +452,9 @@ describe("ImageViewerPage", () => {
 		);
 		renderPage();
 
-		const input = await screen.findByRole("textbox", { name: /search query/i });
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
 		await userEvent.type(input, "pump");
 
 		await waitFor(() => {

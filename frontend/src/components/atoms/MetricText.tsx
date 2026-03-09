@@ -1,4 +1,5 @@
 import { Box, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
 interface MetricTextProps {
 	label: string;
@@ -6,6 +7,7 @@ interface MetricTextProps {
 }
 
 function MetricText({ label, value }: MetricTextProps) {
+	const theme = useTheme();
 	return (
 		<Box
 			sx={{
@@ -17,7 +19,12 @@ function MetricText({ label, value }: MetricTextProps) {
 			<Typography variant="caption" color="text.secondary">
 				{label}
 			</Typography>
-			<Typography variant="caption">{value}</Typography>
+			<Typography
+				variant="caption"
+				sx={{ fontFamily: theme.typography.monoFontFamily }}
+			>
+				{value}
+			</Typography>
 		</Box>
 	);
 }

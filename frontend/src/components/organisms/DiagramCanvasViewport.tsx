@@ -161,7 +161,7 @@ function DiagramCanvasViewport({
 				position: "relative",
 				overflow: "hidden",
 				border: "1px solid",
-				borderColor: "divider",
+				borderColor: theme.palette.map.grid.line,
 				borderRadius: 1,
 				width: "100%",
 				height: "70vh",

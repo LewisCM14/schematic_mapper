@@ -36,12 +36,24 @@ function MappingWorkbench({
 	onConfirmMarker,
 	onCancelMarker,
 }: MappingWorkbenchProps) {
-	const markers: CanvasMarker[] = mappedPositions.map((p) => ({
-		id: p.id,
-		x: p.x,
-		y: p.y,
-		status: "unmapped" as const,
-	}));
+	const markers: CanvasMarker[] = [
+		...mappedPositions.map((p) => ({
+			id: p.id,
+			x: p.x,
+			y: p.y,
+			status: "mapped" as const,
+		})),
+		...(pendingPos
+			? [
+					{
+						id: "__pending__",
+						x: pendingPos.x,
+						y: pendingPos.y,
+						status: "unmapped" as const,
+					},
+				]
+			: []),
+	];
 
 	return (
 		<Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>

@@ -48,4 +48,18 @@ describe("UploadSessionPanel", () => {
 		renderPanel({ showAbort: true });
 		expect(screen.getByRole("button", { name: /abort/i })).toBeInTheDocument();
 	});
+
+	it("renders UploadProgressRow during upload", () => {
+		renderPanel({
+			fileName: "schematic.svg",
+			uploadProgress: 42,
+			isUploading: true,
+		});
+		expect(screen.getByText("42%")).toBeInTheDocument();
+		const progressBars = screen.getAllByRole("progressbar");
+		const determinateBar = progressBars.find((el) =>
+			el.classList.contains("MuiLinearProgress-root"),
+		);
+		expect(determinateBar).toBeTruthy();
+	});
 });

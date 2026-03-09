@@ -1,12 +1,6 @@
-import {
-	Box,
-	FormControl,
-	InputLabel,
-	MenuItem,
-	Select,
-	TextField,
-} from "@mui/material";
+import { Box, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import type { DrawingType } from "../../services/api/schemas";
+import SearchInput from "../atoms/SearchInput";
 
 interface FilterBarProps {
 	drawingTypes: DrawingType[];
@@ -45,12 +39,11 @@ function FilterBar({
 				</Select>
 			</FormControl>
 			{onSearchChange !== undefined && (
-				<TextField
-					size="small"
-					label="Search images"
+				<SearchInput
 					value={searchValue}
-					onChange={(e) => onSearchChange(e.target.value)}
-					inputProps={{ "aria-label": "search images" }}
+					onChange={onSearchChange}
+					label="Search images"
+					onClear={() => onSearchChange("")}
 				/>
 			)}
 		</Box>

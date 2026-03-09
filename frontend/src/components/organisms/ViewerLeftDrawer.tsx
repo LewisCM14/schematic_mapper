@@ -1,6 +1,7 @@
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { Box, Drawer, Tab, Tabs } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { useState } from "react";
 import POIDetailPanel from "./POIDetailPanel";
 import SearchResultsPanel from "./SearchResultsPanel";
@@ -29,6 +30,7 @@ function ViewerLeftDrawer({
 	activeTab: controlledTab,
 	onTabChange,
 }: ViewerLeftDrawerProps) {
+	const theme = useTheme();
 	const [internalTab, setInternalTab] = useState(0);
 	const activeTab = controlledTab ?? internalTab;
 	const setActiveTab = onTabChange ?? setInternalTab;
@@ -45,6 +47,7 @@ function ViewerLeftDrawer({
 					top: 0,
 					position: "relative",
 					height: "100%",
+					background: theme.palette.panel.drawer.bg,
 				},
 			}}
 		>
@@ -53,6 +56,12 @@ function ViewerLeftDrawer({
 					value={activeTab}
 					onChange={(_e, v: number) => setActiveTab(v)}
 					variant="fullWidth"
+					sx={{
+						"& .Mui-selected": {
+							background: theme.palette.panel.drawer.tab.active,
+							color: theme.palette.panel.drawer.tab.text.active,
+						},
+					}}
 				>
 					<Tab
 						icon={<SearchOutlinedIcon fontSize="small" />}

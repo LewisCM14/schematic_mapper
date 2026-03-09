@@ -34,7 +34,7 @@ describe("ViewerLeftDrawer", () => {
 	it("shows search input on Search tab by default", () => {
 		renderDrawer();
 		expect(
-			screen.getByRole("textbox", { name: /search query/i }),
+			screen.getByRole("textbox", { name: /search fitting positions/i }),
 		).toBeInTheDocument();
 	});
 });

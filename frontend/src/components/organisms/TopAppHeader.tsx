@@ -1,6 +1,6 @@
-import { AppBar, Box, Toolbar, Typography } from "@mui/material";
-import AppLogo from "../atoms/AppLogo";
+import { AppBar, Box, Toolbar } from "@mui/material";
 import StatusChip from "../atoms/StatusChip";
+import HeaderIdentity from "../molecules/HeaderIdentity";
 
 interface TopAppHeaderProps {
 	title: string;
@@ -16,18 +16,8 @@ function TopAppHeader({
 	return (
 		<AppBar position="static" color="primary">
 			<Toolbar>
-				<Box sx={{ mr: 1.5 }}>
-					<AppLogo />
-				</Box>
 				<Box sx={{ flexGrow: 1 }}>
-					<Typography variant="h6" component="div" sx={{ lineHeight: 1.2 }}>
-						{title}
-					</Typography>
-					{contextLabel && (
-						<Typography variant="body2" sx={{ opacity: 0.85, lineHeight: 1.2 }}>
-							{contextLabel}
-						</Typography>
-					)}
+					<HeaderIdentity title={title} contextLabel={contextLabel} />
 				</Box>
 				{sourceStatus &&
 					Object.entries(sourceStatus).map(([source, status]) => (

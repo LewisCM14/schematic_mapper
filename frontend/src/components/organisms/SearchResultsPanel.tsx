@@ -4,12 +4,12 @@ import {
 	Chip,
 	CircularProgress,
 	List,
-	TextField,
 	Tooltip,
 	Typography,
 } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useSearch } from "../../services/api/hooks/useSearch";
+import SearchInput from "../atoms/SearchInput";
 import SearchResultItemComponent from "../molecules/SearchResultItem";
 
 const AVAILABLE_SOURCES = ["internal", "asset"] as const;
@@ -81,13 +81,11 @@ function SearchResultsPanel({
 	return (
 		<Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
 			<Box sx={{ p: 1.5 }}>
-				<TextField
-					fullWidth
-					size="small"
-					label="Search fitting positions"
+				<SearchInput
 					value={query}
-					onChange={(e) => setQuery(e.target.value)}
-					inputProps={{ "aria-label": "search query" }}
+					onChange={setQuery}
+					label="Search fitting positions"
+					onClear={() => setQuery("")}
 				/>
 			</Box>
 
