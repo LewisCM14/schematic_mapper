@@ -1,8 +1,10 @@
 """Tests for the search service."""
 
+from io import StringIO
 from unittest.mock import patch
 
 import pytest
+from django.core.management import call_command
 
 from api.asset_adapter import AssetSearchResult
 from api.models import DrawingType, FittingPosition, Image
@@ -47,6 +49,10 @@ class TestCursorEncoding:
 
 @pytest.mark.django_db
 class TestSearchService:
+    @pytest.fixture(autouse=True)
+    def _clear_index_cache(self) -> None:
+        SearchIndexService.clear_cache()
+
     def _setup(self) -> tuple[Image, list[FittingPosition]]:
         dt = DrawingType.objects.create(type_name="composite-search")
         img = Image.objects.create(
@@ -358,6 +364,10 @@ class TestNormalize:
 
 @pytest.mark.django_db
 class TestSearchIndexService:
+    @pytest.fixture(autouse=True)
+    def _clear_index_cache(self) -> None:
+        SearchIndexService.clear_cache()
+
     def _setup(self) -> tuple[Image, list[FittingPosition]]:
         dt = DrawingType.objects.create(type_name="index-test")
         img = Image.objects.create(
@@ -421,3 +431,83 @@ class TestSearchIndexService:
         svc = SearchIndexService()
         rows = svc.get_searchable_fields(img.image_id)
         assert rows == []
+
+    def test_cached_on_second_call(self) -> None:
+        """get_searchable_fields returns cached results on second call."""
+        img, _ = self._setup()
+        svc = SearchIndexService()
+        rows1 = svc.get_searchable_fields(img.image_id)
+        rows2 = svc.get_searchable_fields(img.image_id)
+        assert rows1 is rows2  # same object from cache
+
+    def test_invalidate_causes_fresh_query(self) -> None:
+        """invalidate() clears a single image's projection."""
+        img, _ = self._setup()
+        svc = SearchIndexService()
+        rows1 = svc.get_searchable_fields(img.image_id)
+        svc.invalidate(img.image_id)
+        rows2 = svc.get_searchable_fields(img.image_id)
+        assert rows1 is not rows2
+        assert len(rows2) == len(rows1)
+
+    def test_refresh_pre_populates_cache(self) -> None:
+        """refresh() pre-populates the cache for an image."""
+        img, _ = self._setup()
+        svc = SearchIndexService()
+        refreshed = svc.refresh(img.image_id)
+        cached = svc.get_searchable_fields(img.image_id)
+        assert refreshed is cached
+
+
+@pytest.mark.django_db
+class TestRefreshSearchProjectionCommand:
+    @pytest.fixture(autouse=True)
+    def _clear_index_cache(self) -> None:
+        SearchIndexService.clear_cache()
+
+    def test_refreshes_all_images(self) -> None:
+        dt = DrawingType.objects.create(type_name="cmd-test")
+        img1 = Image.objects.create(
+            drawing_type=dt,
+            component_name="Assembly A",
+            image_binary=b"<svg/>",
+            content_hash="cmd-a",
+            width_px=100,
+            height_px=100,
+        )
+        img2 = Image.objects.create(
+            drawing_type=dt,
+            component_name="Assembly B",
+            image_binary=b"<svg/>",
+            content_hash="cmd-b",
+            width_px=100,
+            height_px=100,
+        )
+        out = StringIO()
+        call_command("refresh_search_projection", stdout=out)
+        output = out.getvalue()
+        assert "Refreshed projections" in output
+        # Both images should now be cached
+        svc = SearchIndexService()
+        assert svc.get_searchable_fields(img1.image_id) is not None
+        assert svc.get_searchable_fields(img2.image_id) is not None
+
+    def test_refreshes_single_image(self) -> None:
+        dt = DrawingType.objects.create(type_name="cmd-single")
+        img = Image.objects.create(
+            drawing_type=dt,
+            component_name="Single Assembly",
+            image_binary=b"<svg/>",
+            content_hash="cmd-single",
+            width_px=100,
+            height_px=100,
+        )
+        out = StringIO()
+        call_command(
+            "refresh_search_projection",
+            "--image-id",
+            str(img.image_id),
+            stdout=out,
+        )
+        output = out.getvalue()
+        assert "Refreshed projection for 1 image" in output
