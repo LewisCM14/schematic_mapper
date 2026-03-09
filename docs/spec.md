@@ -2008,4 +2008,124 @@ All of the following must pass before Phase 11 is considered complete:
 - `uv run ruff check .` — no lint errors.
 - `npm run test` — all frontend tests pass.
 - `npm run build` — production build succeeds.
+
+### Phase 12 — Spec Conformance Remediation
+*Addresses gaps identified by a full codebase audit against all non-implementation sections of this specification.*
+
+#### 12a: POI Marker Clustering in `DiagramCanvasViewport` *(High)*
+*Addresses: `POIMarkerCluster` atom exists but is never composed into `DiagramCanvasViewport`. The spec defines it as "cluster badge for dense marker areas" and Phase 10f stated it should be wired "when marker density exceeds a threshold." No clustering logic exists — all markers render individually regardless of density or zoom level.*
+
+- Add a clustering utility function (e.g. `clusterMarkers(markers, scale, threshold)`) that groups nearby markers based on the current zoom scale and a configurable pixel-distance threshold. Return either individual markers or cluster objects with `count` and centroid coordinates.
+- In `DiagramCanvasViewport.tsx`, call the clustering function whenever `markers` or the panzoom scale changes. Render `<POIMarkerCluster count={n} onClick={...} />` for clusters and `<POIMarkerPin>` for individual markers.
+- When a cluster is clicked, either zoom in to expand the cluster or show a list of the contained fitting positions.
+- Add tests in `DiagramCanvasViewport.test.tsx`: given markers closer than the threshold, assert a `POIMarkerCluster` renders with the correct count; given well-spaced markers, assert individual `POIMarkerPin` components render; zoom change re-evaluates clustering.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 12b: TopAppHeader Menu and Help Icons *(High — prototype placeholders)*
+*Addresses: The spec wireframe shows `[Menu] [Image Name + Type] [Source Chips] [User] [Help]` in the header for the Image Viewer screen. `[Menu]` (hamburger) and `[Help]` icon buttons are absent from `TopAppHeader`. In the prototype there is no side-drawer target for Menu and no help content, so both render as disabled placeholders — following the same pattern as `UserMenuTrigger`.*
+
+- In `TopAppHeader.tsx`, add a disabled `IconButtonAction` with `MenuIcon` at the leading edge of the `Toolbar` (before `HeaderIdentity`). Wrap in a `Tooltip` reading "Navigation (available in enterprise deployment)".
+- Add a disabled `IconButtonAction` with `HelpOutlineIcon` between the source status chips and `UserMenuTrigger`. Wrap in a `Tooltip` reading "Help (available in enterprise deployment)".
+- Update `TopAppHeader.test.tsx` to assert: the menu icon renders with its tooltip text; the help icon renders with its tooltip text; both buttons are disabled.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 12c: `ImageSelectionGrid` Loading, Empty, and Error States *(High)*
+*Addresses: The spec cross-cutting rule states "All async components must provide loading, empty, and error states." `ImageSelectionGrid` renders the tile grid and a load-more button but has no loading skeleton, empty message, or error alert. The parent `ImageSelectionTemplate` passes a `stateSlot` for pre-grid states, but `ImageSelectionGrid` itself should handle in-grid states for infinite scroll loading and empty results after initial data arrives.*
+
+- Add three optional props to `ImageSelectionGrid`: `isLoading: boolean`, `isError: boolean`, `errorMessage?: string`.
+- When `isLoading` is `true` and `images` is empty, render a row of `Skeleton` cards matching the tile layout.
+- When `isError` is `true`, render an `Alert severity="error"` with  `errorMessage` or a default "Failed to load images" message and an optional retry action.
+- When `images` is empty and `isLoading` is `false` and `isError` is `false`, render a `Typography` empty state: "No images found for the selected filters."
+- Update `ImageSelectionPage.tsx` / `ImageSelectionTemplate.tsx` to pass `isLoading`, `isError`, and `errorMessage` from the `useImages` query state to `ImageSelectionGrid`.
+- Add tests in `ImageSelectionGrid.test.tsx`: loading skeleton renders when `isLoading` and images is empty; error alert renders when `isError`; empty message renders when no images and not loading; grid renders tile cards when images are present.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 12d: Missing `useDrawingTypes` Hook Test *(Medium)*
+*Addresses: The spec testing strategy requires co-located test files for all hooks. `useDrawingTypes.ts` has no test file.*
+
+- Create `src/services/api/hooks/useDrawingTypes.test.ts`:
+    - Assert the hook fires `GET /api/drawing-types` and returns the parsed array of drawing types via MSW.
+    - Assert `staleTime: 30 * 60 * 1000` and `gcTime: 60 * 60 * 1000` are applied to the query options.
+    - Assert the query is enabled unconditionally (drawing types load without preconditions).
+- Use `renderHook` from `@testing-library/react`, an isolated `QueryClient` per test with `retry: false` and `gcTime: 0`, and MSW handlers from `src/test/handlers.ts`.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+#### 12e: Missing `useHealth` Hook Test *(Medium)*
+*Addresses: Same as 12d — `useHealth.ts` has no co-located test file.*
+
+- Create `src/services/api/hooks/useHealth.test.ts`:
+    - Assert the hook fires `GET /api/health` and returns `{ status: "ok", database: "connected" }` via MSW.
+    - Assert the hook is enabled unconditionally.
+- Use `renderHook`, isolated `QueryClient`, and MSW handlers.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+#### 12f: `fetchSearch` Query Normalization in HTTP Request *(Medium)*
+*Addresses: `queryKeys.search()` normalizes the query text via `query.trim().toLowerCase()` for cache consistency, but `fetchSearch()` in `endpoints.ts` sends the raw query string to the API. This creates an inconsistency: the cache key maps to a normalized version while the HTTP request sends the original text. The spec says to normalize for cache consistency, and this should extend to the actual request to prevent semantically identical queries from producing different API calls.*
+
+- In `fetchSearch()` in `services/api/endpoints.ts`, normalize the `query` parameter before building the request params: `const normalizedQuery = query.trim().toLowerCase()`. Use `normalizedQuery` in the params object sent to the API.
+- Update `fetchSearch` callers (if any pass raw text directly) to be aware that normalization happens in the endpoint function.
+- Add a test in `endpoints.test.ts` (or a relevant hook test) asserting that `fetchSearch` sends a trimmed, lowercased query to the API.
+- **Verification:** `npm run test` passes; `npm run lint` passes.
+
+#### 12g: `POST /api/admin/images` Single-Request Upload *(Medium)*
+*Addresses: The spec API endpoint list includes `POST /api/admin/images: admin image upload with drawing type` and the upload method section says "Keep single-request upload support for trusted fast networks and small files." Only the chunked upload flow (`/api/admin/uploads`) is implemented.*
+
+- Add a `POST /api/admin/images` endpoint in `api/views.py`:
+    - Accept a JSON body with `drawing_type_id`, `component_name`, `file_name`, `image_data` (base64-encoded file content), and `expected_checksum`.
+    - Enforce the same `MAX_UPLOAD_SIZE_BYTES` and `ALLOWED_MIME_TYPES` validation as `complete_upload`.
+    - Verify SHA-256 checksum of the decoded content.
+    - Parse SVG dimensions via `_parse_svg_dimensions()`.
+    - Create the `Image` record in a single transaction (no session/chunk model needed).
+    - Return `201` with `{ image_id, component_name, drawing_type }`.
+- Register the URL in `api/urls.py` as `path("admin/images", admin_upload_image)`.
+- Add a serializer for the input payload.
+- Add tests in `tests/api/test_views.py` under `TestAdminUploadImageView`: valid SVG upload returns 201 with image_id; checksum mismatch returns 422; file too large returns 400; non-SVG content returns 422.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean.
+
+#### 12h: Extract Source Filter into Discrete Component *(Low)*
+*Addresses: The source filtering UI (internal/asset/sensor toggle chips) is implemented inline in `SearchResultsPanel`. The spec envisions source filtering as a user-facing control, and Phase 10l mentioned a dedicated `SourceFilterChips` component. Extracting it improves reusability and testability.*
+
+- Create `src/components/molecules/SourceFilterChips.tsx`. Props:
+    - `availableSources: string[]` — sources that can be toggled.
+    - `disabledSources?: string[]` — sources shown as disabled (e.g. `"sensor"` in prototype).
+    - `selectedSources: string[]` — currently active sources.
+    - `onToggle: (source: string) => void` — callback when a source chip is clicked.
+- Move the source chip rendering logic out of `SearchResultsPanel` into `SourceFilterChips`. Import and compose it in `SearchResultsPanel`.
+- Add `SourceFilterChips.test.tsx`: assert all sources render as chips; disabled sources have disabled styling and tooltip; clicking an enabled chip calls `onToggle`.
+- **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
+
+#### 12i: SVG Thumbnail Generation *(Low)*
+*Addresses: `ImageSerializer.thumbnail_url` always returns `None`. The spec wireframe shows "preview thumbnail" on image tiles. The frontend correctly renders a `Skeleton` placeholder when null, but tiles never display an actual preview. Generating a thumbnail from the stored SVG content would satisfy the wireframe.*
+
+- Add a `thumbnail` `BinaryField` (nullable) to the `Image` model to store a rasterized PNG thumbnail. Generate and apply the migration.
+- In `complete_upload` (and the new `admin_upload_image` from 12g), after creating the `Image` record, generate a small PNG thumbnail from the SVG content. Use a lightweight approach: store a scaled-down copy of the SVG as a data URI, or use `cairosvg` (add as dependency) to rasterize to a ~240×160 PNG.
+    - If thumbnail generation fails (e.g. malformed SVG), log a warning and leave `thumbnail` as `None` — this is non-blocking.
+- Update `ImageSerializer.get_thumbnail_url` to return a base64 data URI (`data:image/png;base64,...`) when the `thumbnail` field is populated, or `None` otherwise.
+- Add a test: upload an SVG and assert the created image has a non-null `thumbnail` value; the serializer returns a data URI string.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean; `npm run test` passes (frontend `ImageTileCard` renders `CardMedia` when thumbnail_url is present).
+
+#### 12j: Concurrent Upload Session Limit *(Low)*
+*Addresses: The spec operational controls section says "Configure upload timeouts and max concurrent uploads per user/session." No concurrent upload session enforcement exists. A user could create unlimited simultaneous upload sessions.*
+
+- Define `MAX_CONCURRENT_UPLOADS = 3` as a constant in `api/views.py` (or `api/upload_config.py`).
+- In `create_upload_session`, before creating a new session, count active sessions (state in `['initiated', 'uploading', 'verifying']`). If the count meets or exceeds the limit, return `429 Too Many Requests` with `{ "error": "Maximum concurrent upload sessions reached", "code": "upload_limit_reached", "status": 429 }`.
+    - Note: In the prototype (no auth), this counts globally. In enterprise deployment, scope to `uploader_identity`.
+- Add a test in `TestCreateUploadSessionView`: create `MAX_CONCURRENT_UPLOADS` sessions then attempt one more and assert 429 response; completing or aborting a session frees a slot.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean.
+
+#### 12k: Client-Side `imageId` UUID Format Validation *(Low)*
+*Addresses: `ImageViewerPage` checks that `imageId` from the route is not empty, but does not validate UUID format before making API calls. The spec says: "If image_id is missing/invalid, show notice and redirect to Image Selection." A malformed non-UUID string like `/viewer/not-a-uuid` passes the empty check and makes a failed API call before showing the error notice.*
+
+- In `ImageViewerPage.tsx`, after extracting `imageId` from route params, validate it against a UUID regex pattern (e.g. `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i`). If the format is invalid, immediately show the same Snackbar notice ("Image not found — returning to selection") and redirect to `/` — without making any API calls.
+- Add a test in `ImageViewerPage.test.tsx`: navigate to `/viewer/not-a-uuid`; assert the notice is displayed and redirect to `/` occurs without firing `useImage`.
+- **Verification:** `npm run test` passes.
+
+#### Completion Criteria for Phase 12
+All of the following must pass before Phase 12 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
 - `npm run lint` — no Biome errors.
