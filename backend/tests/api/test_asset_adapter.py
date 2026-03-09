@@ -8,6 +8,7 @@ from api.asset_adapter import (
     FAILURE_THRESHOLD,
     AssetRecord,
     AssetSearchRow,
+    clear_asset_cache,
     fetch_asset_details,
     reset_circuit_breaker,
     search_assets,
@@ -16,10 +17,12 @@ from api.asset_adapter import (
 
 @pytest.fixture(autouse=True)
 def _reset_cb() -> Generator[None]:
-    """Reset the circuit breaker before every test."""
+    """Reset the circuit breaker and asset cache before every test."""
     reset_circuit_breaker()
+    clear_asset_cache()
     yield
     reset_circuit_breaker()
+    clear_asset_cache()
 
 
 class TestFetchAssetDetails:
@@ -251,3 +254,147 @@ class TestAssetAdapterContract:
 
         calls = [str(c) for c in mock_cursor.execute.call_args_list]
         assert any("statement_timeout" in c for c in calls)
+
+
+class TestReadThroughCache:
+    """Tests for the TTL read-through cache on asset adapter functions."""
+
+    def test_fetch_details_cache_hit_skips_db(self) -> None:
+        """A second call returns the cached result without a second DB query."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchone.return_value = (
+            "ASSET-001",
+            "FP-001",
+            "Cooling",
+            "Primary",
+            "Inlet",
+        )
+
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+            result1 = fetch_asset_details("FP-001")
+            result2 = fetch_asset_details("FP-001")
+
+            # cursor should only have been acquired once
+            assert mock_connections.__getitem__.return_value.cursor.call_count == 1
+
+        assert result1.source_status == "ok"
+        assert result2.source_status == "ok"
+        assert result2.record is not None
+        assert result2.record.asset_record_id == "ASSET-001"
+
+    def test_fetch_details_cache_expires_after_ttl(self) -> None:
+        """After TTL expires a fresh DB query is made."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchone.return_value = (
+            "ASSET-001",
+            "FP-001",
+            "Cooling",
+            "Primary",
+            "Inlet",
+        )
+
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+            fetch_asset_details("FP-001")
+
+        # Expire the cache entry by advancing time past TTL
+        with (
+            patch("api.cache.time") as mock_cache_time,
+            patch("api.asset_adapter.connections") as mock_connections,
+        ):
+            mock_cache_time.monotonic.return_value = 1e12
+            mock_cursor2 = MagicMock()
+            mock_cursor2.__enter__ = MagicMock(return_value=mock_cursor2)
+            mock_cursor2.__exit__ = MagicMock(return_value=False)
+            mock_cursor2.fetchone.return_value = (
+                "ASSET-002",
+                "FP-001",
+                "Cooling",
+                "Primary",
+                "Inlet",
+            )
+            mock_connections.__getitem__.return_value.cursor.return_value = (
+                mock_cursor2
+            )
+            result = fetch_asset_details("FP-001")
+
+        assert result.record is not None
+        assert result.record.asset_record_id == "ASSET-002"
+
+    def test_degraded_result_not_cached(self) -> None:
+        """Degraded results from DB errors are not cached."""
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.side_effect = (
+                OperationalError("timeout")
+            )
+            result1 = fetch_asset_details("FP-001")
+            assert result1.source_status == "degraded"
+
+        # Next call should attempt the DB again (not returned from cache)
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchone.return_value = (
+            "ASSET-001",
+            "FP-001",
+            "Cooling",
+            "Primary",
+            "Inlet",
+        )
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+            result2 = fetch_asset_details("FP-001")
+            mock_connections.__getitem__.return_value.cursor.assert_called()
+
+        assert result2.source_status == "ok"
+        assert result2.record is not None
+
+    def test_clear_asset_cache_forces_fresh_query(self) -> None:
+        """clear_asset_cache() evicts all entries so the next call hits the DB."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchone.return_value = (
+            "ASSET-001",
+            "FP-001",
+            "Cooling",
+            "Primary",
+            "Inlet",
+        )
+
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+            fetch_asset_details("FP-001")
+            assert mock_connections.__getitem__.return_value.cursor.call_count == 1
+
+        clear_asset_cache()
+
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+            fetch_asset_details("FP-001")
+            assert mock_connections.__getitem__.return_value.cursor.call_count == 1
+
+    def test_search_assets_cache_hit_skips_db(self) -> None:
+        """A second search_assets call with the same args returns cached results."""
+        mock_cursor = MagicMock()
+        mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+        mock_cursor.__exit__ = MagicMock(return_value=False)
+        mock_cursor.fetchall.return_value = [
+            ("FP-001", "Cooling", "Primary", "Inlet"),
+        ]
+
+        with patch("api.asset_adapter.connections") as mock_connections:
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
+            result1 = search_assets(["FP-001"], "cooling")
+            result2 = search_assets(["FP-001"], "cooling")
+
+            assert mock_connections.__getitem__.return_value.cursor.call_count == 1
+
+        assert result1.source_status == "ok"
+        assert result2.source_status == "ok"
+        assert len(result2.rows) == 1

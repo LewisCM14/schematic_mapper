@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from django.db import OperationalError, ProgrammingError, connections
 
+from .cache import TTLCache
+
 
 @dataclass
 class AssetRecord:
@@ -47,6 +49,15 @@ _SEARCHABLE_COLUMNS: list[str] = [
 
 # ── Query timeout (seconds) ──────────────────────────────────────────────────
 QUERY_TIMEOUT_SECONDS = 5
+
+# ── Read-through cache ───────────────────────────────────────────────────────
+CACHE_TTL_SECONDS = 300  # 5 minutes
+_asset_cache: TTLCache[AssetResult | AssetSearchResult] = TTLCache()
+
+
+def clear_asset_cache() -> None:
+    """Clear the asset adapter cache — intended for tests."""
+    _asset_cache.clear()
 
 # ── Circuit breaker settings ─────────────────────────────────────────────────
 FAILURE_THRESHOLD = 3
@@ -101,6 +112,11 @@ def search_assets(
     if _circuit_is_open():
         return AssetSearchResult(source_status="degraded")
 
+    cache_key = f"search:{','.join(sorted(labels))}:{query.lower()}:{table_name}"
+    cached = _asset_cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+
     like_query = f"%{query.lower()}%"
     col_list = ", ".join(_SEARCHABLE_COLUMNS)
     like_clauses = " OR ".join(f"LOWER({col}) LIKE %s" for col in _SEARCHABLE_COLUMNS)
@@ -123,7 +139,7 @@ def search_assets(
         return AssetSearchResult(source_status="degraded")
 
     _record_success()
-    return AssetSearchResult(
+    result = AssetSearchResult(
         source_status="ok",
         rows=[
             AssetSearchRow(
@@ -135,6 +151,8 @@ def search_assets(
             for row in raw_rows
         ],
     )
+    _asset_cache.set(cache_key, result, CACHE_TTL_SECONDS)
+    return result
 
 
 def fetch_asset_details(fitting_position_id: str) -> AssetResult:
@@ -145,6 +163,11 @@ def fetch_asset_details(fitting_position_id: str) -> AssetResult:
     """
     if _circuit_is_open():
         return AssetResult(source_status="degraded", record=None)
+
+    cache_key = f"details:{fitting_position_id}"
+    cached = _asset_cache.get(cache_key)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
 
     try:
         with connections["asset"].cursor() as cursor:
@@ -175,7 +198,7 @@ def fetch_asset_details(fitting_position_id: str) -> AssetResult:
     if row is None:
         return AssetResult(source_status="ok", record=None)
 
-    return AssetResult(
+    result = AssetResult(
         source_status="ok",
         record=AssetRecord(
             asset_record_id=row[0],
@@ -185,3 +208,5 @@ def fetch_asset_details(fitting_position_id: str) -> AssetResult:
             sub_component_name=row[4],
         ),
     )
+    _asset_cache.set(cache_key, result, CACHE_TTL_SECONDS)
+    return result
