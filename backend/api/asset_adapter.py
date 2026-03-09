@@ -87,9 +87,13 @@ def reset_circuit_breaker() -> None:
         _cb_open_until = 0.0
 
 
-def search_assets(labels: list[str], query: str) -> AssetSearchResult:
-    """Search asset_information rows whose fitting_position is in *labels*
+def search_assets(
+    labels: list[str], query: str, *, table_name: str = "asset_information"
+) -> AssetSearchResult:
+    """Search asset rows whose fitting_position is in *labels*
     and whose searchable columns contain *query* (case-insensitive LIKE).
+
+    *table_name* is read from ``SourceSearchConfig.table_name``.
 
     Returns ``source_status="degraded"`` with an empty row list if the asset
     database is unreachable or the query fails.
@@ -102,10 +106,10 @@ def search_assets(labels: list[str], query: str) -> AssetSearchResult:
     like_clauses = " OR ".join(f"LOWER({col}) LIKE %s" for col in _SEARCHABLE_COLUMNS)
     sql = f"""
         SELECT fitting_position, {col_list}
-        FROM asset_information
+        FROM {table_name}
         WHERE fitting_position = ANY(%s)
           AND ({like_clauses})
-    """  # noqa: S608  — col names are from internal config, not user input
+    """  # noqa: S608  — col/table names are from internal config, not user input
     params: list[Any] = [labels] + [like_query] * len(_SEARCHABLE_COLUMNS)
     try:
         with connections["asset"].cursor() as cursor:

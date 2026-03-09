@@ -8,7 +8,13 @@ from api.asset_adapter import AssetSearchResult
 from api.models import DrawingType, FittingPosition, Image
 from api.search_config_service import SearchConfigService
 from api.search_index_service import SearchIndexService
-from api.search_service import _decode_cursor, _encode_cursor, _match_type, search
+from api.search_service import (
+    _decode_cursor,
+    _encode_cursor,
+    _match_type,
+    normalize,
+    search,
+)
 
 
 class TestMatchType:
@@ -315,6 +321,39 @@ class TestSearchConfigService:
     def test_get_field_weight_unknown_column_returns_zero(self) -> None:
         svc = SearchConfigService()
         assert svc.get_field_weight("internal", "nonexistent_col") == 0
+
+    def test_asset_table_name_is_asset_information(self) -> None:
+        svc = SearchConfigService()
+        assert svc.get_config("asset").table_name == "asset_information"
+
+    def test_internal_table_name_is_none(self) -> None:
+        svc = SearchConfigService()
+        assert svc.get_config("internal").table_name is None
+
+    def test_normalization_rules_default_for_internal(self) -> None:
+        svc = SearchConfigService()
+        assert svc.get_config("internal").normalization_rules == ["case_fold", "trim"]
+
+    def test_normalization_rules_default_for_asset(self) -> None:
+        svc = SearchConfigService()
+        assert svc.get_config("asset").normalization_rules == ["case_fold", "trim"]
+
+
+class TestNormalize:
+    def test_case_fold(self) -> None:
+        assert normalize("HELLO", ["case_fold"]) == "hello"
+
+    def test_trim(self) -> None:
+        assert normalize("  hello  ", ["trim"]) == "hello"
+
+    def test_case_fold_and_trim(self) -> None:
+        assert normalize("  HELLO  ", ["case_fold", "trim"]) == "hello"
+
+    def test_empty_rules(self) -> None:
+        assert normalize("  HELLO  ", []) == "  HELLO  "
+
+    def test_unknown_rule_ignored(self) -> None:
+        assert normalize("hello", ["unknown_rule"]) == "hello"
 
 
 @pytest.mark.django_db

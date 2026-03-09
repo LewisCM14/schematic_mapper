@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .asset_adapter import search_assets
-from .search_config_service import SearchConfigService
+from .search_config_service import SearchConfigService, SourceSearchConfig
 from .search_index_service import SearchIndexService, SearchProjectionRow
 
 MatchType = Literal["exact", "prefix", "partial"]
@@ -41,14 +41,26 @@ class SearchResponse:
     request_id: str
 
 
-def _match_type(value: str, query: str) -> MatchType | None:
-    lower_val = value.lower()
-    lower_q = query.lower()
-    if lower_val == lower_q:
+def normalize(value: str, rules: list[str]) -> str:
+    """Apply configured normalization rules to *value*."""
+    result = value
+    for rule in rules:
+        if rule == "case_fold":
+            result = result.casefold()
+        elif rule == "trim":
+            result = result.strip()
+    return result
+
+
+def _match_type(value: str, query: str, config: SourceSearchConfig | None = None) -> MatchType | None:
+    rules = config.normalization_rules if config else ["case_fold", "trim"]
+    norm_val = normalize(value, rules)
+    norm_q = normalize(query, rules)
+    if norm_val == norm_q:
         return "exact"
-    if lower_val.startswith(lower_q):
+    if norm_val.startswith(norm_q):
         return "prefix"
-    if lower_q in lower_val:
+    if norm_q in norm_val:
         return "partial"
     return None
 
@@ -108,7 +120,7 @@ def search(
             for proj_row in projection_rows:
                 for col_name in internal_config.searchable_columns:
                     value = str(getattr(proj_row, col_name))
-                    mt = _match_type(value, query)
+                    mt = _match_type(value, query, internal_config)
                     if mt:
                         _upsert(
                             SearchResultItem(
@@ -130,9 +142,10 @@ def search(
             source_status["asset"] = "degraded" if internal_degraded else "ok"
         else:
             labels = [row.label_text for row in projection_rows]
-            asset_result = search_assets(labels, query)
-            source_status["asset"] = asset_result.source_status
             asset_config = config_service.get_config("asset")
+            asset_table = asset_config.table_name or "asset_information"
+            asset_result = search_assets(labels, query, table_name=asset_table)
+            source_status["asset"] = asset_result.source_status
             for asset_row in asset_result.rows:
                 proj_row_maybe = row_by_label.get(asset_row.fitting_position)
                 if proj_row_maybe is None:
@@ -140,7 +153,7 @@ def search(
                 proj_row = proj_row_maybe
                 for col_name in asset_config.searchable_columns:
                     value = str(getattr(asset_row, col_name))
-                    mt = _match_type(value, query)
+                    mt = _match_type(value, query, asset_config)
                     if mt:
                         _upsert(
                             SearchResultItem(

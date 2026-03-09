@@ -1,6 +1,6 @@
 """Configuration-driven field registry for searchable sources."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import final
 
 
@@ -10,6 +10,8 @@ class SourceSearchConfig:
     enabled: bool
     searchable_columns: list[str]
     field_weights: dict[str, int]
+    table_name: str | None = None
+    normalization_rules: list[str] = field(default_factory=lambda: ["case_fold", "trim"])
 
 
 @final
@@ -22,6 +24,7 @@ class SearchConfigService:
             enabled=True,
             searchable_columns=["label_text", "component_name"],
             field_weights={"label_text": 10, "component_name": 5},
+            table_name=None,
         ),
         "asset": SourceSearchConfig(
             source_name="asset",
@@ -36,6 +39,7 @@ class SearchConfigService:
                 "high_level_component": 6,
                 "sub_system_name": 5,
             },
+            table_name="asset_information",
         ),
     }
 
