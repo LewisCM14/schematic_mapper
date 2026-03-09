@@ -1240,7 +1240,6 @@ The project should be structured as a monorepo containing both the frontend and 
 -   **Server:** Implement the `SearchService` and `GET /api/search` endpoint.
 -   **Client:** Implement the Search Tab on the LHS panel.
 
-
 ### Phase 6: Review Codebase Against Spec & Update
 **Goal:** Close the gaps identified between the prototype codebase and the design principles and requirements defined in this specification. Each item below maps to a concrete shortfall found in the review.
 
@@ -1328,8 +1327,6 @@ All of the following must pass before Phase 6 is considered complete:
 ### Phase 7: Review Codebase Against Spec & Update
 **Goal:** Close all conformance gaps identified in the Phase 6 review — grouped by severity (Critical → Major → Minor). Each sub-item maps directly to a specific shortfall found during the audit.
 
----
-
 #### 7a: Complete MUI Theme Tokens — IBM Plex Mono & Map/Panel Colours *(Critical)*
 *Addresses: IBM Plex Mono absent from theme; map-specific and panel/chrome colour tokens missing; hardcoded inline colours in `ImageViewerPage`.*
 
@@ -1352,8 +1349,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Remove hardcoded ad-hoc colour strings from `ImageViewerPage.tsx` (e.g. `background: "#EEF3F8"`, marker fill values) and replace with `theme.palette.map.*` and `theme.palette.footer.*` via `useTheme()` or `sx` prop references.
 - **Verification:** `npm run build` and `npm run lint` pass; MUI TypeScript compiler emits no errors on palette access; canvas background and footer background pull from the theme.
 
----
-
 #### 7b: Viewer Footer Status Bar *(Critical)*
 *Addresses: `ViewerFooterStatusBar` component absent from `ImageViewerPage`; `source_status`, `request_id`, zoom level, and last-refresh time are not surfaced in the UI.*
 
@@ -1371,8 +1366,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Add a unit test for `ViewerFooterStatusBar` that asserts: source chips render with correct labels, request ID is displayed, zoom level is formatted correctly, and an `ok` status chip has the success colour role.
 - **Verification:** `npm run test` passes; the footer is visible in `ImageViewerPage` with all four data points populated after a search completes.
 
----
-
 #### 7c: AppBar Header on All Screens *(Major)*
 *Addresses: no `AppBar` / `Toolbar` present on `ImageSelectionPage` or `ImageViewerPage`; wireframe requires a `TopAppHeader` organism on every screen.*
 
@@ -1389,8 +1382,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Update `ImageViewerPage.test.tsx` to assert the heading text is present.
 - **Verification:** `npm run test` passes; all three screens display the header bar.
 
----
-
 #### 7d: `httpClient` Request & Response Interceptors *(Major)*
 *Addresses: `httpClient.ts` has no interceptors; the spec requires auth header injection, request ID propagation, and global 401/403 handling.*
 
@@ -1402,8 +1393,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Export the `httpClient` instance as the default export (no change to callers required).
 - Add a unit test (`services/api/httpClient.test.ts`) covering: `X-Request-ID` header is present on outgoing requests; a mocked 401 response triggers the warn path without throwing; a mocked 500 response propagates the error.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
-
----
 
 #### 7e: MSW API Mocking in Tests *(Major)*
 *Addresses: tests currently mock Axios directly; the spec requires `msw` for deterministic API mocking at the network boundary.*
@@ -1427,8 +1416,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Refactor existing test files to remove direct `vi.mock("axios")` / `vi.spyOn` Axios calls and instead rely on the MSW handlers. Inject a `QueryClient` with `retry: false` and `gcTime: 0` per test to prevent cache leakage.
 - **Verification:** `npm run test` passes with all existing tests green and no unhandled-request warnings.
 
----
-
 #### 7f: `sources` Query Parameter Validation *(Major)*
 *Addresses: the `sources` parameter in `GET /api/search` is not validated; unknown source names pass through silently.*
 
@@ -1439,8 +1426,6 @@ All of the following must pass before Phase 6 is considered complete:
     ```
 - Add tests in `test_views.py` under `TestSearchView` covering: valid sources pass through; a single unknown source returns 400 with the correct error code; mixed valid + invalid also returns 400.
 - **Verification:** `uv run pytest` passes.
-
----
 
 #### 7g: `SearchConfigService` & `SearchIndexService` *(Major)*
 *Addresses: searchable fields are hardcoded in `search_service.py`; the spec requires configuration-driven field lists with a dedicated `SearchConfigService` and `SearchIndexService`.*
@@ -1456,8 +1441,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Add `TestSearchConfigService` and `TestSearchIndexService` test classes in `tests/api/test_search_service.py` covering: known source returns correct column list; unknown source raises; disabled source is excluded from enabled list; projection includes only configured columns.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
 
----
-
 #### 7h: Structured Django Logging Configuration *(Minor)*
 *Addresses: `settings.py` has no structured `LOGGING` configuration; the spec requires structured logs and correlation ID propagation across adapters.*
 
@@ -1469,8 +1452,6 @@ All of the following must pass before Phase 6 is considered complete:
     - Keep the formatter simple enough to pass `mypy strict` without third-party log packages.
 - Add a test in `tests/api/test_views.py` (or a dedicated `tests/config/test_logging.py`) asserting that the `api` logger is configured and that a log record from the `api` namespace is captured at `DEBUG` level.
 - **Verification:** `uv run pytest` passes; `uv run ruff check .` passes.
-
----
 
 #### 7i: POI Hover Tooltip Card *(Minor)*
 *Addresses: POI marker hover currently shows no tooltip; the spec requires a `POITooltipCard` molecule with quick-summary data.*
@@ -1487,8 +1468,6 @@ All of the following must pass before Phase 6 is considered complete:
 - Add a unit test for `POITooltipCard` asserting the label text, component name, and fitting position ID are rendered.
 - **Verification:** `npm run test` passes; hovering a POI marker in the viewer shows the tooltip card.
 
----
-
 #### 7j: Bulk Save Uniqueness Validation *(Minor)*
 *Addresses: `POST /api/admin/fitting-positions/bulk` accepts duplicate `fitting_position_id` values in a single payload without rejecting them.*
 
@@ -1500,16 +1479,12 @@ All of the following must pass before Phase 6 is considered complete:
 - Add a test in `test_views.py` under `TestBulkFittingPositionsView` (or equivalent) covering: payload with duplicate IDs returns 400 with `bulk_duplicate_ids`; payload with all-unique IDs succeeds as before.
 - **Verification:** `uv run pytest` passes.
 
----
-
 #### 7k: Admin Screen Prototype Disclaimer *(Minor)*
 *Addresses: the admin route has no access guard or disclaimer; in the prototype (no auth) an unaware user could navigate directly to `/admin` without context.*
 
 - In `AdminPage.tsx` (or `App.tsx`), render a dismissable `Alert severity="warning"` banner at the top of the admin page with the text: `"Admin area — this section is unprotected in the prototype build. Authentication will be enforced in the enterprise deployment."`. 
 - The banner dismisses on click (controlled `open` state) and does not reappear within the same session.
 - **Verification:** `npm run test` passes; the banner renders on `/admin` and can be dismissed.
-
----
 
 #### Completion Criteria for Phase 7
 All of the following must pass before Phase 7 is considered complete:
@@ -1522,8 +1497,6 @@ All of the following must pass before Phase 7 is considered complete:
 
 ### Phase 8: Review Codebase Against Spec & Update
 **Goal:** Close all conformance gaps identified in the Phase 7 review — grouped by severity (Medium → Minor). Each sub-item maps directly to a specific shortfall found during the audit.
-
----
 
 #### 8a: Correlation ID Middleware *(Medium)*
 *Addresses: `log_filters.set_request_id()` is never called; backend logs always show `request_id: "-"`; `search_view` generates its own UUID instead of echoing the client's `X-Request-ID`.*
@@ -1542,8 +1515,6 @@ All of the following must pass before Phase 7 is considered complete:
     - The `api` logger captures `request_id` from the thread-local during an active request.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors; structured log output shows a non-`"-"` `request_id` for all requests.
 
----
-
 #### 8b: Field Weights Applied to Search Ranking *(Medium)*
 *Addresses: `SearchConfigService` defines `field_weights` per column but `search_service.py` never consults them; tiebreaking falls back to alphabetical `label_text` order instead of weight-based ordering as the spec requires.*
 
@@ -1552,8 +1523,6 @@ All of the following must pass before Phase 7 is considered complete:
 - Update the sort key: `(match_type_rank, -field_weight, label_text)` — lower match-type rank wins first, then higher `field_weight` wins (higher weight = higher priority field), then `label_text` alphabetically as the final stable tiebreaker.
 - Add a test in `TestSearchService` (in `tests/api/test_search_service.py`) that constructs two fitting positions with the same `label_text` and produces hits on different-weight fields, then asserts the higher-weight field's result ranks first.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
-
----
 
 #### 8c: Hook-Level Tests *(Medium)*
 *Addresses: `useImages`, `useFittingPositions`, `useFittingPositionDetails`, `useSearch`, and `useAdminUpload` have zero direct test coverage; the spec requires hook tests with mocked responses via MSW.*
@@ -1575,8 +1544,6 @@ All of the following must pass before Phase 7 is considered complete:
 - All hook test files should use `renderHook` from `@testing-library/react`, an isolated `QueryClient` per test with `retry: false` and `gcTime: 0`, and MSW handlers from `src/test/handlers.ts`.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
 
----
-
 #### 8d: Zod Schema Parse Tests *(Medium)*
 *Addresses: `schemas.ts` has no dedicated test file; Zod parse pass and failure cases are untested.*
 
@@ -1588,8 +1555,6 @@ All of the following must pass before Phase 7 is considered complete:
 - Use `expect(() => schema.parse(payload)).toThrow()` for failure cases and `expect(schema.parse(payload)).toEqual(expected)` for success cases.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
 
----
-
 #### 8e: `uploader_identity` Field on `ImageUpload` *(Minor)*
 *Addresses: the spec lists `uploader_identity` as a required field on the upload session model; it is absent from the current `ImageUpload` Django model.*
 
@@ -1599,8 +1564,6 @@ All of the following must pass before Phase 7 is considered complete:
 - Update the `ImageUploadSerializer` (if present) to include `uploader_identity` as an optional field.
 - Add a test in `tests/api/test_models.py` (or existing model tests) asserting that an `ImageUpload` instance can be saved with `uploader_identity=None` and with a non-null string value.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
-
----
 
 #### 8f: `useInfiniteQuery` for Image List *(Minor)*
 *Addresses: `useImages` uses `useQuery`; the spec specifies `useInfiniteQuery` for the image list as the tile grid grows.*
@@ -1618,8 +1581,6 @@ All of the following must pass before Phase 7 is considered complete:
 - Update the backend `TestImagesView` in `tests/api/test_views.py` to cover: default first page returns `has_more` and `next_cursor`; providing a valid cursor returns the correct offset page.
 - **Verification:** `uv run pytest` passes; `npm run test` passes; `npm run build` succeeds.
 
----
-
 #### 8g: Atomic Design Component Extraction *(Minor)*
 *Addresses: `StatusChip`, `TypeBadge`, `ImageTileCard`, `SearchResultItem`, `FilterBar`, and `POIMarkerPin` are all inline in page/organism components; the spec defines them as discrete Atom and Molecule components.*
 
@@ -1635,8 +1596,6 @@ All of the following must pass before Phase 7 is considered complete:
 - Add a unit test file per extracted component asserting core render behaviour (use the same patterns as `POITooltipCard.test.tsx`).
 - **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
 
----
-
 #### 8h: Image Tile Thumbnail *(Minor)*
 *Addresses: image tiles in the selection grid show text metadata only; the spec wireframe requires a preview thumbnail (`CardMedia`) on each tile.*
 
@@ -1650,8 +1609,6 @@ All of the following must pass before Phase 7 is considered complete:
 - Update the backend `TestImagesView` test fixtures to include a `thumbnail_url` field (can be `null` initially).
 - **Verification:** `npm run test` passes; `uv run pytest` passes; `npm run build` succeeds.
 
----
-
 #### 8i: `test_serializers.py` *(Minor)*
 *Addresses: `api/serializers.py` has no dedicated test file; the spec requires unit test coverage of serializer behaviour.*
 
@@ -1662,8 +1619,6 @@ All of the following must pass before Phase 7 is considered complete:
     - **`TestImageUploadSerializer`**: `status` field serializes to the correct string choice; `uploader_identity` serializes as `null` when not set (after 8e is applied).
     - **`TestBulkFittingPositionItemSerializer`** (if applicable): validates that a missing `fitting_position_id` raises a validation error.
 - **Verification:** `uv run pytest` passes; `uv run ruff check .` passes.
-
----
 
 #### Completion Criteria for Phase 8
 All of the following must pass before Phase 8 is considered complete:
@@ -1677,8 +1632,6 @@ All of the following must pass before Phase 8 is considered complete:
 ### Phase 9: Review Codebase Against Spec & Update
 **Goal:** Close all conformance gaps identified in the Phase 8 review — grouped by severity (High → Medium). Each sub-item maps directly to a specific shortfall found during the audit.
 
----
-
 #### 9a: Theme Token Violations *(High)*
 *Addresses: `POITooltipCard` hardcodes `fontFamily: "IBM Plex Mono, monospace"` instead of using the theme; `ViewerFooterStatusBar` uses raw MUI `Chip` instead of the existing `StatusChip` atom.*
 
@@ -1686,8 +1639,6 @@ All of the following must pass before Phase 8 is considered complete:
 - In `src/components/ViewerFooterStatusBar.tsx`, replace all inline `<Chip>` usages for source status with the existing `<StatusChip>` atom imported from `src/components/atoms/StatusChip.tsx`.
 - Update `ViewerFooterStatusBar.test.tsx` assertions to reference `StatusChip` rendering (e.g. assert the correct `status` prop values are passed).
 - **Verification:** `npm run test` passes; `npm run lint` passes; `npm run build` succeeds.
-
----
 
 #### 9b: `HealthDot` Atom & `SourceHealthGroup` Molecule *(High)*
 *Addresses: `HealthDot` atom is absent; `SourceHealthGroup` molecule is absent; `ViewerFooterStatusBar` has no composed source health group.*
@@ -1697,8 +1648,6 @@ All of the following must pass before Phase 8 is considered complete:
 - Update `src/components/ViewerFooterStatusBar.tsx` to replace per-source chip rendering with `<SourceHealthGroup>` components iterated over the `sourceStatus` entries.
 - Add unit tests: `HealthDot.test.tsx` asserting the correct `aria-label` and colour class per status; `SourceHealthGroup.test.tsx` asserting `sourceName` label text and `HealthDot` presence.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
-
----
 
 #### 9c: `FilterBar` Text Search + Backend `?search=` Support *(High)*
 *Addresses: `FilterBar` renders only the drawing type select; the spec requires "drawing type select + optional text filter"; the wireframe shows `[Drawing Type Dropdown] [Search Images]`; `GET /api/images` has no `search` query parameter.*
@@ -1712,8 +1661,6 @@ All of the following must pass before Phase 8 is considered complete:
 - Update `ImageSelectionPage.test.tsx`: assert that typing in the search field updates the rendered tile list (use MSW handler that filters by search).
 - **Verification:** `uv run pytest` passes; `npm run test` passes; `npm run build` succeeds.
 
----
-
 #### 9d: `SearchResultItem` — Remove Incorrect `TypeBadge` Usage *(Medium)*
 *Addresses: `SearchResultItem` uses `TypeBadge` (designed for drawing types) to render `match_type` and `matched_source` — these are metadata fields, not drawing type labels.*
 
@@ -1722,8 +1669,6 @@ All of the following must pass before Phase 8 is considered complete:
     - `matched_source`: render a `Typography variant="caption"` showing the source label, prefixed with `"via "` (e.g. `"via internal"`). No chip — plain metadata text.
 - Update `SearchResultItem.test.tsx` to assert: `exact` match renders a success-coloured chip; `prefix` renders an info chip; `matched_source` text appears with the `"via "` prefix.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
-
----
 
 #### 9e: Missing Hook Test Files *(Medium)*
 *Addresses: `useFittingPositions.ts` and `useFittingPositionDetails.ts` have no co-located test files; the spec requires test files to be co-located with their source.*
@@ -1739,8 +1684,6 @@ All of the following must pass before Phase 8 is considered complete:
 - Both test files must use `renderHook` from `@testing-library/react`, an isolated `QueryClient` per test with `retry: false` and `gcTime: 0`, and MSW handlers from `src/test/handlers.ts`.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
 
----
-
 #### 9f: Backend Test Completions & Dev Dependencies *(Medium)*
 *Addresses: `pytest-mock` and `pytest-cov` are absent from dev dependencies; upload reliability test assertions are incomplete.*
 
@@ -1751,8 +1694,6 @@ All of the following must pass before Phase 8 is considered complete:
     - In `TestUploadChunkView`: add `test_chunk_retry_updates_without_creating_duplicate` — `PUT` the same `part_number` twice with different `chunk_data`; assert `UploadChunk.objects.filter(upload=session).count() == 1` and the stored data matches the second upload (backend already uses `update_or_create`; this test proves it).
 - **Verification:** `uv run pytest` passes; `uv run ruff check .` passes.
 
----
-
 #### 9g: Frontend Test Gaps *(Medium)*
 *Addresses: error boundary fallback rendering is untested; upload finalize failure and abort UI state clearing are untested.*
 
@@ -1761,8 +1702,6 @@ All of the following must pass before Phase 8 is considered complete:
     - Add `test_finalize_failure_shows_error` — override the MSW `POST /api/admin/uploads/:id/complete` handler to return `422` with `{ code: "checksum_mismatch" }`; trigger the complete action in the UI; assert an error message is displayed to the user.
     - Add `test_abort_clears_upload_session_state` — complete a partial upload flow up to the uploading state, trigger the abort action (`DELETE /api/admin/uploads/:id`); assert the upload session UI returns to the initial / start-new-upload state.
 - **Verification:** `npm run test` passes; `npm run lint` passes.
-
----
 
 #### Completion Criteria for Phase 9
 All of the following must pass before Phase 9 is considered complete:
@@ -1776,8 +1715,6 @@ All of the following must pass before Phase 9 is considered complete:
 ### Phase 10: Review Codebase Against Spec & Update
 **Goal:** Close all conformance gaps identified in the Phase 9 review — grouped by severity (Critical → High → Medium → Minor). Each sub-item maps directly to a specific shortfall found during the audit. Items excluded by prototype scope (authentication, sensor integration, CI/CD) are not included.
 
----
-
 #### 10a: Admin Step 3 — Select Uploaded Image *(Critical)*
 *Addresses: Admin Step 3 is "Confirm Upload" (a static alert) instead of "Select Uploaded Image"; the spec wireframe says Step 3 is "Select" and requires reusing Image Selection Screen filter/tile components for admin image selection.*
 
@@ -1788,8 +1725,6 @@ All of the following must pass before Phase 9 is considered complete:
 - This replaces the current hard-wired transition that automatically uses the `image_id` returned by the upload-complete response.
 - Update `AdminPage.test.tsx` to assert: Step 3 renders at least one image tile after upload completes; clicking a tile advances to Step 4 with the correct `imageId`.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
-
----
 
 #### 10b: Admin Step 4 — Mapping Canvas with Viewer Reuse *(Critical)*
 *Addresses: Step 4 mapping canvas is a plain 600×400 grey `Box` — it does not load the uploaded image, has no pan/zoom, no Unmapped/Mapped tabs, no drag-to-adjust markers, and does not reuse the viewer canvas. The spec says: "Mapping Canvas (reuses Screen 1 map canvas)", "Tabs: [Unmapped] [Mapped]", "click to add marker", "drag marker to adjust", "marker color by mapped/unmapped".*
@@ -1811,8 +1746,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Update `AdminPage.test.tsx` to assert: Step 4 renders the uploaded image in the canvas; markers can be placed; the Unmapped/Mapped tabs render.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
 
----
-
 #### 10c: Upload MIME Type & File Size Validation *(Critical)*
 *Addresses: no MIME type, file extension, or max file size enforcement exists in the upload flow. The spec says: "Enforce max size and allowed MIME/type list for supported diagram formats. Reject malformed or unsupported files before final commit."*
 
@@ -1827,8 +1760,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Add tests in `TestCompleteUploadView`: assembled content with invalid MIME type returns 422; valid SVG content passes.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
 
----
-
 #### 10d: Upload Session Resume — Missing Chunks Query *(Critical)*
 *Addresses: no endpoint exists to query which chunk part numbers have been received vs missing for a given `upload_id`. The spec says: "Support resume by querying missing chunk numbers for an upload_id."*
 
@@ -1841,8 +1772,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Add a serializer for the response shape.
 - Add tests in a new `TestGetUploadSessionView` class: returns session metadata with received parts; returns 404 for unknown upload_id.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
-
----
 
 #### 10e: Asset Adapter Timeout & Retry Budgets *(High)*
 *Addresses: `asset_adapter.py` makes raw database queries with no timeout, retry limit, or circuit breaker. The spec says: "Per-source timeout budgets and retry limits", "Circuit breaker behavior for repeatedly failing sources."*
@@ -1857,8 +1786,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Add tests: timeout triggers degraded status; after N failures, next call is short-circuited; after cooldown, query is attempted again.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
 
----
-
 #### 10f: Atomic Design — Remaining Atom Extraction *(High)*
 *Addresses: 6 of 10 spec-defined atoms do not exist as standalone components: `AppLogo`, `IconButtonAction`, `SearchInput`, `SectionLabel`, `MetricText`, `POIMarkerCluster`. Logic is either inline in pages or absent entirely.*
 
@@ -1871,8 +1798,6 @@ All of the following must pass before Phase 9 is considered complete:
     - `POIMarkerCluster.tsx` — props: `count: number`, `onClick`; cluster badge for dense marker areas using `theme.palette.map.poi.cluster`. Wire into `DiagramCanvasViewport` when marker density exceeds a threshold.
 - Add a unit test file per atom asserting core render behaviour.
 - **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
-
----
 
 #### 10g: Atomic Design — Remaining Molecule & Organism Extraction *(High)*
 *Addresses: 5 of 10 spec-defined molecules and 9 of 11 organisms do not exist as standalone components. All logic is inline in page components, violating "Reuse template-level layouts across pages to reduce UI drift."*
@@ -1895,8 +1820,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Add a unit test file per new molecule and organism.
 - **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
 
----
-
 #### 10h: Template Layer Introduction *(High)*
 *Addresses: no template components exist; the spec defines `ImageSelectionTemplate`, `ImageViewerTemplate`, and `AdminMappingTemplate` as a separate Atomic Design layer. The cross-cutting rule states: "Reuse template-level layouts across pages to reduce UI drift."*
 
@@ -1907,8 +1830,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Refactor each page component to delegate layout to its template, keeping only route-level data fetching and state orchestration in the page.
 - Add a unit test per template asserting child slot rendering.
 - **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
-
----
 
 #### 10i: Keyboard Navigation & Accessibility Tests *(High)*
 *Addresses: no keyboard navigation tests exist. The spec requires: "Keyboard navigation for tabs, search list items, and primary actions", "Focus management on route change, dialog open/close, and error fallback states", "All interactive controls must be keyboard accessible."*
@@ -1927,8 +1848,6 @@ All of the following must pass before Phase 9 is considered complete:
     - Source status chips and health dots have text labels (verified via existing `HealthDot` `aria-label` tests — extend to cover `StatusChip`).
 - **Verification:** `npm run test` passes; `npm run lint` passes.
 
----
-
 #### 10j: Upload Structured Logging & Session Cleanup *(Medium)*
 *Addresses: upload views contain zero logging statements; no cleanup for expired/abandoned sessions. The spec says: "Emit structured logs and metrics for upload success rate, failure rate, mean upload time, and checksum failures", "Schedule cleanup for abandoned/expired upload sessions and orphaned chunks."*
 
@@ -1944,8 +1863,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Add a model test asserting the cleanup command aborts stale sessions and deletes their chunks.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
 
----
-
 #### 10k: ImageViewerPage Tab Order & Header Conformance *(Medium)*
 *Addresses: tabs render as [Information, Search] but the spec wireframe shows [Search, Information]; header is missing source status chips per the wireframe: "[Menu] [Image Name + Type] [Source Chips] [User] [Help]".*
 
@@ -1954,8 +1871,6 @@ All of the following must pass before Phase 9 is considered complete:
 - In `ImageViewerPage.tsx`, pass `sourceStatus` from the last successful search response to `TopAppHeader`.
 - Update `ImageViewerPage.test.tsx`: assert Search tab is rendered first; assert source status chips appear in the header after a search completes.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
-
----
 
 #### 10l: Search Sources UI Control & Query Normalization *(Medium)*
 *Addresses: no UI exists for users to select which search sources to query — `sources` is hardcoded to `["internal", "asset"]`. The spec says the search supports `sources=internal,asset,sensor` filtering and the wireframe shows an optional source filter. Query key uses raw text instead of normalized text.*
@@ -1966,8 +1881,6 @@ All of the following must pass before Phase 9 is considered complete:
 - Update `useSearch.test.ts` to assert: `sources` is included in the query key; toggling a source re-triggers the query; query normalization does not affect the displayed text.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
 
----
-
 #### 10m: Backend Test Gaps *(Medium)*
 *Addresses: no contract tests for external source response shapes; no "both sources unavailable" test; no "upload resume after connection drop" test; `query_too_short` error body inconsistency.*
 
@@ -1976,8 +1889,6 @@ All of the following must pass before Phase 9 is considered complete:
 - **Upload resume test:** Add a test in `TestUploadChunkView` that uploads parts 1 and 2, then calls the new `GET /api/admin/uploads/{upload_id}` endpoint (from 10d) to verify `received_parts` is `[1, 2]`, then uploads part 3 and completes successfully.
 - **Error body consistency:** In `api/views.py`, add `"status": 400` to the `query_too_short` error response body to match the pattern used by `search_image_required` and `search_invalid_source`.
 - **Verification:** `uv run pytest` passes; `uv run mypy .` reports no errors.
-
----
 
 #### 10n: Frontend Integration Test Gaps *(Medium)*
 *Addresses: no integration test verifying Zod parse failures surface as controlled client errors; admin Step 1 drawing type dropdown has no loading/empty/error states; `httpClient` 401/403 interceptor resolves the promise instead of rejecting.*
@@ -1988,16 +1899,12 @@ All of the following must pass before Phase 9 is considered complete:
 - Add a test in `httpClient.test.ts` asserting: a 401 response triggers `console.warn` AND rejects the promise (not resolves).
 - **Verification:** `npm run test` passes; `npm run lint` passes.
 
----
-
 #### 10o: Invalid `imageId` Redirect with User Notice *(Minor)*
 *Addresses: `ImageViewerPage` only redirects when `imageId` is missing from the route. If a user navigates to `/viewer/not-a-real-uuid`, the image query fails but no notice is shown and no redirect occurs. The spec says: "If image_id is missing/invalid, show notice and redirect to Image Selection."*
 
 - In `ImageViewerPage.tsx`, detect when `useImage(imageId)` returns an error (e.g. 404 from the API). On error, display a `Snackbar` or `Alert` with a message ("Image not found — returning to selection") and navigate to `/` after a short delay or on dismiss.
 - Add a test in `ImageViewerPage.test.tsx`: override MSW handler for `GET /api/images/:imageId` to return 404; assert the notice is displayed and navigation to `/` is triggered.
 - **Verification:** `npm run test` passes.
-
----
 
 #### 10p: Admin Action Footer *(Minor)*
 *Addresses: the spec wireframe shows a footer bar on the admin page: "Footer: [Validation summary] [Save] [Publish] [Cancel]". No such footer exists — save/back buttons are inline in Step 5.*
@@ -2009,10 +1916,93 @@ All of the following must pass before Phase 9 is considered complete:
 - Update `AdminPage.test.tsx` to assert: footer renders during Step 4 with validation summary; Cancel returns to Step 3.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
 
----
-
 #### Completion Criteria for Phase 10
 All of the following must pass before Phase 10 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+
+### Phase 11 — Spec Conformance Remediation
+*Addresses gaps identified by a full codebase audit against all non-implementation sections of this specification.*
+
+#### 11a: Drawing Types Endpoint *(High)*
+*Addresses: The spec ER diagram defines `DRAWING_TYPES` as a first-class entity with its own lifecycle and shows "Preload drawing types" as a system setup step. No `GET /api/drawing-types` endpoint exists. Both `ImageSelectionPage` and `AdminPage` derive drawing types by fetching **all** images via `useImages()` and extracting unique types client-side. This means drawing types with no images are invisible, extra data is transferred, and the admin cannot select a newly seeded type that has no images yet.*
+
+- Add `GET /api/drawing-types` endpoint in `api/views.py` returning all active `DrawingType` records (fields: `drawing_type_id`, `type_name`, `description`, `is_active`). No authentication required for prototype.
+- Add a `DrawingTypeListSerializer` in `api/serializers.py` (or reuse existing `DrawingTypeSerializer`).
+- Register the URL in `api/urls.py` as `path("drawing-types", list_drawing_types)`.
+- Add backend tests in `tests/api/test_views.py`: assert the endpoint returns seeded types; assert types with no images still appear; assert `is_active=False` types are excluded.
+- Add a frontend Zod schema, endpoint function (`fetchDrawingTypes`), query key, and `useDrawingTypes` hook with `staleTime: 30 * 60 * 1000` and `gcTime: 60 * 60 * 1000` (drawing types change rarely).
+- Refactor `ImageSelectionPage` to use `useDrawingTypes()` for the dropdown instead of deriving types from `useImages()`. Remove the unfiltered `useImages()` call.
+- Refactor `AdminPage` Step 1 to use `useDrawingTypes()` for the drawing type dropdown instead of deriving types from `useImages()`.
+- Add/update frontend tests asserting the dropdown populates from the dedicated endpoint.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean; `npm run test` passes; `npm run build` succeeds.
+
+#### 11b: Wire Unused Atoms and Molecules into Composition Hierarchy *(Medium)*
+*Addresses: Three components were created per spec but are never composed into their parent organisms, violating Atomic Design composition rules. The spec says: "HeaderIdentity: AppLogo + title + current image context" (molecule), "SearchInput: standardized search text input with loading/clear states" (atom), "UploadProgressRow: filename + progress bar + retry/resume action" (molecule).*
+
+- **`HeaderIdentity`**: Refactor `TopAppHeader` to render `HeaderIdentity` instead of directly composing `AppLogo` + `Typography`. Pass `title` and `contextLabel` through. Ensure `TopAppHeader` tests still pass.
+- **`SearchInput`**: Replace the plain `TextField` in `SearchResultsPanel` with the `SearchInput` atom. Wire `onClear` to reset the search query. Replace the `TextField` in `FilterBar` with `SearchInput` when `onSearchChange` is provided. Update relevant tests to verify the `SearchInput` atom renders (e.g. assert the clear button and search icon appear).
+- **`UploadProgressRow`**: Replace the inline `LinearProgress` + `Typography` block in `UploadSessionPanel` with the `UploadProgressRow` molecule. Pass `fileName` and `progress` props. Conditionally render `onRetry` if an error occurred. Update `UploadSessionPanel.test.tsx` to verify the molecule renders during upload.
+- **Verification:** `npm run test` passes; `npm run build` succeeds; `npm run lint` passes.
+
+#### 11c: Apply Custom Theme Tokens *(Medium)*
+*Addresses: The spec defines custom theme tokens under "Panel and chrome tokens" and "Map-specific tokens" and states "Enforce color tokens via MUI theme overrides and avoid hardcoded ad-hoc colors." Several tokens are defined in `theme.ts` but never consumed by any component.*
+
+- **`panel.drawer.bg`**: Apply to `ViewerLeftDrawer`'s `Drawer` paper background via `sx` or `MuiDrawer-paper` override.
+- **`panel.drawer.tab.active`** and **`panel.drawer.tab.text.active`**: Apply to the `Tabs`/`Tab` components in `ViewerLeftDrawer` using `sx` overrides or `MuiTab` theme component overrides so the active tab uses `#E7F1FB` background and `#0B6BCB` text.
+- **`map.grid.line`**: Apply as a subtle grid pattern or border accent on `DiagramCanvasViewport`'s container border color (currently uses `divider`).
+- **`monoFontFamily` on `MetricText`**: The spec states "Monospace font family: IBM Plex Mono for IDs, request IDs, and technical metadata." `MetricText` renders request IDs, timestamps, and zoom levels in the footer but uses the default font. Apply `theme.typography.monoFontFamily` to the value `Typography` in `MetricText`.
+- Update existing component tests to confirm tokens are applied (e.g. snapshot or style assertion).
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 11d: MappingWorkbench Marker Status *(Medium)*
+*Addresses: All markers rendered by `MappingWorkbench` are assigned `status: "unmapped"` regardless of whether they have been placed and labeled. The spec wireframe says markers should be colored by "mapped/unmapped" and the theme defines distinct tokens (`map.poi.default` for mapped, `map.poi.unmapped` for unmapped). Currently every marker renders with the unmapped color.*
+
+- In `MappingWorkbench`, set the `status` of each marker in `mappedPositions` to `"mapped"` (these have been placed and labeled).
+- If a `pendingPos` exists (marker placed but not yet confirmed with a label), render it as a separate marker with `status: "unmapped"`.
+- Update `MappingWorkbench.test.tsx` to assert confirmed markers render as mapped and the pending marker renders as unmapped.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 11e: Missing TopAppHeader Test File *(Medium)*
+*Addresses: Every organism has a co-located test file except `TopAppHeader`. The spec testing strategy says to test presentational components.*
+
+- Create `src/components/organisms/TopAppHeader.test.tsx` with tests covering:
+    - Renders the application title.
+    - Renders `contextLabel` when provided.
+    - Renders `StatusChip` atoms for each entry in `sourceStatus`.
+    - Does not render status chips when `sourceStatus` is omitted.
+- **Verification:** `npm run test` passes.
+
+#### 11f: Rename AdminPage to AdminUploadMappingPage *(Low)*
+*Addresses: The spec defines the admin page component as `AdminUploadMappingPage`. The codebase names it `AdminPage`. Consistent naming with the spec reduces ambiguity.*
+
+- Rename `src/pages/AdminPage.tsx` to `src/pages/AdminUploadMappingPage.tsx`. Rename the function component accordingly.
+- Rename `src/pages/AdminPage.test.tsx` to `src/pages/AdminUploadMappingPage.test.tsx`. Update all internal references.
+- Update the route import in `App.tsx`.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 11g: SVG Dimension Detection on Upload *(Low)*
+*Addresses: The `complete_upload` view hardcodes `width_px = 800` and `height_px = 600` for all uploaded SVGs. The spec defines `width_px` and `height_px` as image metadata fields in the `IMAGES` table, which should reflect the actual drawing dimensions.*
+
+- After assembling the uploaded chunks in `complete_upload`, parse the SVG content to extract dimensions from the `<svg>` element's `width`/`height` attributes or `viewBox` attribute.
+- Fall back to `800 × 600` if no dimensions can be determined (e.g. SVG has no `viewBox` and no explicit size).
+- Add backend tests: upload an SVG with `viewBox="0 0 1200 900"` and assert `width_px=1200`, `height_px=900`; upload an SVG without viewBox and assert default dimensions.
+- **Verification:** `uv run pytest` passes; `uv run mypy .` clean.
+
+#### 11h: Missing `UserMenuTrigger` Molecule *(Low — prototype placeholder)*
+*Addresses: The spec lists `UserMenuTrigger: avatar + menu trigger` as a molecule. The wireframes show `[User]` in the header for all screens. Authentication is excluded from the prototype, but the component should exist as a placeholder.*
+
+- Create `src/components/molecules/UserMenuTrigger.tsx`: renders a disabled `IconButton` with a generic `AccountCircle` avatar icon and a `Tooltip` reading "Sign in (available in enterprise deployment)".
+- Compose into `TopAppHeader` at the trailing end of the `Toolbar`, after source status chips.
+- Add `UserMenuTrigger.test.tsx` asserting it renders the avatar icon and tooltip text.
+- Update `TopAppHeader.test.tsx` to assert the user menu trigger is present.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### Completion Criteria for Phase 11
+All of the following must pass before Phase 11 is considered complete:
 - `uv run pytest` — all backend tests pass.
 - `uv run mypy .` — no type errors.
 - `uv run ruff check .` — no lint errors.
