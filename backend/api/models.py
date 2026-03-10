@@ -76,6 +76,7 @@ class FittingPosition(models.Model):
             )
         ]
         indexes = [
+            models.Index(fields=["image"], name="idx_fp_image_id"),
             models.Index(fields=["label_text"], name="idx_fp_label_text"),
         ]
 

@@ -45,6 +45,8 @@ In its end state the Schematic Mapping application is to be a scalable and exten
 1. The user interface must be able to display vector format drawings of ~15mb in size.
     - Users must be able to pan & zoom on these diagrams.
     - The interface must be performant in handling these visualizations.
+    - The interface must support up to 3,000 mapped fitting positions (POI markers) per diagram while maintaining interactive pan/zoom responsiveness (≤100 ms render latency).
+    - Marker clustering and viewport culling must be employed so that only visible, non-overlapping markers are rendered to the DOM at any given time.
     - Hovering over fitting positions on the drawing is to show a tooltip detailing information.
 1. The user interface is to include a left hand side panel that lists component information.
     - This component information is to relate to fitting positions on the drawings, mapped via X & Y co-ordinates.
@@ -70,7 +72,7 @@ In its end state the Schematic Mapping application is to be a scalable and exten
 | Category | Key Requirements |
 |----------|------------------|
 | High Level | Web app, scalable to enterprise, optimized for MS Edge/desktop, runs on Windows/IIS, extensible data integration, license-free tech |
-| User Interface | Display 15MB vector drawings with pan/zoom, tooltips on hover, left panel with tabs for data sources, search, click interactions |
+| User Interface | Display 15MB vector drawings with pan/zoom supporting up to 3,000 POI markers per diagram; viewport culling and grid-based clustering for ≤100 ms render latency; tooltips on hover; left panel with tabs for data sources, search, click interactions |
 | Data Access | Internal MSSQL for images/mappings, external Oracle API for assets, GraphQL for sensors |
 | Authorization | Integration with ADFS/Active Directory |
 
@@ -982,6 +984,44 @@ Accessibility and consistency:
 - Do not encode status by color alone; pair with icon/label.
 - Keep status colors consistent across viewer and admin workflows.
 - Enforce color tokens via MUI theme overrides and avoid hardcoded ad-hoc colors.
+
+#### Scale & Rendering Performance (3,000 POI / 15 MB SVG)
+
+##### Target Scale
+
+| Metric | Target |
+|---|---|
+| Max fitting positions per diagram | 3,000 |
+| Max diagram file size (SVG) | 15 MB |
+| Pan/zoom render latency | ≤ 100 ms per frame |
+| Max DOM marker nodes at any time | ≤ 500 (via clustering + viewport culling) |
+
+##### Clustering Strategy
+
+- Use a **grid-based spatial clustering** algorithm (`O(n)` time complexity) instead of pairwise distance checks.
+- Divide the viewport into square cells of `threshold / scale` pixels in image-space.
+- Markers that fall into the same cell are grouped into a single cluster.
+- The clustering threshold is a configurable constant (default 40 px at scale 1).
+- At higher zoom levels the effective cell size shrinks, progressively un-clustering markers until individual pins are revealed.
+
+##### Viewport Culling
+
+- Before rendering, compute the visible viewport rectangle from the current pan offset and scale.
+- Expand the rectangle by a configurable buffer (default 100 px) to avoid pop-in during fast pans.
+- Only markers (or clusters) whose position falls within the expanded rectangle are rendered to the DOM.
+- Markers outside the viewport produce zero DOM nodes.
+
+##### Memoization & Render Gating
+
+- Marker atom components (`POIMarkerPin`, `POIMarkerCluster`) are wrapped with `React.memo` to avoid re-renders when props have not changed.
+- The `canvasMarkers` array derived from API data is wrapped in `useMemo` so the downstream clustering memo only recalculates when the source data changes.
+- Scale state updates from the panzoom library are gated through `requestAnimationFrame` so that at most one re-cluster is queued per animation frame.
+
+##### API Transport
+
+- The backend `GET /api/images/{image_id}/fitting-positions` endpoint returns all fitting positions for the image in a single response (no pagination), since the full coordinate set is required for clustering and viewport culling on the client.
+- `GZipMiddleware` is enabled on the Django backend to compress the JSON payload (~600 KB uncompressed → ~80–120 KB gzipped for 3,000 records).
+- The `FittingPosition` model carries an explicit database index on `image_id` to ensure the query remains fast as the table grows.
 
 #### API Integration
 

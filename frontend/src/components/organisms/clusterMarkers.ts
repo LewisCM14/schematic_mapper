@@ -17,11 +17,11 @@ export interface SingleMarker {
 export type ClusterOrMarker = MarkerCluster | SingleMarker;
 
 /**
- * Groups nearby markers into clusters based on the current zoom scale
- * and a pixel-distance threshold.
+ * Groups nearby markers into clusters using a grid-based spatial hash.
  *
- * Uses a simple greedy algorithm: iterate through markers and assign each
- * to the nearest existing cluster within threshold, or start a new cluster.
+ * Divides coordinates into square cells of size `threshold / scale` and
+ * assigns each marker to a cell. Markers in the same cell form a cluster.
+ * Runs in O(n) time regardless of marker count or cluster density.
  */
 export function clusterMarkers(
 	markers: CanvasMarker[],
@@ -30,55 +30,42 @@ export function clusterMarkers(
 ): ClusterOrMarker[] {
 	if (markers.length === 0) return [];
 
-	// Effective distance threshold in image-space coordinates
-	const effectiveThreshold = threshold / scale;
+	const cellSize = threshold / scale;
 
-	const clusters: {
-		cx: number;
-		cy: number;
-		ids: string[];
-		markers: CanvasMarker[];
-	}[] = [];
+	const cells = new Map<
+		string,
+		{ ids: string[]; markers: CanvasMarker[]; sumX: number; sumY: number }
+	>();
 
 	for (const marker of markers) {
-		let assigned = false;
-		for (const cluster of clusters) {
-			const dx = marker.x - cluster.cx;
-			const dy = marker.y - cluster.cy;
-			const dist = Math.sqrt(dx * dx + dy * dy);
-			if (dist <= effectiveThreshold) {
-				cluster.ids.push(marker.id);
-				cluster.markers.push(marker);
-				// Update centroid
-				cluster.cx =
-					cluster.markers.reduce((s, m) => s + m.x, 0) / cluster.markers.length;
-				cluster.cy =
-					cluster.markers.reduce((s, m) => s + m.y, 0) / cluster.markers.length;
-				assigned = true;
-				break;
-			}
+		const col = Math.floor(marker.x / cellSize);
+		const row = Math.floor(marker.y / cellSize);
+		const key = `${col}:${row}`;
+		let cell = cells.get(key);
+		if (!cell) {
+			cell = { ids: [], markers: [], sumX: 0, sumY: 0 };
+			cells.set(key, cell);
 		}
-		if (!assigned) {
-			clusters.push({
-				cx: marker.x,
-				cy: marker.y,
-				ids: [marker.id],
-				markers: [marker],
+		cell.ids.push(marker.id);
+		cell.markers.push(marker);
+		cell.sumX += marker.x;
+		cell.sumY += marker.y;
+	}
+
+	const result: ClusterOrMarker[] = [];
+	for (const cell of cells.values()) {
+		if (cell.markers.length === 1) {
+			result.push({ type: "single", marker: cell.markers[0] });
+		} else {
+			result.push({
+				type: "cluster",
+				id: `cluster-${cell.ids.join("-")}`,
+				x: Math.round(cell.sumX / cell.markers.length),
+				y: Math.round(cell.sumY / cell.markers.length),
+				count: cell.markers.length,
+				markerIds: cell.ids,
 			});
 		}
 	}
-
-	return clusters.map((cluster) => {
-		if (cluster.markers.length === 1) {
-			return { type: "single", marker: cluster.markers[0] } as SingleMarker;
-		}
-		return {
-			type: "cluster",
-			id: `cluster-${cluster.ids.join("-")}`,
-			x: Math.round(cluster.cx),
-			y: Math.round(cluster.cy),
-			count: cluster.markers.length,
-			markerIds: cluster.ids,
-		} as MarkerCluster;
-	});
+	return result;
 }

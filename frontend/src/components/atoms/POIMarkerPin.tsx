@@ -1,10 +1,13 @@
 import { useTheme } from "@mui/material/styles";
+import { memo } from "react";
 
 interface POIMarkerPinProps {
 	selected: boolean;
 }
 
-function POIMarkerPin({ selected }: POIMarkerPinProps) {
+const POIMarkerPin = memo(function POIMarkerPin({
+	selected,
+}: POIMarkerPinProps) {
 	const theme = useTheme();
 	const fill = selected
 		? theme.palette.map.poi.selected
@@ -20,6 +23,6 @@ function POIMarkerPin({ selected }: POIMarkerPinProps) {
 			<circle cx="12" cy="12" r="8" fill={fill} />
 		</svg>
 	);
-}
+});
 
 export default POIMarkerPin;

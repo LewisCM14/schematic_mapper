@@ -38,6 +38,17 @@ export interface DiagramCanvasViewportProps {
 /** Pixel-distance threshold used for marker clustering. */
 const CLUSTER_THRESHOLD = 40;
 
+/** Extra pixels around the visible viewport to render (avoids pop-in during fast pans). */
+const VIEWPORT_BUFFER = 100;
+
+/** Viewport rectangle in image-space coordinates. */
+interface ViewportRect {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
 function DiagramCanvasViewport({
 	imageSvgUrl,
 	markers,
@@ -54,6 +65,8 @@ function DiagramCanvasViewport({
 	const [panZoomHost, setPanZoomHost] = useState<HTMLDivElement | null>(null);
 	const panzoomRef = useRef<PanzoomObject | null>(null);
 	const [currentScale, setCurrentScale] = useState(1);
+	const [viewport, setViewport] = useState<ViewportRect | null>(null);
+	const rafRef = useRef(0);
 
 	// Drag state
 	const dragRef = useRef<{
@@ -75,28 +88,69 @@ function DiagramCanvasViewport({
 		panzoomRef.current = pz;
 		const container = containerRef.current;
 		container?.addEventListener("wheel", pz.zoomWithWheel);
+
+		const updateViewport = () => {
+			if (!container) return;
+			const scale = pz.getScale();
+			const pan = pz.getPan();
+			const w = container.clientWidth;
+			const h = container.clientHeight;
+			// Skip culling when the container has no layout (e.g. jsdom)
+			if (w === 0 && h === 0) {
+				setViewport(null);
+				return;
+			}
+			setViewport({
+				left: -pan.x / scale - VIEWPORT_BUFFER / scale,
+				top: -pan.y / scale - VIEWPORT_BUFFER / scale,
+				right: (-pan.x + w) / scale + VIEWPORT_BUFFER / scale,
+				bottom: (-pan.y + h) / scale + VIEWPORT_BUFFER / scale,
+			});
+		};
+
 		const onPanzoomChange = () => {
 			onZoomChange?.(pz.getScale());
+			// Gate scale + viewport updates to one per animation frame
+			if (rafRef.current) cancelAnimationFrame(rafRef.current);
+			rafRef.current = requestAnimationFrame(() => {
+				setCurrentScale(pz.getScale());
+				updateViewport();
+				rafRef.current = 0;
+			});
 		};
-		const onScaleUpdate = () => {
-			setCurrentScale(pz.getScale());
-		};
+
 		panZoomHost.addEventListener("panzoomchange", onPanzoomChange);
-		panZoomHost.addEventListener("panzoomchange", onScaleUpdate);
+		// Set initial viewport
+		updateViewport();
+
 		return () => {
+			if (rafRef.current) cancelAnimationFrame(rafRef.current);
 			pz.destroy();
 			container?.removeEventListener("wheel", pz.zoomWithWheel);
 			panZoomHost.removeEventListener("panzoomchange", onPanzoomChange);
-			panZoomHost.removeEventListener("panzoomchange", onScaleUpdate);
 			panzoomRef.current = null;
 		};
 	}, [panZoomHost, onZoomChange]);
 
-	// Compute clustered markers
+	// Compute clustered markers, then cull to viewport
 	const clusteredItems = useMemo(
 		() => clusterMarkers(markers, currentScale, CLUSTER_THRESHOLD),
 		[markers, currentScale],
 	);
+
+	const visibleItems = useMemo(() => {
+		if (!viewport) return clusteredItems;
+		return clusteredItems.filter((item) => {
+			const x = item.type === "cluster" ? item.x : item.marker.x;
+			const y = item.type === "cluster" ? item.y : item.marker.y;
+			return (
+				x >= viewport.left &&
+				x <= viewport.right &&
+				y >= viewport.top &&
+				y <= viewport.bottom
+			);
+		});
+	}, [clusteredItems, viewport]);
 
 	// Programmatic pan
 	useEffect(() => {
@@ -244,7 +298,7 @@ function DiagramCanvasViewport({
 				/>
 
 				{/* Marker pins and clusters */}
-				{clusteredItems.map((item) => {
+				{visibleItems.map((item) => {
 					if (item.type === "cluster") {
 						return (
 							<Box

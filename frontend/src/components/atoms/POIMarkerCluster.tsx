@@ -1,12 +1,16 @@
 import { Box, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { memo } from "react";
 
 interface POIMarkerClusterProps {
 	count: number;
 	onClick?: () => void;
 }
 
-function POIMarkerCluster({ count, onClick }: POIMarkerClusterProps) {
+const POIMarkerCluster = memo(function POIMarkerCluster({
+	count,
+	onClick,
+}: POIMarkerClusterProps) {
 	const theme = useTheme();
 	return (
 		<Box
@@ -35,6 +39,6 @@ function POIMarkerCluster({ count, onClick }: POIMarkerClusterProps) {
 			</Typography>
 		</Box>
 	);
-}
+});
 
 export default POIMarkerCluster;

@@ -1,5 +1,5 @@
 import { Snackbar, Tooltip } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import POITooltipCard from "../components/molecules/POITooltipCard";
 import type { CanvasMarker } from "../components/organisms/DiagramCanvasViewport";
@@ -55,13 +55,16 @@ function ImageViewerPage() {
 	}, []);
 
 	// Build markers for DiagramCanvasViewport
-	const canvasMarkers: CanvasMarker[] =
-		positions?.map((pos) => ({
-			id: pos.fitting_position_id,
-			x: pos.x_coordinate,
-			y: pos.y_coordinate,
-			status: "mapped" as const,
-		})) ?? [];
+	const canvasMarkers: CanvasMarker[] = useMemo(
+		() =>
+			positions?.map((pos) => ({
+				id: pos.fitting_position_id,
+				x: pos.x_coordinate,
+				y: pos.y_coordinate,
+				status: "mapped" as const,
+			})) ?? [],
+		[positions],
+	);
 
 	// Tooltip wrapper for markers in the viewer
 	const renderMarkerTooltip = useCallback(
