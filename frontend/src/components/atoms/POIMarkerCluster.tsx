@@ -22,7 +22,7 @@ function POIMarkerCluster({ count, onClick }: POIMarkerClusterProps) {
 				height: 32,
 				borderRadius: "50%",
 				backgroundColor: theme.palette.map.poi.cluster,
-				color: "#fff",
+				color: theme.palette.common.white,
 				display: "flex",
 				alignItems: "center",
 				justifyContent: "center",

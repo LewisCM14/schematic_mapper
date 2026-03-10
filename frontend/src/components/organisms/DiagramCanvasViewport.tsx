@@ -195,7 +195,7 @@ function DiagramCanvasViewport({
 					display: "flex",
 					flexDirection: "column",
 					gap: 0.5,
-					background: "rgba(255,255,255,0.85)",
+					background: `color-mix(in srgb, ${theme.palette.background.paper} 85%, transparent)`,
 					borderRadius: 1,
 					p: 0.5,
 				}}
