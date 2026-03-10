@@ -10,6 +10,7 @@
 - [Database Layer](#database-layer)
 - [Server Side Layer](#server-side-layer)
 - [Client Side](#client-side)
+- [Frontend Project Structure](#frontend-project-structure)
 - [Glossary](#glossary)
 
 ## Glossary
@@ -1150,6 +1151,60 @@ Accessibility and consistency:
     - Seed deterministic cursor pages to validate infinite scroll ordering.
     - Disable shared QueryClient state between tests to avoid cache leakage.
     - Run MSW in strict mode to fail on unhandled requests.
+
+#### Frontend Project Structure
+
+```
+src/
+├── main.tsx                           # React root mount (StrictMode + QueryClientProvider + Router)
+├── App.tsx                            # Top-level routes, error boundary, lazy-loaded pages
+├── theme.ts                           # MUI theme (palette, typography, component overrides)
+├── components/
+│   ├── atoms/                         # Leaf UI primitives (AppLogo, StatusChip, SearchInput, etc.)
+│   ├── molecules/                     # Composed elements (FilterBar, ImageTileCard, SearchResultItem, etc.)
+│   ├── organisms/                     # Feature sections (DiagramCanvasViewport, ViewerLeftDrawer, etc.)
+│   └── templates/                     # Page-level layout shells (ImageSelectionTemplate, ImageViewerTemplate, etc.)
+├── pages/                             # Route entry points (lazy-loaded via React.lazy)
+│   ├── ImageSelectionPage.tsx         # Drawing type + image tile selection
+│   ├── ImageViewerPage.tsx            # Diagram canvas + search + fitting-position detail
+│   └── AdminUploadMappingPage.tsx     # Stepper workflow: type → upload → select → map → save
+├── services/
+│   └── api/
+│       ├── httpClient.ts              # Axios instance, base URL, interceptors
+│       ├── endpoints.ts               # Typed endpoint functions (Zod-validated responses)
+│       ├── schemas.ts                 # Zod schemas for API request/response contracts
+│       ├── queryKeys.ts               # Centralised TanStack Query key factory
+│       ├── config.ts                  # Cache timing, operational constants (staleTime, gcTime, chunk size)
+│       ├── fileUtils.ts               # Crypto utilities (SHA-256 hash, base64 encoding)
+│       └── hooks/                     # TanStack Query hooks (one per endpoint/workflow)
+│           ├── useDrawingTypes.ts     # GET /api/drawing-types
+│           ├── useImages.ts           # GET /api/images, GET /api/images/:id
+│           ├── useFittingPositions.ts # GET /api/images/:id/fitting-positions
+│           ├── useFittingPositionDetails.ts  # GET /api/fitting-positions/:id/details
+│           ├── useSearch.ts           # GET /api/search
+│           ├── useHealth.ts           # GET /api/health
+│           ├── useAdminUpload.ts      # Upload mutations (create session, upload chunk, complete, abort)
+│           └── useChunkedUpload.ts    # Orchestration hook: session → chunks → finalise
+└── test/
+    ├── setup.ts                       # Vitest global setup (jest-dom matchers, MSW server lifecycle)
+    ├── fixtures.ts                    # Shared deterministic test data (images, positions, uploads)
+    └── handlers.ts                    # MSW request handlers (imports fixtures, exports server)
+```
+
+**Package responsibilities:**
+
+| Package | Responsibility |
+|---|---|
+| `components/atoms/` | Leaf UI primitives with no business logic or API awareness |
+| `components/molecules/` | Composed elements combining atoms with layout/interaction logic |
+| `components/organisms/` | Feature-level sections that may consume hooks and manage local state |
+| `components/templates/` | Page layout shells providing slot-based composition for organisms |
+| `pages/` | Route entry points; orchestrate templates, hooks, and navigation |
+| `services/api/` | HTTP client, Zod schemas, endpoint functions, TanStack Query hooks |
+| `services/api/hooks/` | One hook per API endpoint/workflow; encapsulates cache policy and mutations |
+| `services/api/config.ts` | Centralised cache timing and operational constants (no magic numbers) |
+| `services/api/fileUtils.ts` | Crypto/encoding utilities extracted from page-level business logic |
+| `test/` | MSW handlers, shared fixtures, and vitest global setup |
 
 ---
 

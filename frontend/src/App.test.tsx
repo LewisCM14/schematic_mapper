@@ -22,15 +22,19 @@ function renderWithClient(ui: React.ReactElement, initialPath = "/") {
 }
 
 describe("App", () => {
-	it("renders the image selection page at /", () => {
+	it("renders the image selection page at /", async () => {
 		renderWithClient(<App />);
-		expect(screen.getByText("Schematic Mapper")).toBeInTheDocument();
+		expect(
+			await screen.findByText("Schematic Mapper", {}, { timeout: 5000 }),
+		).toBeInTheDocument();
 	});
 
-	it("renders the image viewer page at /viewer/:imageId", () => {
+	it("renders the image viewer page at /viewer/:imageId", async () => {
 		const imageId = "00000000-0000-0000-0000-000000000001";
 		renderWithClient(<App />, `/viewer/${imageId}`);
-		expect(screen.getByText("Schematic Mapper")).toBeInTheDocument();
+		expect(
+			await screen.findByText("Schematic Mapper", {}, { timeout: 5000 }),
+		).toBeInTheDocument();
 	});
 
 	it("error boundary renders fallback with Retry button when child throws", async () => {

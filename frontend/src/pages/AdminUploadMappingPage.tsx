@@ -17,13 +17,8 @@ import MappingWorkbench from "../components/organisms/MappingWorkbench";
 import UploadSessionPanel from "../components/organisms/UploadSessionPanel";
 import AdminMappingTemplate from "../components/templates/AdminMappingTemplate";
 import type { BulkFittingPositionItem } from "../services/api/endpoints";
-import {
-	useAbortUpload,
-	useCompleteUpload,
-	useCreateUploadSession,
-	useSaveBulkFittingPositions,
-	useUploadChunk,
-} from "../services/api/hooks/useAdminUpload";
+import { useSaveBulkFittingPositions } from "../services/api/hooks/useAdminUpload";
+import { useChunkedUpload } from "../services/api/hooks/useChunkedUpload";
 import { useDrawingTypes } from "../services/api/hooks/useDrawingTypes";
 import { useImage, useImages } from "../services/api/hooks/useImages";
 
@@ -34,22 +29,6 @@ const STEPS = [
 	"Map Positions",
 	"Save",
 ];
-
-const CHUNK_SIZE = 64 * 1024; // 64 KB
-
-async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
-	const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-	return Array.from(new Uint8Array(hashBuffer))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-	const bytes = new Uint8Array(buffer);
-	let binary = "";
-	for (const b of bytes) binary += String.fromCharCode(b);
-	return btoa(binary);
-}
 
 interface MappedPos {
 	id: string;
@@ -75,18 +54,11 @@ function AdminUploadMappingPage() {
 	// Step 2 — upload
 	const [componentName, setComponentName] = useState("");
 	const [file, setFile] = useState<File | null>(null);
-	const [uploadProgress, setUploadProgress] = useState(0); // 0-100
-	const [uploadError, setUploadError] = useState<string | null>(null);
-	const [uploadId, setUploadId] = useState<string | null>(null);
 	const [idempotencyKey] = useState(() => crypto.randomUUID());
-
-	const createSession = useCreateUploadSession();
-	const uploadChunkMut = useUploadChunk();
-	const completeUploadMut = useCompleteUpload();
-	const abortUploadMut = useAbortUpload();
+	const [upload, uploadActions] = useChunkedUpload();
 
 	// Step 3 — select uploaded image
-	const [completedImageId, setCompletedImageId] = useState<string | null>(null);
+	const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
 	const { data: selectableImagesData, isLoading: selectableImagesLoading } =
 		useImages(
 			typeof selectedDrawingTypeId === "number"
@@ -101,7 +73,7 @@ function AdminUploadMappingPage() {
 	);
 	const [editingLabel, setEditingLabel] = useState("");
 	const [mappingTab, setMappingTab] = useState(0); // 0 = Unmapped, 1 = Mapped
-	const { data: selectedImage } = useImage(completedImageId ?? "");
+	const { data: selectedImage } = useImage(selectedImageId ?? "");
 
 	// Step 5 — save
 	const saveBulk = useSaveBulkFittingPositions();
@@ -115,7 +87,6 @@ function AdminUploadMappingPage() {
 	function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
 		const picked = e.target.files?.[0] ?? null;
 		setFile(picked);
-		setUploadError(null);
 	}
 
 	async function handleUpload() {
@@ -126,59 +97,19 @@ function AdminUploadMappingPage() {
 		)
 			return;
 
-		setUploadError(null);
-		setUploadProgress(0);
+		await uploadActions.start({
+			drawingTypeId: selectedDrawingTypeId,
+			componentName,
+			file,
+			idempotencyKey,
+		});
 
-		try {
-			const buffer = await file.arrayBuffer();
-			const checksum = await sha256Hex(buffer);
-
-			// Create session
-			const session = await createSession.mutateAsync({
-				drawingTypeId: selectedDrawingTypeId,
-				componentName,
-				fileName: file.name,
-				fileSize: file.size,
-				expectedChecksum: checksum,
-				idempotencyKey,
-			});
-			setUploadId(session.upload_id);
-
-			// Upload chunks
-			const totalChunks = Math.ceil(buffer.byteLength / CHUNK_SIZE);
-			for (let i = 0; i < totalChunks; i++) {
-				const start = i * CHUNK_SIZE;
-				const end = Math.min(start + CHUNK_SIZE, buffer.byteLength);
-				const chunk = buffer.slice(start, end);
-				const chunkB64 = arrayBufferToBase64(chunk);
-				await uploadChunkMut.mutateAsync({
-					uploadId: session.upload_id,
-					partNumber: i + 1,
-					chunkData: chunkB64,
-				});
-				setUploadProgress(Math.round(((i + 1) / totalChunks) * 90));
-			}
-
-			// Finalize
-			const result = await completeUploadMut.mutateAsync({
-				uploadId: session.upload_id,
-				idempotencyKey,
-			});
-			setCompletedImageId(result.image_id);
-			setUploadProgress(100);
-			setActiveStep(2);
-		} catch (err) {
-			const msg = err instanceof Error ? err.message : "Upload failed";
-			setUploadError(msg);
-		}
+		// Advance to step 3 only on success (completedImageId set by hook)
+		// The effect is handled via upload.completedImageId below
 	}
 
 	async function handleAbort() {
-		if (!uploadId) return;
-		await abortUploadMut.mutateAsync(uploadId);
-		setUploadId(null);
-		setUploadProgress(0);
-		setUploadError(null);
+		await uploadActions.abort();
 		setFile(null);
 	}
 
@@ -198,7 +129,7 @@ function AdminUploadMappingPage() {
 	}
 
 	async function handleSave() {
-		if (!completedImageId) return;
+		if (!selectedImageId) return;
 		const items: BulkFittingPositionItem[] = mappedPositions.map((p) => ({
 			fitting_position_id: p.id,
 			label_text: p.label,
@@ -206,11 +137,17 @@ function AdminUploadMappingPage() {
 			y_coordinate: p.y,
 		}));
 		const result = await saveBulk.mutateAsync({
-			imageId: completedImageId,
+			imageId: selectedImageId,
 			fittingPositions: items,
 		});
 		setSaveResult(result);
 		setActiveStep(4);
+	}
+
+	// Auto-advance to Step 3 when upload completes
+	if (upload.completedImageId && activeStep === 1) {
+		setSelectedImageId(upload.completedImageId);
+		setActiveStep(2);
 	}
 
 	// ── Render ────────────────────────────────────────────────────────────────
@@ -292,25 +229,17 @@ function AdminUploadMappingPage() {
 						onComponentNameChange={setComponentName}
 						fileName={file ? file.name : null}
 						onFileChange={handleFileChange}
-						uploadProgress={uploadProgress}
-						uploadError={uploadError}
-						isUploading={
-							createSession.isPending ||
-							uploadChunkMut.isPending ||
-							completeUploadMut.isPending
-						}
-						showAbort={!!uploadId}
+						uploadProgress={upload.progress}
+						uploadError={upload.error}
+						isUploading={upload.isUploading}
+						showAbort={upload.showAbort}
 						onUpload={handleUpload}
 						onAbort={handleAbort}
 						onBack={() => setActiveStep(0)}
 						uploadDisabled={
-							!file ||
-							!componentName.trim() ||
-							createSession.isPending ||
-							uploadChunkMut.isPending ||
-							completeUploadMut.isPending
+							!file || !componentName.trim() || upload.isUploading
 						}
-						abortDisabled={abortUploadMut.isPending}
+						abortDisabled={false}
 					/>
 				</Paper>
 			)}
@@ -318,7 +247,7 @@ function AdminUploadMappingPage() {
 			{/* ── Step 3: Select image ── */}
 			{activeStep === 2 && (
 				<Paper sx={{ p: 3 }}>
-					{completedImageId && (
+					{upload.completedImageId && (
 						<Alert severity="success" sx={{ mb: 2 }}>
 							Upload complete — select an image to map.
 						</Alert>
@@ -355,7 +284,7 @@ function AdminUploadMappingPage() {
 										<ImageTileCard
 											image={img}
 											onClick={(imageId) => {
-												setCompletedImageId(imageId);
+												setSelectedImageId(imageId);
 												setActiveStep(3);
 											}}
 										/>
@@ -460,7 +389,7 @@ function AdminUploadMappingPage() {
 						<>
 							<Typography variant="body2" sx={{ mb: 2 }}>
 								{mappedPositions.length} fitting position(s) ready to save for
-								image <code>{completedImageId}</code>.
+								image <code>{selectedImageId}</code>.
 							</Typography>
 							{mappedPositions.map((p) => (
 								<Typography key={p.id} variant="caption" display="block">

@@ -1,4 +1,10 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+	GC_TIME_IMAGE_DETAIL,
+	GC_TIME_IMAGE_LIST,
+	STALE_TIME_IMAGE_DETAIL,
+	STALE_TIME_IMAGE_LIST,
+} from "../config";
 import { fetchImage, fetchImages } from "../endpoints";
 import { queryKeys } from "../queryKeys";
 
@@ -27,8 +33,8 @@ export function useImages(drawingTypeId?: number, search?: string) {
 		initialPageParam: undefined as string | undefined,
 		getNextPageParam: (lastPage) =>
 			lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined,
-		staleTime: 5 * 60 * 1000,
-		gcTime: 30 * 60 * 1000,
+		staleTime: STALE_TIME_IMAGE_LIST,
+		gcTime: GC_TIME_IMAGE_LIST,
 	});
 }
 
@@ -37,7 +43,7 @@ export function useImage(imageId: string) {
 		queryKey: queryKeys.images.detail(imageId),
 		queryFn: () => fetchImage(imageId),
 		enabled: Boolean(imageId),
-		staleTime: 15 * 60 * 1000,
-		gcTime: 60 * 60 * 1000,
+		staleTime: STALE_TIME_IMAGE_DETAIL,
+		gcTime: GC_TIME_IMAGE_DETAIL,
 	});
 }

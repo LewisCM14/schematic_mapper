@@ -1,14 +1,18 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import {
+	GC_TIME_SEARCH,
+	SEARCH_DEFAULT_LIMIT,
+	SEARCH_MIN_QUERY_LENGTH,
+	STALE_TIME_SEARCH,
+} from "../config";
 import { fetchSearch } from "../endpoints";
 import { queryKeys } from "../queryKeys";
-
-const DEFAULT_LIMIT = 25;
 
 export function useSearch(
 	imageId: string,
 	query: string,
 	sources: string[] = ["internal", "asset"],
-	limit: number = DEFAULT_LIMIT,
+	limit: number = SEARCH_DEFAULT_LIMIT,
 ) {
 	return useInfiniteQuery({
 		queryKey: queryKeys.search(imageId, query, sources, limit),
@@ -22,8 +26,8 @@ export function useSearch(
 			}),
 		initialPageParam: null as string | null,
 		getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
-		enabled: Boolean(imageId) && query.length >= 2,
-		staleTime: 30 * 1000,
-		gcTime: 10 * 60 * 1000,
+		enabled: Boolean(imageId) && query.length >= SEARCH_MIN_QUERY_LENGTH,
+		staleTime: STALE_TIME_SEARCH,
+		gcTime: GC_TIME_SEARCH,
 	});
 }
