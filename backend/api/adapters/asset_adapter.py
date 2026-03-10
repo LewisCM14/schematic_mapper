@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from django.db import OperationalError, ProgrammingError, connections
 
-from .cache import TTLCache
+from api.cache import TTLCache
 
 
 @dataclass

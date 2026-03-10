@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from django.test import Client
 
-from api.asset_adapter import AssetRecord, AssetResult
+from api.adapters.asset_adapter import AssetRecord, AssetResult
 from api.models import DrawingType, FittingPosition, Image, ImageUpload
 
 
@@ -306,7 +306,7 @@ class TestGetFittingPositionDetailsView:
                 sub_component_name="Inlet Pump Assembly",
             ),
         )
-        with patch("api.views.fetch_asset_details", return_value=mock_result):
+        with patch("api.views.images.fetch_asset_details", return_value=mock_result):
             response = client.get("/api/fitting-positions/FP-PUMP-01-INLET/details")
         assert response.status_code == 200
         data = response.json()
@@ -320,7 +320,7 @@ class TestGetFittingPositionDetailsView:
     ) -> None:
         self._make_fp(image)
         mock_result = AssetResult(source_status="ok", record=None)
-        with patch("api.views.fetch_asset_details", return_value=mock_result):
+        with patch("api.views.images.fetch_asset_details", return_value=mock_result):
             response = client.get("/api/fitting-positions/FP-PUMP-01-INLET/details")
         assert response.status_code == 200
         data = response.json()
@@ -332,7 +332,7 @@ class TestGetFittingPositionDetailsView:
     ) -> None:
         self._make_fp(image)
         mock_result = AssetResult(source_status="degraded", record=None)
-        with patch("api.views.fetch_asset_details", return_value=mock_result):
+        with patch("api.views.images.fetch_asset_details", return_value=mock_result):
             response = client.get("/api/fitting-positions/FP-PUMP-01-INLET/details")
         assert response.status_code == 200
         data = response.json()
@@ -964,7 +964,7 @@ class TestAdminUploadImageView:
             "image_data": encoded,
             "expected_checksum": checksum,
         }
-        with patch("api.views.MAX_UPLOAD_SIZE_BYTES", 2):
+        with patch("api.services.upload_service.MAX_UPLOAD_SIZE_BYTES", 2):
             response = client.post(
                 "/api/admin/images",
                 data=json.dumps(payload),
@@ -1222,8 +1222,8 @@ class TestSearchView:
         self, client: Client, image: Image
     ) -> None:
         self._make_fp(image)
-        with patch("api.search_service.search_assets") as mock_search_assets:
-            from api.asset_adapter import AssetSearchResult
+        with patch("api.services.search_service.search_assets") as mock_search_assets:
+            from api.adapters.asset_adapter import AssetSearchResult
 
             mock_search_assets.return_value = AssetSearchResult(
                 source_status="degraded"

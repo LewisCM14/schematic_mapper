@@ -385,6 +385,56 @@ Sensor mapping notes:
     - Uses Django models and migrations for internal MSSQL schema evolution.
     - Keeps write operations limited to app-owned internal tables.
 
+#### Backend Project Structure
+
+The `api` Django app is organised into domain-aligned packages that mirror the five-layer architecture above.
+
+```
+api/
+├── __init__.py
+├── apps.py                       # Django app config
+├── admin.py                      # Django admin registration
+├── constants.py                  # Shared constants (limits, regex, defaults)
+├── models.py                     # ORM models (Image, FittingPosition, ImageUpload, etc.)
+├── cache.py                      # Generic TTL read-through cache
+├── middleware.py                  # Request-ID middleware
+├── urls.py                       # URL routing → views package
+├── views/
+│   ├── __init__.py               # Re-exports all view functions
+│   ├── health.py                 # GET /api/health
+│   ├── images.py                 # Image & fitting-position read endpoints
+│   ├── admin.py                  # Upload lifecycle, admin image upload, bulk FPs
+│   └── search.py                 # GET /api/search
+├── serializers/
+│   ├── __init__.py               # Re-exports all serializer classes
+│   ├── image_serializers.py      # DrawingType, Image, FittingPosition serializers
+│   ├── upload_serializers.py     # Upload session & chunk serializers
+│   └── search_serializers.py     # Search result serializers
+├── services/
+│   ├── __init__.py
+│   ├── image_service.py          # SVG dimension parsing, thumbnail generation
+│   ├── upload_service.py         # Upload session state machine & verification
+│   ├── search_service.py         # Multi-source search orchestration
+│   ├── search_config_service.py  # Per-source search field configuration
+│   └── search_index_service.py   # In-memory search projection with TTL cache
+├── adapters/
+│   ├── __init__.py               # Re-exports adapter types and functions
+│   └── asset_adapter.py          # Asset DB adapter (circuit breaker, TTL cache)
+├── migrations/
+└── management/
+    └── commands/                  # refresh_search_projection, cleanup_uploads, etc.
+```
+
+**Package responsibilities:**
+
+| Package | Layer | Responsibility |
+|---|---|---|
+| `views/` | API | HTTP request handling, input validation, response shaping |
+| `serializers/` | API | DRF serialisation / deserialisation contracts |
+| `services/` | Application | Business logic, orchestration, state machines |
+| `adapters/` | Source adapter | External data-source access with resilience patterns |
+| `models.py` | Persistence | Django ORM models and migration history |
+| `constants.py` | Cross-cutting | Shared configuration constants |
 
 
 #### API Endpoints

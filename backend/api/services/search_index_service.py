@@ -3,9 +3,9 @@
 import uuid
 from dataclasses import dataclass
 
-from .cache import TTLCache
-from .models import FittingPosition, Image
-from .search_config_service import SearchConfigService
+from api.cache import TTLCache
+from api.models import FittingPosition, Image
+from api.services.search_config_service import SearchConfigService
 
 PROJECTION_TTL_SECONDS = 600  # 10 minutes
 

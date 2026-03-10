@@ -6,11 +6,11 @@ from unittest.mock import patch
 import pytest
 from django.core.management import call_command
 
-from api.asset_adapter import AssetSearchResult
+from api.adapters.asset_adapter import AssetSearchResult
 from api.models import DrawingType, FittingPosition, Image
-from api.search_config_service import SearchConfigService
-from api.search_index_service import SearchIndexService
-from api.search_service import (
+from api.services.search_config_service import SearchConfigService
+from api.services.search_index_service import SearchIndexService
+from api.services.search_service import (
     _decode_cursor,
     _encode_cursor,
     _match_type,
@@ -160,7 +160,7 @@ class TestSearchService:
 
     def test_asset_source_degraded_on_db_error(self) -> None:
         img, _ = self._setup()
-        with patch("api.search_service.search_assets") as mock_search_assets:
+        with patch("api.services.search_service.search_assets") as mock_search_assets:
             mock_search_assets.return_value = AssetSearchResult(
                 source_status="degraded"
             )
@@ -266,7 +266,7 @@ class TestSearchService:
                 "get_searchable_fields",
                 side_effect=RuntimeError("db down"),
             ),
-            patch("api.search_service.search_assets") as mock_search_assets,
+            patch("api.services.search_service.search_assets") as mock_search_assets,
         ):
             mock_search_assets.return_value = AssetSearchResult(
                 source_status="degraded"

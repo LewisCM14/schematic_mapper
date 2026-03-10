@@ -5,7 +5,7 @@ import uuid
 from django.core.management.base import BaseCommand
 
 from api.models import Image
-from api.search_index_service import SearchIndexService
+from api.services.search_index_service import SearchIndexService
 
 
 class Command(BaseCommand):

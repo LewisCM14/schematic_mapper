@@ -6,9 +6,9 @@ import uuid
 from dataclasses import dataclass
 from typing import Literal
 
-from .asset_adapter import search_assets
-from .search_config_service import SearchConfigService, SourceSearchConfig
-from .search_index_service import SearchIndexService, SearchProjectionRow
+from api.adapters.asset_adapter import search_assets
+from api.services.search_config_service import SearchConfigService, SourceSearchConfig
+from api.services.search_index_service import SearchIndexService, SearchProjectionRow
 
 MatchType = Literal["exact", "prefix", "partial"]
 SourceName = Literal["internal", "asset"]

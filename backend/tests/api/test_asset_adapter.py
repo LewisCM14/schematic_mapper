@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.db import OperationalError
 
-from api.asset_adapter import (
+from api.adapters.asset_adapter import (
     FAILURE_THRESHOLD,
     AssetRecord,
     AssetSearchRow,
@@ -38,7 +38,7 @@ class TestFetchAssetDetails:
             "Inlet Pump Assembly",
         )
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result = fetch_asset_details("FP-PUMP-01-INLET")
 
@@ -54,7 +54,7 @@ class TestFetchAssetDetails:
         mock_cursor.__exit__ = MagicMock(return_value=False)
         mock_cursor.fetchone.return_value = None
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result = fetch_asset_details("UNKNOWN-LABEL")
 
@@ -64,7 +64,7 @@ class TestFetchAssetDetails:
     def test_returns_degraded_on_operational_error(self) -> None:
         from django.db import OperationalError
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 OperationalError("connection refused")
             )
@@ -76,7 +76,7 @@ class TestFetchAssetDetails:
     def test_returns_degraded_on_programming_error(self) -> None:
         from django.db import ProgrammingError
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 ProgrammingError("relation does not exist")
             )
@@ -90,7 +90,7 @@ class TestCircuitBreaker:
     def test_trips_after_consecutive_failures(self) -> None:
         """After FAILURE_THRESHOLD consecutive failures the circuit opens,
         returning degraded without attempting a query."""
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 OperationalError("timeout")
             )
@@ -98,7 +98,7 @@ class TestCircuitBreaker:
                 fetch_asset_details("FP-001")
 
         # Next call should be short-circuited — no cursor call
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             result = fetch_asset_details("FP-001")
             mock_connections.__getitem__.return_value.cursor.assert_not_called()
 
@@ -111,7 +111,7 @@ class TestCircuitBreaker:
         mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
         mock_cursor.__exit__ = MagicMock(return_value=False)
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             # Accumulate failures just below threshold
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 OperationalError("timeout")
@@ -146,7 +146,7 @@ class TestCircuitBreaker:
 
     def test_half_open_after_cooldown(self) -> None:
         """After the cooldown elapses the circuit allows a retry."""
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 OperationalError("timeout")
             )
@@ -155,8 +155,8 @@ class TestCircuitBreaker:
 
         # Fast-forward past the cooldown
         with (
-            patch("api.asset_adapter.time") as mock_time,
-            patch("api.asset_adapter.connections") as mock_connections,
+            patch("api.adapters.asset_adapter.time") as mock_time,
+            patch("api.adapters.asset_adapter.connections") as mock_connections,
         ):
             mock_time.monotonic.return_value = 1e12  # well past any deadline
             mock_cursor = MagicMock()
@@ -227,14 +227,14 @@ class TestAssetAdapterContract:
 
     def test_search_assets_trips_circuit(self) -> None:
         """search_assets also participates in the shared circuit breaker."""
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 OperationalError("timeout")
             )
             for _ in range(FAILURE_THRESHOLD):
                 search_assets(["FP-001"], "pump")
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             result = search_assets(["FP-001"], "pump")
             mock_connections.__getitem__.return_value.cursor.assert_not_called()
         assert result.source_status == "degraded"
@@ -246,7 +246,7 @@ class TestAssetAdapterContract:
         mock_cursor.__exit__ = MagicMock(return_value=False)
         mock_cursor.fetchone.return_value = None
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = (
                 mock_cursor
             )
@@ -272,7 +272,7 @@ class TestReadThroughCache:
             "Inlet",
         )
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result1 = fetch_asset_details("FP-001")
             result2 = fetch_asset_details("FP-001")
@@ -298,14 +298,14 @@ class TestReadThroughCache:
             "Inlet",
         )
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             fetch_asset_details("FP-001")
 
         # Expire the cache entry by advancing time past TTL
         with (
             patch("api.cache.time") as mock_cache_time,
-            patch("api.asset_adapter.connections") as mock_connections,
+            patch("api.adapters.asset_adapter.connections") as mock_connections,
         ):
             mock_cache_time.monotonic.return_value = 1e12
             mock_cursor2 = MagicMock()
@@ -328,7 +328,7 @@ class TestReadThroughCache:
 
     def test_degraded_result_not_cached(self) -> None:
         """Degraded results from DB errors are not cached."""
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.side_effect = (
                 OperationalError("timeout")
             )
@@ -346,7 +346,7 @@ class TestReadThroughCache:
             "Primary",
             "Inlet",
         )
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result2 = fetch_asset_details("FP-001")
             mock_connections.__getitem__.return_value.cursor.assert_called()
@@ -367,14 +367,14 @@ class TestReadThroughCache:
             "Inlet",
         )
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             fetch_asset_details("FP-001")
             assert mock_connections.__getitem__.return_value.cursor.call_count == 1
 
         clear_asset_cache()
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             fetch_asset_details("FP-001")
             assert mock_connections.__getitem__.return_value.cursor.call_count == 1
@@ -388,7 +388,7 @@ class TestReadThroughCache:
             ("FP-001", "Cooling", "Primary", "Inlet"),
         ]
 
-        with patch("api.asset_adapter.connections") as mock_connections:
+        with patch("api.adapters.asset_adapter.connections") as mock_connections:
             mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result1 = search_assets(["FP-001"], "cooling")
             result2 = search_assets(["FP-001"], "cooling")
