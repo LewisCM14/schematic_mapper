@@ -2202,3 +2202,30 @@ All of the following must pass before Phase 13 is considered complete:
 
 After Phase 13, the prototype achieves full conformance with all non-implementation sections of this specification.
 - `npm run lint` — no Biome errors.
+
+### Phase 14 — Final Cleanup (Cosmetic)
+*Eighth conformance audit. Addresses the remaining low-severity cosmetic gaps between the codebase and the non-implementation sections of this specification. All functional, architectural, and testing requirements are fully conformant after Phase 13. The items below are limited to the colour-token enforcement rule in §Typography & Color Scheme ("Enforce color tokens via MUI theme overrides and avoid hardcoded ad-hoc colors").*
+
+#### 14a: Replace Hardcoded Colour Values in Components *(Low)*
+*Addresses: §Typography & Color Scheme — "avoid hardcoded ad-hoc colors."*
+
+- In `src/components/atoms/POIMarkerCluster.tsx`, replace the hardcoded `color: "#fff"` with the MUI theme token `common.white` (accessed via the `sx` prop or `useTheme()`).
+- In `src/components/organisms/DiagramCanvasViewport.tsx`, replace the hardcoded `background: "rgba(255,255,255,0.85)"` for the zoom-control overlay with a theme-derived value (e.g. `alpha(theme.palette.background.paper, 0.85)` via MUI's `alpha` utility, or `theme.palette.background.paper` with an explicit opacity).
+- **Verification:** `npm run build` passes; `npm run test` passes; `npm run lint` passes; no hardcoded hex or rgba colour strings remain in component source files under `src/components/` or `src/pages/`.
+
+#### 14b: Remove Dead Vite Boilerplate CSS *(Low)*
+*Addresses: §Typography & Color Scheme — "avoid hardcoded ad-hoc colors." `src/App.css` and `src/index.css` are Vite scaffold leftovers containing many hardcoded colour values. Neither file is imported by any module in the application.*
+
+- Delete `src/App.css` and `src/index.css`.
+- Verify no import references exist (there are none currently).
+- **Verification:** `npm run build` passes; `npm run test` passes; `npm run lint` passes.
+
+#### Completion Criteria for Phase 14
+All of the following must pass before Phase 14 is considered complete:
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.
+- No hardcoded hex or rgba colour strings in any file under `src/components/` or `src/pages/`.
+- `uv run pytest` — all backend tests pass (no backend changes expected, but verify no regressions).
+
+After Phase 14, the prototype achieves full conformance with all non-implementation sections of this specification, including the colour-token enforcement rule.
