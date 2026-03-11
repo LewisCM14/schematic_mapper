@@ -53,6 +53,15 @@ def create_upload_session(request: Request) -> Response:
             },
             status=429,
         )
+    except FileExistsError:
+        return Response(
+            {
+                "error": upload_service.DUPLICATE_COMPONENT_NAME_MESSAGE,
+                "code": upload_service.DUPLICATE_COMPONENT_NAME_CODE,
+                "status": 409,
+            },
+            status=409,
+        )
 
     return Response(UploadSessionSerializer(session).data, status=status)
 
@@ -161,6 +170,17 @@ def bulk_fitting_positions(request: Request) -> Response:
             status=400,
         )
 
+    label_texts = [item["label_text"].strip().lower() for item in data["fitting_positions"]]
+    if len(label_texts) != len(set(label_texts)):
+        return Response(
+            {
+                "error": "Duplicate label_text values in payload",
+                "code": "bulk_duplicate_labels",
+                "status": 400,
+            },
+            status=400,
+        )
+
     created = 0
     updated = 0
     for item in data["fitting_positions"]:
@@ -171,6 +191,8 @@ def bulk_fitting_positions(request: Request) -> Response:
                 "label_text": item["label_text"],
                 "x_coordinate": item["x_coordinate"],
                 "y_coordinate": item["y_coordinate"],
+                "width": item["width"],
+                "height": item["height"],
                 "is_active": True,
             },
         )
@@ -180,3 +202,10 @@ def bulk_fitting_positions(request: Request) -> Response:
             updated += 1
 
     return Response({"created": created, "updated": updated}, status=200)
+
+
+@api_view(["DELETE"])
+def delete_fitting_position(request: Request, fitting_position_id: str) -> Response:
+    fitting_position = get_object_or_404(FittingPosition, pk=fitting_position_id)
+    fitting_position.delete()
+    return Response(status=204)

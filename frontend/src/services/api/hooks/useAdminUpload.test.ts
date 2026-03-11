@@ -56,7 +56,7 @@ describe("useCompleteUpload", () => {
 		result.current.mutate({ uploadId: UPLOAD_ID, idempotencyKey: "key-1" });
 		await waitFor(() => expect(result.current.isSuccess).toBe(true));
 		expect(spy).toHaveBeenCalledWith(
-			expect.objectContaining({ queryKey: queryKeys.images.list() }),
+			expect.objectContaining({ queryKey: queryKeys.images.all }),
 		);
 	});
 });

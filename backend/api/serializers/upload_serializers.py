@@ -49,6 +49,8 @@ class BulkFittingPositionItemSerializer(serializers.Serializer[Any]):
     label_text = serializers.CharField(max_length=100)
     x_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
     y_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    width = serializers.DecimalField(max_digits=10, decimal_places=3, min_value=0)
+    height = serializers.DecimalField(max_digits=10, decimal_places=3, min_value=0)
 
 
 class BulkFittingPositionSerializer(serializers.Serializer[Any]):

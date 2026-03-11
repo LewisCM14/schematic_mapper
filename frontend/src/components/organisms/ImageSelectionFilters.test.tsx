@@ -19,8 +19,6 @@ describe("ImageSelectionFilters", () => {
 					]}
 					selectedTypeId={null}
 					onTypeChange={vi.fn()}
-					searchValue=""
-					onSearchChange={vi.fn()}
 				/>
 			</ThemeProvider>,
 		);

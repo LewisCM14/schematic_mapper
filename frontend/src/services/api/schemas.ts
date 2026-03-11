@@ -32,6 +32,8 @@ export const FittingPositionSchema = z.object({
 	fitting_position_id: z.string(),
 	x_coordinate: z.coerce.number(),
 	y_coordinate: z.coerce.number(),
+	width: z.coerce.number(),
+	height: z.coerce.number(),
 	label_text: z.string(),
 	is_active: z.boolean(),
 });
@@ -48,6 +50,8 @@ export const FittingPositionDetailSchema = z.object({
 	label_text: z.string(),
 	x_coordinate: z.coerce.number(),
 	y_coordinate: z.coerce.number(),
+	width: z.coerce.number(),
+	height: z.coerce.number(),
 	asset: AssetInfoSchema.nullable(),
 	source_status: z.record(z.string(), z.string()),
 });

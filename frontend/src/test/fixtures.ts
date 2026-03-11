@@ -47,6 +47,8 @@ export const FIXTURES = {
 			fitting_position_id: "FP-PUMP-01-INLET",
 			x_coordinate: 300,
 			y_coordinate: 250,
+			width: 0,
+			height: 0,
 			label_text: "FP-PUMP-01-INLET",
 			is_active: true,
 		},
@@ -56,6 +58,8 @@ export const FIXTURES = {
 		label_text: "FP-PUMP-01-INLET",
 		x_coordinate: 300,
 		y_coordinate: 250,
+		width: 0,
+		height: 0,
 		asset: {
 			asset_record_id: "AR-001",
 			high_level_component: "Cooling Pump",

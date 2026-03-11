@@ -1,5 +1,5 @@
 import { ThemeProvider } from "@mui/material/styles";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import theme from "../../theme";
@@ -90,5 +90,122 @@ describe("DiagramCanvasViewport", () => {
 		expect(
 			screen.queryByRole("button", { name: /markers clustered/ }),
 		).toBeNull();
+	});
+
+	it("keeps the reset control available after the image load fit flow runs", async () => {
+		renderCanvas();
+		const image = screen.getByAltText("schematic diagram");
+		image.dispatchEvent(new Event("load"));
+		expect(
+			await screen.findByRole("button", { name: "reset view" }),
+		).toBeInTheDocument();
+	});
+
+	it("renders admin rectangles and a pending draft rectangle", () => {
+		renderCanvas({
+			markers: [],
+			rectangles: [
+				{ id: "FP-BOX-1", x: 10, y: 20, width: 30, height: 40, status: "mapped" },
+			],
+			draftRectangle: {
+				id: "__pending__",
+				x: 50,
+				y: 60,
+				width: 20,
+				height: 25,
+				status: "unmapped",
+			},
+		});
+		expect(screen.getByLabelText("rectangle FP-BOX-1")).toBeInTheDocument();
+		expect(screen.getByLabelText("rectangle __pending__")).toBeInTheDocument();
+	});
+
+	it("fires onRectangleDraw when dragging on the canvas", () => {
+		const onRectangleDraw = vi.fn();
+		renderCanvas({ markers: [], onRectangleDraw });
+
+		const canvasHost = screen.getByAltText("schematic diagram").parentElement;
+		if (!canvasHost) {
+			throw new Error("Expected diagram canvas host to exist");
+		}
+
+		vi.spyOn(canvasHost, "getBoundingClientRect").mockReturnValue({
+			bottom: 600,
+			height: 600,
+			left: 0,
+			right: 800,
+			top: 0,
+			width: 800,
+			x: 0,
+			y: 0,
+			toJSON: () => ({}),
+		});
+
+		fireEvent.pointerDown(canvasHost, {
+			clientX: 100,
+			clientY: 120,
+			pointerId: 1,
+		});
+		fireEvent.pointerMove(canvasHost, {
+			clientX: 220,
+			clientY: 260,
+			pointerId: 1,
+		});
+		fireEvent.pointerUp(canvasHost, {
+			clientX: 220,
+			clientY: 260,
+			pointerId: 1,
+		});
+
+		expect(onRectangleDraw).toHaveBeenCalledWith({
+			height: 140,
+			width: 120,
+			x: 100,
+			y: 120,
+		});
+	});
+
+	it("does not draw a rectangle while in pan mode", () => {
+		const onRectangleDraw = vi.fn();
+		renderCanvas({
+			markers: [],
+			onRectangleDraw,
+			interactionMode: "pan",
+		});
+
+		const canvasHost = screen.getByAltText("schematic diagram").parentElement;
+		if (!canvasHost) {
+			throw new Error("Expected diagram canvas host to exist");
+		}
+
+		vi.spyOn(canvasHost, "getBoundingClientRect").mockReturnValue({
+			bottom: 600,
+			height: 600,
+			left: 0,
+			right: 800,
+			top: 0,
+			width: 800,
+			x: 0,
+			y: 0,
+			toJSON: () => ({}),
+		});
+
+		fireEvent.pointerDown(canvasHost, {
+			clientX: 100,
+			clientY: 120,
+			pointerId: 1,
+		});
+		fireEvent.pointerMove(canvasHost, {
+			clientX: 220,
+			clientY: 260,
+			pointerId: 1,
+		});
+		fireEvent.pointerUp(canvasHost, {
+			clientX: 220,
+			clientY: 260,
+			pointerId: 1,
+		});
+
+		expect(onRectangleDraw).not.toHaveBeenCalled();
 	});
 });

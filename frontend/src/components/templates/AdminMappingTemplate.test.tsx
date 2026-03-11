@@ -1,6 +1,7 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import theme from "../../theme";
@@ -54,5 +55,26 @@ describe("AdminMappingTemplate", () => {
 		expect(
 			screen.getByText(/unprotected in the prototype/),
 		).toBeInTheDocument();
+	});
+
+	it("renders a back control when onBack is provided", async () => {
+		const onBack = vi.fn();
+		renderWithProviders(
+			<AdminMappingTemplate
+				title="Admin Panel"
+				steps={["A"]}
+				activeStep={0}
+				showDisclaimer={false}
+				onDismissDisclaimer={vi.fn()}
+				onBack={onBack}
+			>
+				<div />
+			</AdminMappingTemplate>,
+		);
+
+		await userEvent.click(
+			screen.getByRole("button", { name: "back to image selection" }),
+		);
+		expect(onBack).toHaveBeenCalledTimes(1);
 	});
 });

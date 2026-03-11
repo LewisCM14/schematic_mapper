@@ -30,6 +30,13 @@ describe("ImageSelectionPage", () => {
 		expect(screen.getByText("Schematic Mapper")).toBeInTheDocument();
 	});
 
+	it("shows an admin upload entry point", () => {
+		renderPage();
+		expect(
+			screen.getByRole("button", { name: "Open Admin Upload" }),
+		).toBeInTheDocument();
+	});
+
 	it("renders drawing type dropdown", async () => {
 		renderPage();
 		await waitFor(() => {
@@ -39,26 +46,25 @@ describe("ImageSelectionPage", () => {
 		});
 	});
 
-	it("tile grid is hidden before a drawing type is selected", async () => {
+	it("defaults the drawing type dropdown to the first available value", async () => {
 		renderPage();
 		await waitFor(() =>
 			expect(
 				screen.getByRole("combobox", { name: /drawing type/i }),
 			).toBeInTheDocument(),
 		);
-		expect(
-			screen.queryByText("Cooling System Assembly"),
-		).not.toBeInTheDocument();
+		await waitFor(() => {
+			expect(screen.getByRole("combobox", { name: /drawing type/i })).toHaveTextContent(
+				"composite",
+			);
+		});
 	});
 
-	it("shows prompt to select a type when no type chosen", async () => {
-		server.use(http.get("/api/images", () => HttpResponse.json([])));
+	it("shows image cards once the default drawing type is applied", async () => {
 		renderPage();
 		await waitFor(() => {
 			expect(
-				screen.getByText(
-					/Select a drawing type above to view available schematics/,
-				),
+				screen.getByText("Cooling System Assembly"),
 			).toBeInTheDocument();
 		});
 	});
@@ -140,23 +146,38 @@ describe("ImageSelectionPage", () => {
 		});
 	});
 
-	it("renders the search images text field", async () => {
+	it("does not render a search images text field", async () => {
 		renderPage();
 		await waitFor(() =>
 			expect(
-				screen.getByRole("textbox", { name: /search images/i }),
+				screen.getByRole("combobox", { name: /drawing type/i }),
 			).toBeInTheDocument(),
 		);
+		expect(
+			screen.queryByRole("textbox", { name: /search images/i }),
+		).not.toBeInTheDocument();
 	});
 
-	it("typing in search field updates displayed tiles via filtered query", async () => {
+	it("updates displayed tiles when the drawing type changes", async () => {
 		server.use(
 			http.get("/api/images", ({ request }) => {
 				const url = new URL(request.url);
-				const search = url.searchParams.get("search");
-				if (search === "cooling") {
+				const drawingTypeId = url.searchParams.get("drawing_type_id");
+				if (drawingTypeId === "2") {
 					return HttpResponse.json({
-						results: [FIXTURES.image],
+						results: [
+							{
+								...FIXTURES.image,
+								image_id: "00000000-0000-4000-8000-000000000002",
+								component_name: "System Overview",
+								drawing_type: {
+									drawing_type_id: 2,
+									type_name: "system",
+									description: "",
+									is_active: true,
+								},
+							},
+						],
 						has_more: false,
 						next_cursor: null,
 					});
@@ -168,6 +189,19 @@ describe("ImageSelectionPage", () => {
 				});
 			}),
 		);
+		server.use(
+			http.get("/api/drawing-types", () =>
+				HttpResponse.json([
+					...FIXTURES.drawingTypes,
+					{
+						drawing_type_id: 2,
+						type_name: "system",
+						description: "",
+						is_active: true,
+					},
+				]),
+			),
+		);
 		const user = userEvent.setup();
 		renderPage();
 
@@ -177,14 +211,12 @@ describe("ImageSelectionPage", () => {
 			).toBeInTheDocument(),
 		);
 
-		// Select a drawing type first so the grid shows
 		await user.click(screen.getByRole("combobox", { name: /drawing type/i }));
-		const option = await screen.findByRole("option", { name: "composite" });
+		const option = await screen.findByRole("option", { name: "system" });
 		await user.click(option);
 
-		// Type into the search field
-		const searchField = screen.getByRole("textbox", { name: /search images/i });
-		await user.type(searchField, "cooling");
-		expect(searchField).toHaveValue("cooling");
+		await waitFor(() => {
+			expect(screen.getByText("System Overview")).toBeInTheDocument();
+		});
 	});
 });

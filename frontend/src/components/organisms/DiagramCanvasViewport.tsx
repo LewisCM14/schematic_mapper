@@ -17,12 +17,35 @@ export interface CanvasMarker {
 	status: "mapped" | "unmapped";
 }
 
+export interface CanvasRectangle {
+	id: string;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	status: "mapped" | "unmapped";
+}
+
 export interface DiagramCanvasViewportProps {
 	imageSvgUrl: string;
 	markers: CanvasMarker[];
+	rectangles?: CanvasRectangle[];
+	showMappedRectangles?: boolean;
+	interactiveMappedRectangles?: boolean;
+	pinnedTooltipId?: string | null;
+	pinnedTooltipContent?: React.ReactNode;
+	requestedZoomScale?: number | null;
+	draftRectangle?: CanvasRectangle | null;
+	interactionMode?: "pan" | "draw";
 	onMarkerClick?: (id: string) => void;
 	onCanvasClick?: (x: number, y: number) => void;
 	onMarkerDrag?: (id: string, x: number, y: number) => void;
+	onRectangleDraw?: (rectangle: {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	}) => void;
 	panToTarget?: { x: number; y: number } | null;
 	/** When provided, called on every panzoom scale change */
 	onZoomChange?: (scale: number) => void;
@@ -52,9 +75,18 @@ interface ViewportRect {
 function DiagramCanvasViewport({
 	imageSvgUrl,
 	markers,
+	rectangles = [],
+	showMappedRectangles = true,
+	interactiveMappedRectangles = false,
+	pinnedTooltipId = null,
+	pinnedTooltipContent,
+	requestedZoomScale = null,
+	draftRectangle = null,
+	interactionMode: interactionModeProp,
 	onMarkerClick,
 	onCanvasClick,
 	onMarkerDrag,
+	onRectangleDraw,
 	panToTarget,
 	onZoomChange,
 	selectedMarkerId,
@@ -62,11 +94,16 @@ function DiagramCanvasViewport({
 }: DiagramCanvasViewportProps) {
 	const theme = useTheme();
 	const containerRef = useRef<HTMLDivElement>(null);
+	const imgRef = useRef<HTMLImageElement>(null);
 	const [panZoomHost, setPanZoomHost] = useState<HTMLDivElement | null>(null);
 	const panzoomRef = useRef<PanzoomObject | null>(null);
+	const fitScaleRef = useRef(1);
 	const [currentScale, setCurrentScale] = useState(1);
 	const [viewport, setViewport] = useState<ViewportRect | null>(null);
 	const rafRef = useRef(0);
+	const fitRafRef = useRef(0);
+	const lastAppliedRequestedZoomRef = useRef<number | null>(null);
+	const [imageReady, setImageReady] = useState(false);
 
 	// Drag state
 	const dragRef = useRef<{
@@ -76,18 +113,104 @@ function DiagramCanvasViewport({
 		originX: number;
 		originY: number;
 	} | null>(null);
+	const drawRef = useRef<{ startX: number; startY: number } | null>(null);
+	const [liveRectangle, setLiveRectangle] = useState<CanvasRectangle | null>(
+		null,
+	);
+	const interactionMode = interactionModeProp ?? (onRectangleDraw ? "draw" : "pan");
+	const isDrawMode = interactionMode === "draw";
+	const isDrawModeRef = useRef(isDrawMode);
+
+	useEffect(() => {
+		isDrawModeRef.current = isDrawMode;
+	}, [isDrawMode]);
+
+	// Compute the scale that fits the image inside the container and centre it
+	const zoomToFit = useCallback(() => {
+		const pz = panzoomRef.current;
+		const container = containerRef.current;
+		const img = imgRef.current;
+		if (!pz || !container || !img) return;
+		const cw = container.clientWidth;
+		const ch = container.clientHeight;
+		const iw = img.naturalWidth || img.clientWidth;
+		const ih = img.naturalHeight || img.clientHeight;
+		if (!iw || !ih || !cw || !ch) return;
+		const fitScale = Math.min(cw / iw, ch / ih);
+		fitScaleRef.current = fitScale;
+		const panX = (cw / fitScale - iw) / 2;
+		const panY = (ch / fitScale - ih) / 2;
+		pz.setOptions({
+			minScale: fitScale,
+			startScale: fitScale,
+			startX: panX,
+			startY: panY,
+		});
+		pz.reset({ animate: false, force: true });
+	}, []);
+
+	const scheduleZoomToFit = useCallback(() => {
+		if (fitRafRef.current) cancelAnimationFrame(fitRafRef.current);
+		fitRafRef.current = requestAnimationFrame(() => {
+			fitRafRef.current = requestAnimationFrame(() => {
+				zoomToFit();
+				fitRafRef.current = 0;
+			});
+		});
+	}, [zoomToFit]);
 
 	// Initialise Panzoom
 	useEffect(() => {
 		if (!panZoomHost) return;
 		const pz = Panzoom(panZoomHost, {
-			contain: "outside",
-			minScale: 0.5,
+			origin: "0 0",
+			minScale: 0.1,
 			maxScale: 10,
+			cursor: "inherit",
+			noBind: true,
 		});
 		panzoomRef.current = pz;
+		// Panzoom sets an inline cursor style that overrides the sx prop.
+		// Clear it so the React-managed cursor (crosshair / grab) wins.
+		panZoomHost.style.cursor = "";
 		const container = containerRef.current;
 		container?.addEventListener("wheel", pz.zoomWithWheel);
+
+		const addPointerListeners = (
+			element: EventTarget,
+			eventNames: string,
+			handler: EventListener,
+			options?: AddEventListenerOptions,
+		) => {
+			eventNames.split(" ").forEach((eventName) => {
+				element.addEventListener(eventName, handler, options);
+			});
+		};
+
+		const removePointerListeners = (
+			element: EventTarget,
+			eventNames: string,
+			handler: EventListener,
+		) => {
+			eventNames.split(" ").forEach((eventName) => {
+				element.removeEventListener(eventName, handler);
+			});
+		};
+
+		const handlePanzoomPointerDown: EventListener = (event) => {
+			if (isDrawModeRef.current) {
+				return;
+			}
+			pz.handleDown(event as PointerEvent);
+		};
+
+		addPointerListeners(panZoomHost, pz.eventNames.down, handlePanzoomPointerDown);
+		addPointerListeners(document, pz.eventNames.move, pz.handleMove as EventListener, {
+			passive: true,
+		});
+		addPointerListeners(document, pz.eventNames.up, pz.handleUp as EventListener, {
+			passive: true,
+		});
 
 		const updateViewport = () => {
 			if (!container) return;
@@ -109,7 +232,8 @@ function DiagramCanvasViewport({
 		};
 
 		const onPanzoomChange = () => {
-			onZoomChange?.(pz.getScale());
+			const fitScale = fitScaleRef.current || 1;
+			onZoomChange?.(pz.getScale() / fitScale);
 			// Gate scale + viewport updates to one per animation frame
 			if (rafRef.current) cancelAnimationFrame(rafRef.current);
 			rafRef.current = requestAnimationFrame(() => {
@@ -125,12 +249,40 @@ function DiagramCanvasViewport({
 
 		return () => {
 			if (rafRef.current) cancelAnimationFrame(rafRef.current);
+			if (fitRafRef.current) cancelAnimationFrame(fitRafRef.current);
 			pz.destroy();
 			container?.removeEventListener("wheel", pz.zoomWithWheel);
+			removePointerListeners(
+				panZoomHost,
+				pz.eventNames.down,
+				handlePanzoomPointerDown,
+			);
+			removePointerListeners(
+				document,
+				pz.eventNames.move,
+				pz.handleMove as EventListener,
+			);
+			removePointerListeners(
+				document,
+				pz.eventNames.up,
+				pz.handleUp as EventListener,
+			);
 			panZoomHost.removeEventListener("panzoomchange", onPanzoomChange);
 			panzoomRef.current = null;
 		};
 	}, [panZoomHost, onZoomChange]);
+
+	useEffect(() => {
+		setImageReady(false);
+	}, [imageSvgUrl]);
+
+	useEffect(() => {
+		const img = imgRef.current;
+		if (!img || !panZoomHost) return;
+		if (imageReady || img.complete) {
+			scheduleZoomToFit();
+		}
+	}, [imageReady, imageSvgUrl, panZoomHost, scheduleZoomToFit]);
 
 	// Compute clustered markers, then cull to viewport
 	const clusteredItems = useMemo(
@@ -152,6 +304,83 @@ function DiagramCanvasViewport({
 		});
 	}, [clusteredItems, viewport]);
 
+	const visibleRectangles = useMemo(() => {
+		const allRectangles = [
+			...rectangles,
+			...(draftRectangle ? [draftRectangle] : []),
+			...(liveRectangle ? [liveRectangle] : []),
+		];
+		if (!viewport) return allRectangles;
+		return allRectangles.filter((rectangle) => {
+			const right = rectangle.x + rectangle.width;
+			const bottom = rectangle.y + rectangle.height;
+			return (
+				right >= viewport.left &&
+				rectangle.x <= viewport.right &&
+				bottom >= viewport.top &&
+				rectangle.y <= viewport.bottom
+			);
+		});
+	}, [draftRectangle, liveRectangle, rectangles, viewport]);
+
+	const visibleInteractiveRectangles = useMemo(
+		() =>
+			interactiveMappedRectangles
+				? visibleRectangles.filter(
+					(rectangle) => rectangle.status === "mapped" && rectangle.width > 0 && rectangle.height > 0,
+				)
+				: [],
+		[interactiveMappedRectangles, visibleRectangles],
+	);
+
+	const pinnedTooltipTarget = useMemo(() => {
+		if (!pinnedTooltipId) return null;
+		const rectangle = rectangles.find((item) => item.id === pinnedTooltipId);
+		if (rectangle) {
+			return {
+				x: rectangle.x + Math.min(rectangle.width * 0.18, 18),
+				y: rectangle.y + Math.min(rectangle.height * 0.18, 18),
+				transform: "translate(calc(-100% - 8px), calc(-100% - 8px))",
+			};
+		}
+		const marker = markers.find((item) => item.id === pinnedTooltipId);
+		if (marker) {
+			return {
+				x: marker.x,
+				y: marker.y,
+				transform: "translate(calc(-100% - 8px), calc(-100% - 8px))",
+			};
+		}
+		return null;
+	}, [markers, pinnedTooltipId, rectangles]);
+
+	useEffect(() => {
+		if (requestedZoomScale == null) {
+			lastAppliedRequestedZoomRef.current = null;
+			return;
+		}
+		if (!imageReady) return;
+		const pz = panzoomRef.current;
+		if (!pz) return;
+		const nextZoom = Number(requestedZoomScale);
+		if (!Number.isFinite(nextZoom) || nextZoom <= 0) return;
+		const fitScale = fitScaleRef.current || 1;
+		const targetScale = fitScale * nextZoom;
+		const currentZoom = pz.getScale() / fitScale;
+		if (Math.abs(currentZoom - nextZoom) < 0.01) {
+			lastAppliedRequestedZoomRef.current = nextZoom;
+			return;
+		}
+		if (
+			lastAppliedRequestedZoomRef.current != null &&
+			Math.abs(lastAppliedRequestedZoomRef.current - nextZoom) < 0.0001
+		) {
+			return;
+		}
+		pz.zoom(targetScale, { animate: false, force: true });
+		lastAppliedRequestedZoomRef.current = nextZoom;
+	}, [imageReady, requestedZoomScale]);
+
 	// Programmatic pan
 	useEffect(() => {
 		if (!panToTarget) return;
@@ -159,13 +388,14 @@ function DiagramCanvasViewport({
 		const container = containerRef.current;
 		if (!pz || !container) return;
 		const scale = pz.getScale();
-		const panX = container.clientWidth / 2 - panToTarget.x * scale;
-		const panY = container.clientHeight / 2 - panToTarget.y * scale;
+		const panX = container.clientWidth / (2 * scale) - panToTarget.x;
+		const panY = container.clientHeight / (2 * scale) - panToTarget.y;
 		pz.pan(panX, panY);
 	}, [panToTarget]);
 
 	const handleCanvasClick = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
+			if (isDrawMode) return;
 			if (!onCanvasClick || !panZoomHost) return;
 			// Only fire if click is on the host itself (not on a marker)
 			if (e.target !== panZoomHost && !(e.target instanceof HTMLImageElement))
@@ -177,7 +407,21 @@ function DiagramCanvasViewport({
 			const y = Math.round((e.clientY - rect.top) / scale);
 			onCanvasClick(x, y);
 		},
-		[onCanvasClick, panZoomHost],
+		[isDrawMode, onCanvasClick, panZoomHost],
+	);
+
+	const getCanvasCoordinates = useCallback(
+		(clientX: number, clientY: number) => {
+			if (!panZoomHost) return null;
+			const rect = panZoomHost.getBoundingClientRect();
+			const pz = panzoomRef.current;
+			const scale = pz ? pz.getScale() : 1;
+			return {
+				x: Math.round((clientX - rect.left) / scale),
+				y: Math.round((clientY - rect.top) / scale),
+			};
+		},
+		[panZoomHost],
 	);
 
 	// Drag handlers for markers
@@ -204,6 +448,19 @@ function DiagramCanvasViewport({
 
 	const handlePointerMove = useCallback(
 		(e: React.PointerEvent) => {
+			if (drawRef.current) {
+				const current = getCanvasCoordinates(e.clientX, e.clientY);
+				if (!current) return;
+				setLiveRectangle({
+					id: "__drawing__",
+					x: Math.min(drawRef.current.startX, current.x),
+					y: Math.min(drawRef.current.startY, current.y),
+					width: Math.abs(current.x - drawRef.current.startX),
+					height: Math.abs(current.y - drawRef.current.startY),
+					status: "unmapped",
+				});
+				return;
+			}
 			if (!dragRef.current || !onMarkerDrag) return;
 			const pz = panzoomRef.current;
 			const scale = pz ? pz.getScale() : 1;
@@ -215,14 +472,78 @@ function DiagramCanvasViewport({
 				Math.round(dragRef.current.originY + dy),
 			);
 		},
-		[onMarkerDrag],
+		[getCanvasCoordinates, onMarkerDrag],
 	);
 
-	const handlePointerUp = useCallback(() => {
+	const handlePointerUp = useCallback((e: React.PointerEvent) => {
+		if (drawRef.current) {
+			const current = getCanvasCoordinates(e.clientX, e.clientY);
+			const completedRectangle = current
+				? {
+					x: Math.min(drawRef.current.startX, current.x),
+					y: Math.min(drawRef.current.startY, current.y),
+					width: Math.abs(current.x - drawRef.current.startX),
+					height: Math.abs(current.y - drawRef.current.startY),
+				}
+				: liveRectangle
+					? {
+						x: liveRectangle.x,
+						y: liveRectangle.y,
+						width: liveRectangle.width,
+						height: liveRectangle.height,
+					}
+					: null;
+			if (
+				completedRectangle &&
+				completedRectangle.width >= 4 &&
+				completedRectangle.height >= 4
+			) {
+				onRectangleDraw?.({
+					x: completedRectangle.x,
+					y: completedRectangle.y,
+					width: completedRectangle.width,
+					height: completedRectangle.height,
+				});
+			}
+			drawRef.current = null;
+			setLiveRectangle(null);
+			return;
+		}
 		if (dragRef.current) {
 			dragRef.current = null;
 			panzoomRef.current?.setOptions({ disablePan: false });
 		}
+	}, [getCanvasCoordinates, liveRectangle, onRectangleDraw]);
+
+	const handleViewportPointerDown = useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!onRectangleDraw || !isDrawMode) return;
+			if (
+				e.target !== panZoomHost &&
+				!(e.target instanceof HTMLImageElement)
+			)
+				return;
+			e.preventDefault();
+			e.stopPropagation();
+			const coords = getCanvasCoordinates(e.clientX, e.clientY);
+			if (!coords) return;
+			drawRef.current = { startX: coords.x, startY: coords.y };
+			setLiveRectangle({
+				id: "__drawing__",
+				x: coords.x,
+				y: coords.y,
+				width: 0,
+				height: 0,
+				status: "unmapped",
+			});
+		},
+		[getCanvasCoordinates, isDrawMode, onRectangleDraw, panZoomHost],
+	);
+
+	useEffect(() => {
+		return () => {
+			if (fitRafRef.current) cancelAnimationFrame(fitRafRef.current);
+		};
 	}, []);
 
 	return (
@@ -268,7 +589,7 @@ function DiagramCanvasViewport({
 				/>
 				<IconButtonAction
 					icon={<RestartAltIcon fontSize="small" />}
-					onClick={() => panzoomRef.current?.reset()}
+					onClick={zoomToFit}
 					ariaLabel="reset view"
 					tooltip="Reset view"
 				/>
@@ -277,25 +598,126 @@ function DiagramCanvasViewport({
 			{/* Panzoom host — wraps SVG image and markers together */}
 			<Box
 				ref={setPanZoomHost}
+				onPointerDown={handleViewportPointerDown}
 				onClick={handleCanvasClick}
 				onPointerMove={handlePointerMove}
 				onPointerUp={handlePointerUp}
 				sx={{
 					position: "relative",
 					display: "inline-block",
-					cursor: onCanvasClick ? "crosshair" : "grab",
-					"&:active": { cursor: onCanvasClick ? "crosshair" : "grabbing" },
+					transformOrigin: "0 0",
+					cursor:
+						isDrawMode || onCanvasClick
+							? "crosshair"
+							: "move",
+					"&:active": {
+						cursor:
+							isDrawMode || onCanvasClick ? "crosshair" : "move",
+					},
 					userSelect: "none",
 				}}
 			>
 				{/* SVG schematic */}
 				<Box
 					component="img"
+					ref={imgRef}
 					src={imageSvgUrl}
 					alt="schematic diagram"
 					sx={{ display: "block" }}
 					draggable={false}
+					onLoad={() => {
+						setImageReady(true);
+						scheduleZoomToFit();
+					}}
 				/>
+
+				{visibleRectangles
+					.filter(
+						(rectangle) =>
+							rectangle.status === "unmapped" || showMappedRectangles,
+					)
+					.map((rectangle) => {
+						const isSelected = rectangle.id === selectedMarkerId;
+						const rectangleColor =
+							rectangle.status === "unmapped"
+								? theme.palette.map.poi.unmapped
+								: isSelected
+									? theme.palette.map.poi.selected
+									: theme.palette.map.poi.default;
+
+						return (
+					<Box
+						key={rectangle.id}
+						aria-label={`rectangle ${rectangle.id}`}
+						data-testid={`rectangle-${rectangle.id}`}
+						sx={{
+							position: "absolute",
+							left: rectangle.x,
+							top: rectangle.y,
+							width: rectangle.width,
+							height: rectangle.height,
+							border: `${isSelected ? 3 : 2}px solid`,
+							borderColor: rectangleColor,
+							borderStyle:
+								rectangle.status === "unmapped" ? "dashed" : "solid",
+							background: `color-mix(in srgb, ${rectangleColor} ${isSelected ? 22 : 12}%, transparent)`,
+							boxSizing: "border-box",
+							pointerEvents: "none",
+						}}
+					/>
+						);
+					})}
+
+				{visibleInteractiveRectangles.map((rectangle) => {
+					const button = (
+						<Box
+							key={`hitbox-${rectangle.id}`}
+							component="button"
+							type="button"
+							className="panzoom-exclude"
+							onClick={(e: React.MouseEvent) => {
+								e.stopPropagation();
+								onMarkerClick?.(rectangle.id);
+							}}
+							sx={{
+								position: "absolute",
+								left: rectangle.x,
+								top: rectangle.y,
+								width: rectangle.width,
+								height: rectangle.height,
+								transform: "none",
+								padding: 0,
+								margin: 0,
+								border: 0,
+								background: "transparent",
+								opacity: 0,
+								cursor: "pointer",
+							}}
+							aria-label={rectangle.id}
+						/>
+					);
+					return renderMarkerWrapper
+						? renderMarkerWrapper(rectangle.id, button)
+						: button;
+				})}
+
+				{pinnedTooltipTarget && pinnedTooltipContent && (
+					<Box
+						role="tooltip"
+						aria-label={`pinned tooltip ${pinnedTooltipId}`}
+						sx={{
+							position: "absolute",
+							left: pinnedTooltipTarget.x,
+							top: pinnedTooltipTarget.y,
+							transform: pinnedTooltipTarget.transform,
+							zIndex: 4,
+							pointerEvents: "auto",
+							maxWidth: "min(240px, calc(100vw - 64px))",
+						}}
+					>
+						{pinnedTooltipContent}
+					</Box>
+				)}
 
 				{/* Marker pins and clusters */}
 				{visibleItems.map((item) => {
@@ -327,6 +749,7 @@ function DiagramCanvasViewport({
 					const button = (
 						<IconButton
 							key={marker.id}
+								className="panzoom-exclude"
 							size="small"
 							onClick={(e) => {
 								e.stopPropagation();

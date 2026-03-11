@@ -266,6 +266,8 @@ class TestListFittingPositionsView:
             image=image,
             x_coordinate="100.000",
             y_coordinate="200.000",
+            width="80.000",
+            height="40.000",
             label_text="FP-TEST-01",
         )
         response = client.get(f"/api/images/{image.image_id}/fitting-positions")
@@ -273,6 +275,8 @@ class TestListFittingPositionsView:
         assert len(data) == 1
         assert data[0]["fitting_position_id"] == "FP-TEST-01"
         assert data[0]["label_text"] == "FP-TEST-01"
+        assert data[0]["width"] == "80.000"
+        assert data[0]["height"] == "40.000"
 
     def test_empty_list_when_no_positions(self, client: Client, image: Image) -> None:
         response = client.get(f"/api/images/{image.image_id}/fitting-positions")
@@ -287,6 +291,8 @@ class TestGetFittingPositionDetailsView:
             image=image,
             x_coordinate="300.000",
             y_coordinate="250.000",
+            width="90.000",
+            height="30.000",
             label_text="FP-PUMP-01-INLET",
         )
 
@@ -311,6 +317,8 @@ class TestGetFittingPositionDetailsView:
         assert response.status_code == 200
         data = response.json()
         assert data["fitting_position_id"] == "FP-PUMP-01-INLET"
+        assert data["width"] == "90.000"
+        assert data["height"] == "30.000"
         assert data["asset"]["asset_record_id"] == "ASSET-001"
         assert data["asset"]["high_level_component"] == "Cooling System"
         assert data["source_status"]["asset"] == "ok"
@@ -421,6 +429,27 @@ class TestCreateUploadSessionView:
             content_type="application/json",
         )
         assert response.status_code == 400
+
+    def test_rejects_duplicate_component_name_ignoring_case_and_whitespace(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        Image.objects.create(
+            drawing_type=drawing_type,
+            component_name="Cooling Assembly",
+            image_binary=b"<svg/>",
+            content_hash="abc123",
+            width_px=800,
+            height_px=600,
+        )
+        payload = _upload_payload(drawing_type, key="duplicate-name")
+        payload["component_name"] = " cooling assembly  "
+        response = client.post(
+            "/api/admin/uploads",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+        assert response.json()["code"] == "duplicate_component_name"
 
     def test_returns_429_when_concurrent_limit_reached(
         self, client: Client, drawing_type: DrawingType
@@ -806,6 +835,32 @@ class TestCompleteUploadView:
         img = Image.objects.get(pk=response.json()["image_id"])
         assert img.thumbnail is not None
 
+    def test_rejects_duplicate_component_name_on_finalize(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        Image.objects.create(
+            drawing_type=drawing_type,
+            component_name="Cooling Assembly",
+            image_binary=b"<svg/>",
+            content_hash="existing",
+            width_px=800,
+            height_px=600,
+        )
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>'
+        session = self._create_session_with_chunk(drawing_type, svg)
+        session.component_name = " cooling assembly  "
+        session.save(update_fields=["component_name"])
+
+        response = client.post(
+            f"/api/admin/uploads/{session.upload_id}/complete",
+            data=json.dumps({"idempotency_key": session.idempotency_key}),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+        assert response.json()["code"] == "duplicate_component_name"
+        session.refresh_from_db()
+        assert session.state == "failed"
+
 
 @pytest.mark.django_db
 class TestAbortUploadView:
@@ -948,6 +1003,27 @@ class TestAdminUploadImageView:
         assert response.status_code == 422
         assert response.json()["code"] == "checksum_mismatch"
 
+    def test_rejects_duplicate_component_name_ignoring_case_and_whitespace(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
+        Image.objects.create(
+            drawing_type=drawing_type,
+            component_name="Test Component",
+            image_binary=b"<svg/>",
+            content_hash="existing",
+            width_px=100,
+            height_px=100,
+        )
+        payload = self._svg_payload(drawing_type)
+        payload["component_name"] = " test component  "
+        response = client.post(
+            "/api/admin/images",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+        assert response.json()["code"] == "duplicate_component_name"
+
     def test_file_too_large_returns_400(
         self, client: Client, drawing_type: DrawingType
     ) -> None:
@@ -1055,6 +1131,8 @@ class TestBulkFittingPositionsView:
                     "label_text": "FP-BULK-01",
                     "x_coordinate": "100.000",
                     "y_coordinate": "200.000",
+                    "width": "80.000",
+                    "height": "40.000",
                 },
             ],
         }
@@ -1066,6 +1144,9 @@ class TestBulkFittingPositionsView:
         assert response.status_code == 200
         assert response.json()["created"] == 1
         assert FittingPosition.objects.filter(fitting_position_id="FP-BULK-01").exists()
+        created = FittingPosition.objects.get(fitting_position_id="FP-BULK-01")
+        assert float(created.width) == 80.0
+        assert float(created.height) == 40.0
 
     def test_updates_existing_positions(self, client: Client, image: Image) -> None:
         FittingPosition.objects.create(
@@ -1074,6 +1155,8 @@ class TestBulkFittingPositionsView:
             label_text="old",
             x_coordinate="0.000",
             y_coordinate="0.000",
+            width="0.000",
+            height="0.000",
         )
         payload = {
             "image_id": str(image.image_id),
@@ -1083,6 +1166,8 @@ class TestBulkFittingPositionsView:
                     "label_text": "new",
                     "x_coordinate": "50.000",
                     "y_coordinate": "60.000",
+                    "width": "75.000",
+                    "height": "35.000",
                 },
             ],
         }
@@ -1095,6 +1180,8 @@ class TestBulkFittingPositionsView:
         assert response.json()["updated"] == 1
         fp = FittingPosition.objects.get(fitting_position_id="FP-BULK-02")
         assert fp.label_text == "new"
+        assert float(fp.width) == 75.0
+        assert float(fp.height) == 35.0
 
     def test_returns_404_for_unknown_image(self, client: Client) -> None:
         payload = {
@@ -1119,12 +1206,16 @@ class TestBulkFittingPositionsView:
                     "label_text": "first",
                     "x_coordinate": "10.000",
                     "y_coordinate": "20.000",
+                    "width": "10.000",
+                    "height": "10.000",
                 },
                 {
                     "fitting_position_id": "FP-DUP-01",
                     "label_text": "duplicate",
                     "x_coordinate": "30.000",
                     "y_coordinate": "40.000",
+                    "width": "10.000",
+                    "height": "10.000",
                 },
             ],
         }
@@ -1145,12 +1236,16 @@ class TestBulkFittingPositionsView:
                     "label_text": "first",
                     "x_coordinate": "10.000",
                     "y_coordinate": "20.000",
+                    "width": "10.000",
+                    "height": "10.000",
                 },
                 {
                     "fitting_position_id": "FP-UNIQ-02",
                     "label_text": "second",
                     "x_coordinate": "30.000",
                     "y_coordinate": "40.000",
+                    "width": "10.000",
+                    "height": "10.000",
                 },
             ],
         }
@@ -1161,6 +1256,63 @@ class TestBulkFittingPositionsView:
         )
         assert response.status_code == 200
         assert response.json()["created"] == 2
+
+    def test_returns_400_for_duplicate_label_text_values(
+        self, client: Client, image: Image
+    ) -> None:
+        payload = {
+            "image_id": str(image.image_id),
+            "fitting_positions": [
+                {
+                    "fitting_position_id": "FP-LABEL-01",
+                    "label_text": "dup-label",
+                    "x_coordinate": "10.000",
+                    "y_coordinate": "20.000",
+                    "width": "10.000",
+                    "height": "10.000",
+                },
+                {
+                    "fitting_position_id": "FP-LABEL-02",
+                    "label_text": " DUP-LABEL ",
+                    "x_coordinate": "30.000",
+                    "y_coordinate": "40.000",
+                    "width": "10.000",
+                    "height": "10.000",
+                },
+            ],
+        }
+        response = client.post(
+            "/api/admin/fitting-positions/bulk",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        assert response.json()["code"] == "bulk_duplicate_labels"
+
+
+@pytest.mark.django_db
+class TestDeleteFittingPositionView:
+    def test_deletes_existing_fitting_position(self, client: Client, image: Image) -> None:
+        fitting_position = FittingPosition.objects.create(
+            fitting_position_id="FP-DELETE-01",
+            image=image,
+            label_text="delete-me",
+            x_coordinate="10.000",
+            y_coordinate="20.000",
+        )
+
+        response = client.delete(
+            f"/api/admin/fitting-positions/{fitting_position.fitting_position_id}"
+        )
+
+        assert response.status_code == 204
+        assert not FittingPosition.objects.filter(
+            fitting_position_id="FP-DELETE-01"
+        ).exists()
+
+    def test_returns_404_for_unknown_fitting_position(self, client: Client) -> None:
+        response = client.delete("/api/admin/fitting-positions/UNKNOWN-FP")
+        assert response.status_code == 404
 
 
 # ── Search ────────────────────────────────────────────────────────────────────

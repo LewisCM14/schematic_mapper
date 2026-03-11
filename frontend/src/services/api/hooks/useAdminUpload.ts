@@ -5,6 +5,7 @@ import {
 	type CreateUploadSessionParams,
 	completeUpload,
 	createUploadSession,
+	deleteFittingPosition,
 	fetchImage,
 	saveBulkFittingPositions,
 	uploadChunk,
@@ -43,7 +44,7 @@ export function useCompleteUpload() {
 			idempotencyKey: string;
 		}) => completeUpload(uploadId, idempotencyKey),
 		onSuccess: (result) => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.images.list() });
+			queryClient.invalidateQueries({ queryKey: queryKeys.images.all });
 			void queryClient.prefetchQuery({
 				queryKey: queryKeys.images.detail(result.image_id),
 				queryFn: () => fetchImage(result.image_id),
@@ -77,6 +78,29 @@ export function useSaveBulkFittingPositions() {
 			});
 			queryClient.invalidateQueries({
 				queryKey: ["fitting-positions"],
+			});
+		},
+	});
+}
+
+export function useDeleteFittingPosition() {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			fittingPositionId,
+		}: {
+			fittingPositionId: string;
+			imageId: string;
+		}) => deleteFittingPosition(fittingPositionId),
+		onSuccess: (_data, variables) => {
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.images.fittingPositions(variables.imageId),
+			});
+			queryClient.invalidateQueries({
+				queryKey: queryKeys.fittingPositions.detail(variables.fittingPositionId),
+			});
+			queryClient.invalidateQueries({
+				queryKey: ["search", variables.imageId],
 			});
 		},
 	});

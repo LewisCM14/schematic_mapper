@@ -62,6 +62,11 @@ export const handlers = [
 	http.post("/api/admin/fitting-positions/bulk", () =>
 		HttpResponse.json({ created: 0, updated: 0 }),
 	),
+
+	http.delete(
+		"/api/admin/fitting-positions/:id",
+		() => new HttpResponse(null, { status: 204 }),
+	),
 ];
 
 // ── MSW server instance ──────────────────────────────────────────────────────

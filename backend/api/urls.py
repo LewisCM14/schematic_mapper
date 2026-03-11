@@ -5,6 +5,7 @@ from .views import (
     bulk_fitting_positions,
     complete_upload,
     create_upload_session,
+    delete_fitting_position,
     get_fitting_position_details,
     get_image,
     health,
@@ -34,4 +35,8 @@ urlpatterns = [
     path("admin/uploads/<uuid:upload_id>/complete", complete_upload),
     path("admin/uploads/<uuid:upload_id>", upload_session_detail),
     path("admin/fitting-positions/bulk", bulk_fitting_positions),
+    path(
+        "admin/fitting-positions/<str:fitting_position_id>",
+        delete_fitting_position,
+    ),
 ]

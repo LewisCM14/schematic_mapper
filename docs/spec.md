@@ -44,6 +44,7 @@ In its end state the Schematic Mapping application is to be a scalable and exten
 
 1. The user interface must be able to display vector format drawings of ~15mb in size.
     - Users must be able to pan & zoom on these diagrams.
+    - On initial load, and when the user activates the reset-view control, the viewer must scale and centre the drawing so the full image fits within the visible viewport without cropping any edge.
     - The interface must be performant in handling these visualizations.
     - The interface must support up to 3,000 mapped fitting positions (POI markers) per diagram while maintaining interactive pan/zoom responsiveness (≤100 ms render latency).
     - Marker clustering and viewport culling must be employed so that only visible, non-overlapping markers are rendered to the DOM at any given time.
@@ -55,6 +56,9 @@ In its end state the Schematic Mapping application is to be a scalable and exten
     - Clicking on a result in the side bar is to pan to the fitting position on the drawing. 
     - Clicking on a fitting position on the drawing is to open the information within the side bar.
 1. There is to be an admin section that allows for image upload and the mapping of co-ordinates to fitting position identifiers.
+    - In the prototype, the admin workflow must be reachable through a visible entry point on the main image-selection screen and provide an obvious return path back to the viewer workflow.
+    - When editing an existing image, deleting mappings must be staged locally until the user completes Review and Save; canceling the workflow must discard staged deletions and leave persisted mappings unchanged.
+    - Completing Save from the review step must return the user to the image selection screen.
 
 **Data Access**
 
@@ -258,6 +262,8 @@ erDiagram
         uniqueidentifier image_id FK
         decimal x_coordinate
         decimal y_coordinate
+        decimal width
+        decimal height
         nvarchar(100) label_text
         bit is_active
         datetime2 created_at
@@ -267,6 +273,8 @@ erDiagram
 
 - `label_text` is unique per image via composite constraint `UNIQUE (image_id, label_text)`.
 - The same `label_text` value can appear on different images.
+- `component_name` is unique across all images via normalized constraint `UNIQUE (Lower(Trim(component_name)))`.
+- `width` and `height` store the bounding box dimensions of the fitting position area on the drawing; default `0` for point-only mappings.
 
 
 
@@ -300,6 +308,8 @@ erDiagram
         uniqueidentifier image_id FK
         decimal x_coordinate
         decimal y_coordinate
+        decimal width
+        decimal height
         nvarchar(100) label_text
         bit is_active
         datetime2 created_at
@@ -336,6 +346,8 @@ erDiagram
         uniqueidentifier image_id FK
         decimal x_coordinate
         decimal y_coordinate
+        decimal width
+        decimal height
         nvarchar(100) label_text
         bit is_active
         datetime2 created_at
@@ -496,6 +508,7 @@ api/
 - `POST /api/admin/uploads/{upload_id}/complete`: finalize upload, validate checksum, and create image record.
 - `DELETE /api/admin/uploads/{upload_id}`: abort upload and cleanup staged parts.
 - `POST /api/admin/fitting-positions/bulk`: bulk create/update coordinate mappings.
+- `DELETE /api/admin/fitting-positions/{fitting_position_id}`: delete a single fitting position mapping.
 
 #### Search Architecture
 
@@ -714,14 +727,14 @@ Purpose:
 - Entry screen where users choose drawing type, browse image tiles, and launch Screen 1.
 
 MUI component composition:
-- `AppBar`, `Toolbar`, `Container`, `FormControl`, `InputLabel`, `Select`, `MenuItem`
-- `TextField` for optional search, `Grid`, `Card`, `CardMedia`, `CardContent`, `CardActionArea`
+- `AppBar`, `Toolbar`, `Container`, `FormControl`, `InputLabel`, `Select`, `MenuItem`, `Button`
+- `Grid`, `Card`, `CardMedia`, `CardContent`, `CardActionArea`
 - `Skeleton` for loading states, `Pagination` optional (or infinite scroll)
 
 ```mermaid
 flowchart TB
     H[Header: AppBar + Title]
-    F1[Filter Row: Drawing Type Select + Optional Search]
+    F1[Filter Row: Drawing Type Select + Admin Entry Point]
     G[Image Tile Grid]
     A[Action: Tile Click Opens Image Viewer]
 
@@ -732,7 +745,7 @@ flowchart TB
 +----------------------------------------------------------------------------------+
 | Header (AppBar): [Schematic Mapper] [User]                                       |
 +----------------------------------------------------------------------------------+
-| Filters: [Drawing Type Dropdown] [Search Images] [Source Filter optional]        |
+| Filters: [Drawing Type Dropdown]                      [Open Admin Upload]        |
 +----------------------------------------------------------------------------------+
 | Tile Grid (Card list):                                                           |
 | [Image Tile] [Image Tile] [Image Tile] [Image Tile]                              |
@@ -745,8 +758,9 @@ flowchart TB
 ```
 
 Interaction notes:
-- Drawing type selection is mandatory before tile list is shown.
+- Drawing type selection is mandatory before tile list is shown; the first available drawing type is auto-selected on load.
 - Tile click passes `image_id` and loads Image Viewer screen initial context.
+- An "Open Admin Upload" button provides the visible entry point to the admin workflow.
 
 **Screen: Image Viewer**
 
@@ -807,11 +821,14 @@ Interaction notes:
 - Source health in header/footer mirrors backend `source_status`.
 - Client route guard enforces `image_id` presence (for example `/viewer/:imageId` only).
 - If `image_id` is missing/invalid, show notice and redirect to Image Selection.
+- Viewer URL encodes shareable state as query parameters: `fp` (selected fitting position ID), `q` (search query), `src` (active search sources), `z` (zoom level relative to fit scale). Opening a shared URL restores the selected POI, search context, and zoom level.
+- Clicking a fitting position on the canvas pins a detail tooltip card; clicking elsewhere or the close button dismisses it.
 
 **Workflow: Admin Upload and Mapping**
 
 Purpose:
 - Admin workflow to upload/select image, then map fitting positions using a map-like interface.
+- Uploaded component names must be unique across stored drawings regardless of letter case and surrounding whitespace. Attempts to reuse a normalized name must be rejected before the upload proceeds.
 
 MUI component composition:
 - Reuses Image Selection screen components for image selection and Image Viewing screen components for map/panel interactions.
@@ -821,26 +838,27 @@ MUI component composition:
 flowchart LR
     S1[Step 1: Select Drawing Type]
     S2[Step 2: Upload Image Resumable]
-    S3[Step 3: Select Uploaded Image]
+    S3[Step 3: Select Image]
     S4[Step 4: Map Fitting Positions on Canvas]
-    S5[Step 5: Validate and Save]
+    S5[Step 5: Review and Save]
 
     S1 --> S2 --> S3 --> S4 --> S5
+    S1 -->|Edit existing image| S3
 ```
 
 ```text
 +----------------------------------------------------------------------------------+
 | Header (AppBar): [Admin Panel] [User]                                            |
 +----------------------------------------------------------------------------------+
-| Stepper: 1 Type -> 2 Upload -> 3 Select -> 4 Map -> 5 Save                       |
+| Stepper: 1 Type -> 2 Upload -> 3 Select -> 4 Map -> 5 Review & Save              |
 +----------------------------------------------------------------------------------+
 | Step 2 Upload                                                                    |
 | [Drawing Type Select] [File Picker] [Upload Progress] [Resume/Retry status]      |
 +-------------------------------+--------------------------------------------------+
 | Step 4 Mapping LHS Panel      | Mapping Canvas (reuses Screen 1 map canvas)      |
-| Tabs: [Unmapped] [Mapped]     | - click to add marker                            |
-| - fitting position search     | - drag marker to adjust                          |
-| - validation warnings         | - marker color by mapped/unmapped                |
+| Tabs: [Unmapped] [Mapped]     | - drag to draw label box                         |
+| - fitting position search     | - show selected box dimensions                   |
+| - validation warnings         | - mapped boxes persist; save center coordinate   |
 +-------------------------------+--------------------------------------------------+
 | Footer: [Validation summary] [Save] [Publish] [Cancel]                           |
 +----------------------------------------------------------------------------------+
@@ -1872,23 +1890,27 @@ All of the following must pass before Phase 9 is considered complete:
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
 
 #### 10b: Admin Step 4 — Mapping Canvas with Viewer Reuse *(Critical)*
-*Addresses: Step 4 mapping canvas is a plain 600×400 grey `Box` — it does not load the uploaded image, has no pan/zoom, no Unmapped/Mapped tabs, no drag-to-adjust markers, and does not reuse the viewer canvas. The spec says: "Mapping Canvas (reuses Screen 1 map canvas)", "Tabs: [Unmapped] [Mapped]", "click to add marker", "drag marker to adjust", "marker color by mapped/unmapped".*
+*Addresses: Step 4 mapping must allow operators to define the extent of a fitting position by drawing a box around the target link or component, rather than dropping a single point. The workbench must still reuse the shared viewer canvas, retain pan/zoom, and keep mapped vs pending states distinct.*
 
 - Extract the pan/zoom canvas logic from `ImageViewerPage` into a shared `DiagramCanvasViewport` organism component (`src/components/organisms/DiagramCanvasViewport.tsx`). Props:
     - `imageSvgUrl: string` — the SVG image source.
     - `markers: Array<{ id: string; x: number; y: number; status: "mapped" | "unmapped" }>` — marker positions to render.
+    - `rectangles?: Array<{ id: string; x: number; y: number; width: number; height: number; status: "mapped" | "unmapped" }>` — admin annotation boxes to render.
+    - `draftRectangle?: { id: string; x: number; y: number; width: number; height: number; status: "mapped" | "unmapped" } | null` — pending admin annotation box.
     - `onMarkerClick?: (id: string) => void` — click handler for existing markers.
     - `onCanvasClick?: (x: number, y: number) => void` — click handler for placing new markers (admin only).
     - `onMarkerDrag?: (id: string, x: number, y: number) => void` — drag handler for repositioning markers (admin only).
+    - `onRectangleDraw?: ({ x, y, width, height }) => void` — admin-only drag gesture handler for drawing a new bounding box.
     - `panToTarget?: { x: number; y: number } | null` — programmatic pan target.
 - Refactor `ImageViewerPage.tsx` to use `<DiagramCanvasViewport>` instead of its inline canvas implementation.
 - In `AdminPage.tsx` Step 4:
     - Replace the plain `Box` with `<DiagramCanvasViewport>` loading the uploaded image's SVG via `useImage(selectedImageId)`.
-    - Render markers coloured by mapped/unmapped status using `theme.palette.map.poi.default` for mapped and `theme.palette.map.poi.unmapped` for unmapped.
-    - Enable `onCanvasClick` for adding new markers and `onMarkerDrag` for repositioning via pointer events.
-    - Add a tabbed LHS panel with `[Unmapped]` and `[Mapped]` tabs listing fitting positions, matching the spec wireframe.
-- Add unit tests for `DiagramCanvasViewport` asserting: image renders, markers render at specified positions, `onCanvasClick` fires with coordinates, `onMarkerClick` fires with marker ID.
-- Update `AdminPage.test.tsx` to assert: Step 4 renders the uploaded image in the canvas; markers can be placed; the Unmapped/Mapped tabs render.
+    - Render admin annotation boxes coloured by mapped/unmapped status using `theme.palette.map.poi.default` for mapped and `theme.palette.map.poi.unmapped` for pending.
+    - Enable click-drag drawing to create a new rectangular selection; after box creation, prompt for the fitting position ID.
+    - Persist the rectangle locally for admin review while deriving the saved fitting-position coordinate from the rectangle center until the backend schema supports box extents.
+    - Add a tabbed LHS panel with `[Unmapped]` and `[Mapped]` tabs listing fitting positions and box dimensions, matching the spec wireframe intent.
+- Add unit tests for `DiagramCanvasViewport` asserting: image renders, markers render at specified positions, `onMarkerClick` fires with marker ID, and `onRectangleDraw` fires with box coordinates when a drag gesture completes.
+- Update `AdminPage.test.tsx` to assert: Step 4 renders the uploaded image in the canvas; selection boxes can be drawn and labeled; the Unmapped/Mapped tabs render.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
 
 #### 10c: Upload MIME Type & File Size Validation *(Critical)*
@@ -2374,3 +2396,80 @@ All of the following must pass before Phase 14 is considered complete:
 - `uv run pytest` — all backend tests pass (no backend changes expected, but verify no regressions).
 
 After Phase 14, the prototype achieves full conformance with all non-implementation sections of this specification, including the colour-token enforcement rule.
+
+### Phase 15 — UAT Feedback Implementation
+**Goal:** Implement design refinements and missing features surfaced during user acceptance testing of the prototype.
+
+#### 15a: Rectangle-Based Fitting Position Mapping *(Critical)*
+*Addresses: UAT feedback that point-only markers are insufficient for identifying fitting positions on dense schematics. Operators need to draw a bounding box around the target area.*
+
+- Add `width` and `height` `DecimalField` columns to the `FittingPosition` model (default `0` for backward compatibility with existing point-only mappings). Generate and apply migration.
+- Update `FittingPositionSerializer`, `FittingPositionDetailSerializer`, and `BulkFittingPositionItemSerializer` to include `width` and `height`.
+- Update `seed_test_data` management command (renamed from `seed_phase3`) to seed eight fitting positions with explicit bounding box dimensions.
+- Update `DiagramCanvasViewport` to render both markers (width/height = 0) and rectangles (width/height > 0) from the fitting positions data. Add `CanvasRectangle` interface, `onRectangleDraw` callback, `interactionMode` ("pan" | "draw"), and `draftRectangle` prop.
+- Refactor `MappingWorkbench` from click-to-place markers to drag-to-draw rectangles. Add rectangle dimension display, persisted/draft status chips, selected position highlighting, and delete confirmation flow.
+- Update `AdminUploadMappingPage` mapping state to track `persistedMappings`, `draftMappings`, and `pendingDeletedPersistedMappings` separately. Stage deletions locally until save, then execute deletes followed by bulk save.
+- Update frontend Zod schemas (`FittingPositionSchema`, `FittingPositionDetailSchema`) and test fixtures to include `width` and `height`.
+- **Verification:** `uv run pytest` passes; `npm run test` passes; `npm run build` succeeds.
+
+#### 15b: Delete Individual Fitting Position Endpoint *(Critical)*
+*Addresses: Admin edit mode requires the ability to remove individual fitting positions from an existing image.*
+
+- Add `DELETE /api/admin/fitting-positions/{fitting_position_id}` endpoint in `api/views/admin.py`. Returns `204 No Content` on success, `404` if not found.
+- Register the URL in `api/urls.py`.
+- Add `useDeleteFittingPosition` mutation hook with cache invalidation for fitting positions, fitting position detail, and search queries for the affected image.
+- Add backend tests for the delete endpoint and frontend MSW handler.
+- **Verification:** `uv run pytest` passes; `npm run test` passes.
+
+#### 15c: Component Name Uniqueness Enforcement *(High)*
+*Addresses: Spec requirement that "Uploaded component names must be unique across stored drawings regardless of letter case and surrounding whitespace."*
+
+- Add database-level unique constraint on `Image.component_name` using `Lower(Trim(...))` via Django migration.
+- Add `normalize_component_name()`, `image_component_name_exists()`, `active_upload_name_exists()`, and `has_component_name_conflict()` helpers in `upload_service.py`.
+- Update `create_session`, `complete_upload`, and `admin_upload_image` to check for conflicts and return `409` with `code: "duplicate_component_name"` when found.
+- Update `bulk_fitting_positions` view to reject duplicate `label_text` values (case-insensitive) within a single payload.
+- Add backend tests covering uniqueness enforcement across upload and bulk save flows.
+- **Verification:** `uv run pytest` passes; `npm run test` passes.
+
+#### 15d: Shareable Viewer URLs *(High)*
+*Addresses: Users need to share what they are looking at — selected POI, search context, and zoom level — via a URL.*
+
+- In `ImageViewerPage`, read and write URL query parameters via `useSearchParams`:
+    - `fp` — selected fitting position ID.
+    - `q` — search query text.
+    - `src` — comma-separated active search sources.
+    - `z` — zoom level relative to fit scale (omit default `1.0`).
+- Add `updateViewerUrl()` callback using the functional form of `setSearchParams` to avoid stale merges.
+- Add `requestedZoomScale` prop on `DiagramCanvasViewport` that applies zoom as `fitScale × requestedZoomScale`. Track fit scale via `fitScaleRef`.
+- Guard initial zoom-to-fit from overwriting a shared zoom via `requestedZoomAppliedRef`.
+- On mount, restore selected POI, search context, and zoom from URL parameters.
+- Add tests covering URL restore from shared link, URL update on POI selection, URL update on search parameter changes, and zoom level encoding as fit-relative.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### 15e: Admin Edit Mode for Existing Images *(High)*
+*Addresses: Spec requirement "When editing an existing image, deleting mappings must be staged locally until the user completes Review and Save."*
+
+- Add "Select Existing Image" button at Step 1 that jumps directly to Step 3 (image selection) bypassing the upload step.
+- Step 3 shows all images of the selected drawing type. In edit mode, selecting an image loads its persisted fitting positions for editing.
+- Staged deletions of persisted mappings are tracked in `pendingDeletedPersistedMappings`. Canceling the workflow discards staged deletions.
+- On save, execute deletes first via `useDeleteFittingPosition`, then bulk save remaining positions, then navigate to image selection.
+- Add label uniqueness validation within a single image (case-insensitive) with error feedback on the label input.
+- **Verification:** `npm run test` passes.
+
+#### 15f: Image Selection & Viewer UX Refinements *(Medium)*
+*Addresses: UAT feedback on layout, tooltips, and navigation.*
+
+- Image Selection Screen: change from `Container maxWidth="lg"` to full-width responsive `Box` layout. Auto-select first drawing type on load. Add visible "Open Admin Upload" button as the admin entry point. Remove image search field from `ImageSelectionFilters`.
+- Image Viewer: style hover tooltip with MUI `Tooltip` using transparent background and themed Paper elevation. Add pinned tooltip on fitting position click with close button via `POITooltipCard.onClose`. Add back navigation button in `TopAppHeader`.
+- `SearchResultsPanel`: support controlled query and source props (`query`, `onQueryChange`, `activeSources`, `onActiveSourcesChange`) for URL state synchronisation.
+- `ImageTileCard`: enhance card styling for consistent grid height with `minHeight` and `objectFit: "cover"` on `CardMedia`.
+- **Verification:** `npm run test` passes; `npm run build` succeeds.
+
+#### Completion Criteria for Phase 15
+All of the following must pass before Phase 15 is considered complete:
+- `uv run pytest` — all backend tests pass.
+- `uv run mypy .` — no type errors.
+- `uv run ruff check .` — no lint errors.
+- `npm run test` — all frontend tests pass.
+- `npm run build` — production build succeeds.
+- `npm run lint` — no Biome errors.

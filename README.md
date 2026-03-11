@@ -64,12 +64,31 @@ DB_ASSET_USER=your_db_user
 DB_ASSET_PASSWORD=your_db_password
 ```
 
-### 4. Install dependencies and run
+### 4. Install dependencies and apply migrations
 
 ```bash
 cd backend
 uv sync
 uv run python manage.py migrate
+```
+
+### 5. Seed test data
+
+Seed the internal database with a drawing type, a placeholder image, and a fitting position:
+
+```bash
+uv run python manage.py seed_test_data
+```
+
+Seed the mock asset database with the schema and demo asset records:
+
+```bash
+uv run python manage.py setup_mock_asset_db
+```
+
+### 6. Start the backend server
+
+```bash
 uv run python manage.py runserver
 ```
 
@@ -80,6 +99,9 @@ The API will be available at `http://127.0.0.1:8000`.
 | Command | Description |
 |---|---|
 | `uv run python manage.py runserver` | Start the development server |
+| `uv run python manage.py migrate` | Apply database migrations |
+| `uv run python manage.py seed_test_data` | Seed a drawing type, image, and fitting position |
+| `uv run python manage.py setup_mock_asset_db` | Seed the mock asset database |
 | `uv run pytest` | Run tests |
 | `uv run mypy .` | Type check |
 | `uv run ruff check --fix .` | Lint and auto-fix |
@@ -113,3 +135,30 @@ The UI will be available at `http://localhost:5173`. API requests are proxied to
 | `npm test` | Run tests (single pass) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npx @biomejs/biome check --write .` | Lint and format |
+
+---
+
+## Running the Full Application
+
+Start both servers in separate terminals:
+
+**Terminal 1 — Backend:**
+```bash
+cd backend
+uv run python manage.py runserver
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+Open `http://localhost:5173` in Microsoft Edge. The frontend proxies all `/api` requests to the Django backend on port 8000.
+
+## UAT Notes
+
+- Open the admin upload workflow from the `Open Admin Upload` button on the main image-selection screen, or visit `http://localhost:5173/admin` directly.
+- A reusable SVG upload fixture for UAT is available at `docs/uat-assets/admin-upload-sample.svg`.
+- The admin header back arrow returns to the main image-selection screen.
+- Uploaded component names are unique across drawings, ignoring letter case and surrounding whitespace.

@@ -41,6 +41,7 @@ class ImageSerializer(serializers.ModelSerializer[Image]):
 class ImageDetailSerializer(serializers.ModelSerializer[Image]):
     drawing_type = DrawingTypeSerializer(read_only=True)
     image_svg = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Image
@@ -52,7 +53,16 @@ class ImageDetailSerializer(serializers.ModelSerializer[Image]):
             "height_px",
             "uploaded_at",
             "image_svg",
+            "thumbnail_url",
         ]
+
+    def get_thumbnail_url(self, obj: Image) -> str | None:
+        if obj.thumbnail:
+            import base64
+
+            encoded = base64.b64encode(bytes(obj.thumbnail)).decode("ascii")
+            return f"data:image/png;base64,{encoded}"
+        return None
 
     def get_image_svg(self, obj: Image) -> str:
         return bytes(obj.image_binary).decode("utf-8")
@@ -65,6 +75,8 @@ class FittingPositionSerializer(serializers.ModelSerializer[FittingPosition]):
             "fitting_position_id",
             "x_coordinate",
             "y_coordinate",
+            "width",
+            "height",
             "label_text",
             "is_active",
         ]
@@ -82,5 +94,7 @@ class FittingPositionDetailSerializer(serializers.Serializer[Any]):
     label_text = serializers.CharField()
     x_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
     y_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)
+    width = serializers.DecimalField(max_digits=10, decimal_places=3)
+    height = serializers.DecimalField(max_digits=10, decimal_places=3)
     asset = AssetInfoSerializer(allow_null=True)
     source_status = serializers.DictField(child=serializers.CharField())

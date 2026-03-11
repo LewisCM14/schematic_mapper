@@ -48,6 +48,27 @@ class TestImageModel:
         )
         assert "Cooling Assembly" in str(image)
 
+    def test_component_name_unique_ignoring_case_and_whitespace(
+        self, drawing_type: DrawingType
+    ) -> None:
+        Image.objects.create(
+            drawing_type=drawing_type,
+            component_name="Cooling Assembly",
+            image_binary=b"<svg/>",
+            content_hash="abc123",
+            width_px=800,
+            height_px=600,
+        )
+        with pytest.raises(IntegrityError):
+            Image.objects.create(
+                drawing_type=drawing_type,
+                component_name=" cooling assembly  ",
+                image_binary=b"<svg/>",
+                content_hash="def456",
+                width_px=800,
+                height_px=600,
+            )
+
 
 @pytest.mark.django_db
 class TestFittingPositionModel:

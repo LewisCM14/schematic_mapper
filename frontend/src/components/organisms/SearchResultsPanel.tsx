@@ -10,6 +10,10 @@ const AVAILABLE_SOURCES = ["internal", "asset"] as const;
 interface SearchResultsPanelProps {
 	imageId: string;
 	onSelectFp: (fittingPositionId: string, x: number, y: number) => void;
+	query?: string;
+	onQueryChange?: (value: string) => void;
+	activeSources?: string[];
+	onActiveSourcesChange?: (value: string[]) => void;
 	onSearchMetadata?: (
 		sourceStatus: Record<string, string>,
 		requestId: string,
@@ -20,19 +24,27 @@ interface SearchResultsPanelProps {
 function SearchResultsPanel({
 	imageId,
 	onSelectFp,
+	query: controlledQuery,
+	onQueryChange,
+	activeSources: controlledSources,
+	onActiveSourcesChange,
 	onSearchMetadata,
 }: SearchResultsPanelProps) {
-	const [query, setQuery] = useState("");
-	const [activeSources, setActiveSources] = useState<string[]>([
+	const [internalQuery, setInternalQuery] = useState("");
+	const [internalActiveSources, setInternalActiveSources] = useState<string[]>([
 		...AVAILABLE_SOURCES,
 	]);
+	const query = controlledQuery ?? internalQuery;
+	const setQuery = onQueryChange ?? setInternalQuery;
+	const activeSources = controlledSources ?? internalActiveSources;
+	const setActiveSources = onActiveSourcesChange ?? setInternalActiveSources;
 	const sentinelRef = useRef<HTMLDivElement | null>(null);
 
 	const toggleSource = (source: string) => {
-		setActiveSources((prev) =>
-			prev.includes(source)
-				? prev.filter((s) => s !== source)
-				: [...prev, source],
+		setActiveSources(
+			activeSources.includes(source)
+				? activeSources.filter((s) => s !== source)
+				: [...activeSources, source],
 		);
 	};
 

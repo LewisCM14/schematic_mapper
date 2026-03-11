@@ -1,3 +1,4 @@
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import MenuIcon from "@mui/icons-material/Menu";
 import { AppBar, Box, Toolbar } from "@mui/material";
@@ -10,23 +11,34 @@ interface TopAppHeaderProps {
 	title: string;
 	contextLabel?: string;
 	sourceStatus?: Record<string, string>;
+	onBack?: () => void;
 }
 
 function TopAppHeader({
 	title,
 	contextLabel,
 	sourceStatus,
+	onBack,
 }: TopAppHeaderProps) {
 	return (
 		<AppBar position="static" color="primary">
 			<Toolbar>
-				<IconButtonAction
-					icon={<MenuIcon />}
-					onClick={() => {}}
-					ariaLabel="navigation menu"
-					tooltip="Navigation (available in enterprise deployment)"
-					disabled
-				/>
+				{onBack ? (
+					<IconButtonAction
+						icon={<ArrowBackIcon />}
+						onClick={onBack}
+						ariaLabel="back to image selection"
+						tooltip="Back to image selection"
+					/>
+				) : (
+					<IconButtonAction
+						icon={<MenuIcon />}
+						onClick={() => {}}
+						ariaLabel="navigation menu"
+						tooltip="Navigation (available in enterprise deployment)"
+						disabled
+					/>
+				)}
 				<Box sx={{ flexGrow: 1, ml: 1 }}>
 					<HeaderIdentity title={title} contextLabel={contextLabel} />
 				</Box>

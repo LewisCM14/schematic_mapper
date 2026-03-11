@@ -9,6 +9,7 @@ interface AdminMappingTemplateProps {
 	activeStep: number;
 	showDisclaimer: boolean;
 	onDismissDisclaimer: () => void;
+	onBack?: () => void;
 	children: ReactNode;
 }
 
@@ -18,11 +19,12 @@ function AdminMappingTemplate({
 	activeStep,
 	showDisclaimer,
 	onDismissDisclaimer,
+	onBack,
 	children,
 }: AdminMappingTemplateProps) {
 	return (
 		<>
-			<TopAppHeader title={title} />
+			<TopAppHeader title={title} onBack={onBack} />
 			{showDisclaimer && (
 				<Alert
 					severity="warning"
@@ -33,7 +35,7 @@ function AdminMappingTemplate({
 					Authentication will be enforced in the enterprise deployment.
 				</Alert>
 			)}
-			<Box sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
+			<Box sx={{ width: "100%", px: { xs: 2, md: 3 }, py: 3 }}>
 				<Typography variant="h5" gutterBottom>
 					Admin — Upload &amp; Map
 				</Typography>

@@ -1,4 +1,5 @@
 import {
+	Box,
 	Card,
 	CardActionArea,
 	CardContent,
@@ -16,18 +17,28 @@ interface ImageTileCardProps {
 
 function ImageTileCard({ image, onClick }: ImageTileCardProps) {
 	return (
-		<Card>
-			<CardActionArea onClick={() => onClick(image.image_id)}>
-				{image.thumbnail_url ? (
-					<CardMedia
-						component="img"
-						image={image.thumbnail_url}
-						height={120}
-						alt={image.component_name}
-					/>
-				) : (
-					<Skeleton variant="rectangular" height={120} />
-				)}
+		<Card sx={{ height: "100%" }}>
+			<CardActionArea
+				onClick={() => onClick(image.image_id)}
+				sx={{
+					height: "100%",
+					display: "flex",
+					flexDirection: "column",
+					alignItems: "stretch",
+				}}
+			>
+				<Box sx={{ minHeight: 120, display: "flex", alignItems: "stretch" }}>
+					{image.thumbnail_url ? (
+						<CardMedia
+							component="img"
+							image={image.thumbnail_url}
+							alt={image.component_name}
+							sx={{ height: 120, objectFit: "cover" }}
+						/>
+					) : (
+						<Skeleton variant="rectangular" height={120} sx={{ width: "100%" }} />
+					)}
+				</Box>
 				<CardContent>
 					<Typography variant="h6" noWrap>
 						{image.component_name}

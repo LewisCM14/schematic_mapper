@@ -124,11 +124,17 @@ export async function abortUpload(uploadId: string) {
 	await httpClient.delete(`/admin/uploads/${uploadId}`);
 }
 
+export async function deleteFittingPosition(fittingPositionId: string) {
+	await httpClient.delete(`/admin/fitting-positions/${fittingPositionId}`);
+}
+
 export interface BulkFittingPositionItem {
 	fitting_position_id: string;
 	label_text: string;
 	x_coordinate: number;
 	y_coordinate: number;
+	width: number;
+	height: number;
 }
 
 export async function saveBulkFittingPositions(

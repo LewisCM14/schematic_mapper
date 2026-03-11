@@ -103,6 +103,8 @@ def get_fitting_position_details(
         "label_text": fp.label_text,
         "x_coordinate": fp.x_coordinate,
         "y_coordinate": fp.y_coordinate,
+        "width": fp.width,
+        "height": fp.height,
         "asset": asset_data,
         "source_status": {"asset": asset_result.source_status},
     }

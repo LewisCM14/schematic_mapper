@@ -3,6 +3,7 @@ from api.views.admin import (
     bulk_fitting_positions,
     complete_upload,
     create_upload_session,
+    delete_fitting_position,
     upload_chunk,
     upload_session_detail,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "bulk_fitting_positions",
     "complete_upload",
     "create_upload_session",
+    "delete_fitting_position",
     "get_fitting_position_details",
     "get_image",
     "health",

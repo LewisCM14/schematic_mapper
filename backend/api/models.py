@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.db.models.functions import Lower, Trim
 
 UPLOAD_STATE_INITIATED = "initiated"
 UPLOAD_STATE_UPLOADING = "uploading"
@@ -48,6 +49,12 @@ class Image(models.Model):
 
     class Meta:
         db_table = "images"
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim("component_name")),
+                name="uq_images_component_name_normalized",
+            )
+        ]
         indexes = [
             models.Index(fields=["component_name"], name="idx_images_component_name"),
         ]
@@ -63,6 +70,8 @@ class FittingPosition(models.Model):
     )
     x_coordinate = models.DecimalField(max_digits=10, decimal_places=3)
     y_coordinate = models.DecimalField(max_digits=10, decimal_places=3)
+    width = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    height = models.DecimalField(max_digits=10, decimal_places=3, default=0)
     label_text = models.CharField(max_length=100)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

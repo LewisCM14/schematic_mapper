@@ -1,4 +1,4 @@
-import { Box, Container, Typography } from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import type { DrawingType, Image } from "../../services/api/schemas";
 import ImageSelectionFilters from "../organisms/ImageSelectionFilters";
@@ -11,13 +11,12 @@ interface ImageSelectionTemplateProps {
 	drawingTypes: DrawingType[];
 	selectedTypeId: string | null;
 	onTypeChange: (id: string) => void;
-	searchValue: string;
-	onSearchChange: (value: string) => void;
 	images: Image[];
 	onImageClick: (imageId: string) => void;
 	hasNextPage?: boolean;
 	isFetchingNextPage?: boolean;
 	onLoadMore?: () => void;
+	onOpenAdmin?: () => void;
 	showGrid: boolean;
 	stateSlot: ReactNode;
 	imagesLoading?: boolean;
@@ -31,13 +30,12 @@ function ImageSelectionTemplate({
 	drawingTypes,
 	selectedTypeId,
 	onTypeChange,
-	searchValue,
-	onSearchChange,
 	images,
 	onImageClick,
 	hasNextPage,
 	isFetchingNextPage,
 	onLoadMore,
+	onOpenAdmin,
 	showGrid,
 	stateSlot,
 	imagesLoading,
@@ -47,17 +45,29 @@ function ImageSelectionTemplate({
 	return (
 		<>
 			<TopAppHeader title={title} />
-			<Container maxWidth="lg" sx={{ mt: 3 }}>
-				<Typography variant="body1" color="text.secondary" gutterBottom>
-					{description}
-				</Typography>
+			<Box sx={{ width: "100%", px: { xs: 2, md: 3 }, py: 3 }}>
+				<Box
+					sx={{
+						display: "flex",
+						justifyContent: "space-between",
+						alignItems: { xs: "flex-start", sm: "center" },
+						gap: 2,
+						flexWrap: "wrap",
+						mb: 2,
+					}}
+				>
+					<Typography variant="body1" color="text.secondary">
+						{description}
+					</Typography>
+					<Button variant="contained" onClick={onOpenAdmin}>
+						Open Admin Upload
+					</Button>
+				</Box>
 
 				<ImageSelectionFilters
 					drawingTypes={drawingTypes}
 					selectedTypeId={selectedTypeId}
 					onTypeChange={onTypeChange}
-					searchValue={searchValue}
-					onSearchChange={onSearchChange}
 				/>
 
 				<Box sx={{ mt: 4 }}>
@@ -76,7 +86,7 @@ function ImageSelectionTemplate({
 						/>
 					)}
 				</Box>
-			</Container>
+			</Box>
 		</>
 	);
 }

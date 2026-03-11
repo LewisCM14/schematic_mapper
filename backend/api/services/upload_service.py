@@ -5,6 +5,8 @@ import hashlib
 import logging
 import time
 
+from django.db import IntegrityError
+from django.db.models.functions import Lower, Trim
 from django.shortcuts import get_object_or_404
 
 from api.constants import MAX_CONCURRENT_UPLOADS, MAX_UPLOAD_SIZE_BYTES
@@ -23,6 +25,53 @@ from api.models import (
 from api.services.image_service import generate_thumbnail, parse_svg_dimensions
 
 logger = logging.getLogger("api")
+
+DUPLICATE_COMPONENT_NAME_CODE = "duplicate_component_name"
+DUPLICATE_COMPONENT_NAME_MESSAGE = (
+    "Component name already exists. Names must be unique ignoring letter case "
+    "and surrounding whitespace."
+)
+
+
+def normalize_component_name(component_name: str) -> str:
+    return component_name.strip()
+
+
+def image_component_name_exists(component_name: str) -> bool:
+    normalized_name = component_name.casefold()
+    return (
+        Image.objects.annotate(
+            normalized_component_name=Lower(Trim("component_name"))
+        )
+        .filter(normalized_component_name=normalized_name)
+        .exists()
+    )
+
+
+def active_upload_name_exists(
+    component_name: str, *, exclude_upload_id: object | None = None
+) -> bool:
+    normalized_name = component_name.casefold()
+    active_states = [
+        UPLOAD_STATE_INITIATED,
+        UPLOAD_STATE_UPLOADING,
+        UPLOAD_STATE_VERIFYING,
+    ]
+    queryset = ImageUpload.objects.filter(state__in=active_states).annotate(
+        normalized_component_name=Lower(Trim("component_name"))
+    )
+    if exclude_upload_id is not None:
+        queryset = queryset.exclude(pk=exclude_upload_id)
+    return queryset.filter(normalized_component_name=normalized_name).exists()
+
+
+def has_component_name_conflict(
+    component_name: str, *, exclude_upload_id: object | None = None
+) -> bool:
+    return image_component_name_exists(component_name) or active_upload_name_exists(
+        component_name,
+        exclude_upload_id=exclude_upload_id,
+    )
 
 
 def create_session(
@@ -52,10 +101,14 @@ def create_session(
     if active_count >= MAX_CONCURRENT_UPLOADS:
         raise PermissionError("upload_limit_reached")
 
+    normalized_component_name = normalize_component_name(component_name)
+    if has_component_name_conflict(normalized_component_name):
+        raise FileExistsError(DUPLICATE_COMPONENT_NAME_CODE)
+
     drawing_type = get_object_or_404(DrawingType, pk=drawing_type_id)
     session = ImageUpload.objects.create(
         drawing_type=drawing_type,
-        component_name=component_name,
+        component_name=normalized_component_name,
         file_name=file_name,
         file_size=file_size,
         expected_checksum=expected_checksum,
@@ -159,19 +212,44 @@ def complete_upload(
 
     width_px, height_px = parse_svg_dimensions(assembled)
 
-    image = Image.objects.create(
-        drawing_type=session.drawing_type,
-        component_name=session.component_name,
-        image_binary=assembled,
-        content_hash=actual_checksum,
-        width_px=width_px,
-        height_px=height_px,
-        thumbnail=generate_thumbnail(assembled),
-    )
+    session.component_name = normalize_component_name(session.component_name)
+    if has_component_name_conflict(
+        session.component_name, exclude_upload_id=session.upload_id
+    ):
+        session.state = UPLOAD_STATE_FAILED
+        session.error_message = DUPLICATE_COMPONENT_NAME_MESSAGE
+        session.save(
+            update_fields=["state", "error_message", "component_name", "updated_at"]
+        )
+        return {
+            "error": DUPLICATE_COMPONENT_NAME_MESSAGE,
+            "code": DUPLICATE_COMPONENT_NAME_CODE,
+        }, 409
+
+    try:
+        image = Image.objects.create(
+            drawing_type=session.drawing_type,
+            component_name=session.component_name,
+            image_binary=assembled,
+            content_hash=actual_checksum,
+            width_px=width_px,
+            height_px=height_px,
+            thumbnail=generate_thumbnail(assembled),
+        )
+    except IntegrityError:
+        session.state = UPLOAD_STATE_FAILED
+        session.error_message = DUPLICATE_COMPONENT_NAME_MESSAGE
+        session.save(
+            update_fields=["state", "error_message", "component_name", "updated_at"]
+        )
+        return {
+            "error": DUPLICATE_COMPONENT_NAME_MESSAGE,
+            "code": DUPLICATE_COMPONENT_NAME_CODE,
+        }, 409
 
     session.state = UPLOAD_STATE_COMPLETED
     session.image = image
-    session.save(update_fields=["state", "image", "updated_at"])
+    session.save(update_fields=["state", "image", "component_name", "updated_at"])
     session.chunks.all().delete()
 
     duration_ms = int((time.monotonic() - t_start) * 1000)
@@ -229,6 +307,13 @@ def admin_upload_image(
 ) -> tuple[dict[str, object], int]:
     """Single-request admin image upload. Returns (payload, http_status)."""
     drawing_type = get_object_or_404(DrawingType, pk=drawing_type_id)
+    normalized_component_name = normalize_component_name(component_name)
+
+    if has_component_name_conflict(normalized_component_name):
+        return {
+            "error": DUPLICATE_COMPONENT_NAME_MESSAGE,
+            "code": DUPLICATE_COMPONENT_NAME_CODE,
+        }, 409
 
     try:
         file_bytes = base64.b64decode(image_data_b64, validate=True)
@@ -249,15 +334,21 @@ def admin_upload_image(
 
     width_px, height_px = parse_svg_dimensions(file_bytes)
 
-    image = Image.objects.create(
-        drawing_type=drawing_type,
-        component_name=component_name,
-        image_binary=file_bytes,
-        content_hash=actual_checksum,
-        width_px=width_px,
-        height_px=height_px,
-        thumbnail=generate_thumbnail(file_bytes),
-    )
+    try:
+        image = Image.objects.create(
+            drawing_type=drawing_type,
+            component_name=normalized_component_name,
+            image_binary=file_bytes,
+            content_hash=actual_checksum,
+            width_px=width_px,
+            height_px=height_px,
+            thumbnail=generate_thumbnail(file_bytes),
+        )
+    except IntegrityError:
+        return {
+            "error": DUPLICATE_COMPONENT_NAME_MESSAGE,
+            "code": DUPLICATE_COMPONENT_NAME_CODE,
+        }, 409
 
     return {
         "image": image,

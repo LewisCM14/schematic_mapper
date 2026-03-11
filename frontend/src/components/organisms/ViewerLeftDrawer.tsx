@@ -11,6 +11,10 @@ interface ViewerLeftDrawerProps {
 	imageId: string;
 	selectedFpId: string | null;
 	onSelectFp: (fittingPositionId: string, x: number, y: number) => void;
+	searchQuery?: string;
+	onSearchQueryChange?: (value: string) => void;
+	activeSources?: string[];
+	onActiveSourcesChange?: (value: string[]) => void;
 	onSearchMetadata?: (
 		sourceStatus: Record<string, string>,
 		requestId: string,
@@ -26,6 +30,10 @@ function ViewerLeftDrawer({
 	imageId,
 	selectedFpId,
 	onSelectFp,
+	searchQuery,
+	onSearchQueryChange,
+	activeSources,
+	onActiveSourcesChange,
 	onSearchMetadata,
 	activeTab: controlledTab,
 	onTabChange,
@@ -77,14 +85,26 @@ function ViewerLeftDrawer({
 					/>
 				</Tabs>
 			</Box>
-			{activeTab === 0 && (
+			<Box
+				sx={{ display: activeTab === 0 ? "block" : "none", height: "100%" }}
+				aria-hidden={activeTab !== 0}
+			>
 				<SearchResultsPanel
 					imageId={imageId}
 					onSelectFp={onSelectFp}
+					query={searchQuery}
+					onQueryChange={onSearchQueryChange}
+					activeSources={activeSources}
+					onActiveSourcesChange={onActiveSourcesChange}
 					onSearchMetadata={onSearchMetadata}
 				/>
-			)}
-			{activeTab === 1 && <POIDetailPanel fittingPositionId={selectedFpId} />}
+			</Box>
+			<Box
+				sx={{ display: activeTab === 1 ? "block" : "none", height: "100%" }}
+				aria-hidden={activeTab !== 1}
+			>
+				<POIDetailPanel fittingPositionId={selectedFpId} />
+			</Box>
 		</Drawer>
 	);
 }

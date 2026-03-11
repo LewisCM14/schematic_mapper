@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import axios from "axios";
 import { UPLOAD_CHUNK_SIZE } from "../config";
 import { arrayBufferToBase64, sha256Hex } from "../fileUtils";
 import {
@@ -51,6 +52,21 @@ export function useChunkedUpload(): [ChunkedUploadState, ChunkedUploadActions] {
 		createSession.isPending ||
 		uploadChunkMut.isPending ||
 		completeUploadMut.isPending;
+
+	function getUploadErrorMessage(error: unknown): string {
+		if (axios.isAxiosError(error)) {
+			const apiError = error.response?.data;
+			if (
+				apiError &&
+				typeof apiError === "object" &&
+				"error" in apiError &&
+				typeof apiError.error === "string"
+			) {
+				return apiError.error;
+			}
+		}
+		return error instanceof Error ? error.message : "Upload failed";
+	}
 
 	async function start({
 		drawingTypeId,
@@ -101,8 +117,7 @@ export function useChunkedUpload(): [ChunkedUploadState, ChunkedUploadActions] {
 			setCompletedImageId(result.image_id);
 			setProgress(100);
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : "Upload failed";
-			setError(msg);
+			setError(getUploadErrorMessage(err));
 		}
 	}
 

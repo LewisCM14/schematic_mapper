@@ -3,20 +3,31 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FIXTURES, IMAGE_ID, server } from "../test/handlers";
 import theme from "../theme";
 import ImageViewerPage from "./ImageViewerPage";
 
-function renderPage(imageId = IMAGE_ID) {
+function LocationProbe() {
+	const location = useLocation();
+	return <div data-testid="location-probe">{`${location.pathname}${location.search}`}</div>;
+}
+
+function getProbeSearchParams() {
+	const probeText = screen.getByTestId("location-probe").textContent ?? "";
+	return new URL(`http://localhost${probeText}`).searchParams;
+}
+
+function renderPage(imageId = IMAGE_ID, search = "") {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false, gcTime: 0 } },
 	});
 	return render(
 		<ThemeProvider theme={theme}>
-			<MemoryRouter initialEntries={[`/viewer/${imageId}`]}>
+			<MemoryRouter initialEntries={[`/viewer/${imageId}${search}`]}>
 				<QueryClientProvider client={client}>
+					<LocationProbe />
 					<Routes>
 						<Route path="/viewer/:imageId" element={<ImageViewerPage />} />
 						<Route path="/" element={<div>Home</div>} />
@@ -70,6 +81,29 @@ describe("ImageViewerPage", () => {
 				screen.getByRole("button", { name: "FP-PUMP-01-INLET" }),
 			).toBeInTheDocument();
 		});
+	});
+
+	it("keeps saved rectangle areas interactive without rendering them visibly", async () => {
+		server.use(
+			http.get("/api/images/:imageId/fitting-positions", () =>
+				HttpResponse.json([
+					{
+						fitting_position_id: "FP-RECT-01",
+						x_coordinate: 300,
+						y_coordinate: 250,
+						width: 80,
+						height: 40,
+						label_text: "FP-RECT-01",
+						is_active: true,
+					},
+				]),
+			),
+		);
+		renderPage();
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: "FP-RECT-01" })).toBeInTheDocument();
+		});
+		expect(screen.queryByLabelText("rectangle FP-RECT-01")).not.toBeInTheDocument();
 	});
 
 	it("shows error when image fails to load", async () => {
@@ -282,6 +316,185 @@ describe("ImageViewerPage", () => {
 				"aria-selected",
 				"true",
 			);
+		});
+	});
+
+	it("preserves the search entry after selecting a search result", async () => {
+		server.use(
+			http.get("/api/search", () =>
+				HttpResponse.json({
+					query: "pump",
+					image_id: IMAGE_ID,
+					limit: 25,
+					results: [
+						{
+							fitting_position_id: "FP-001",
+							label_text: "PUMP-01",
+							image_id: IMAGE_ID,
+							x_coordinate: 100,
+							y_coordinate: 200,
+							component_name: "Cooling System",
+							matched_source: "internal",
+							matched_field: "label_text",
+							match_type: "exact",
+						},
+					],
+					source_status: { internal: "ok", asset: "ok" },
+					has_more: false,
+					next_cursor: null,
+					request_id: "req-test-persist-1",
+				}),
+			),
+		);
+		renderPage();
+
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
+		await userEvent.type(input, "pump");
+
+		const resultItem = await screen.findByText("PUMP-01");
+		await userEvent.click(resultItem);
+
+		await waitFor(() => {
+			expect(screen.getByRole("tab", { name: /information/i })).toHaveAttribute(
+				"aria-selected",
+				"true",
+			);
+		});
+
+		await userEvent.click(screen.getByRole("tab", { name: /search/i }));
+
+		expect(
+			screen.getByRole("textbox", { name: /search fitting positions/i }),
+		).toHaveValue("pump");
+	});
+
+	it("pins a diagram tooltip open after selecting a result from the left panel", async () => {
+		server.use(
+			http.get("/api/search", () =>
+				HttpResponse.json({
+					query: "pump",
+					image_id: IMAGE_ID,
+					limit: 25,
+					results: [
+						{
+							fitting_position_id: "FP-PUMP-01-INLET",
+							label_text: "FP-PUMP-01-INLET",
+							image_id: IMAGE_ID,
+							x_coordinate: 300,
+							y_coordinate: 250,
+							component_name: "Cooling System",
+							matched_source: "internal",
+							matched_field: "label_text",
+							match_type: "exact",
+						},
+					],
+					source_status: { internal: "ok", asset: "ok" },
+					has_more: false,
+					next_cursor: null,
+					request_id: "req-test-pinned-tooltip",
+				}),
+			),
+		);
+		renderPage();
+
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
+		await userEvent.type(input, "pump");
+
+		await userEvent.click(await screen.findByText("FP-PUMP-01-INLET"));
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole("button", { name: /close tooltip/i }),
+			).toBeInTheDocument();
+		});
+
+		await userEvent.click(screen.getByRole("button", { name: /close tooltip/i }));
+
+		await waitFor(() => {
+			expect(
+				screen.queryByRole("button", { name: /close tooltip/i }),
+			).not.toBeInTheDocument();
+		});
+	});
+
+	it("restores a selected POI from the shared URL", async () => {
+		renderPage(IMAGE_ID, "?fp=FP-PUMP-01-INLET");
+
+		await waitFor(() => {
+			expect(screen.getByRole("tab", { name: /information/i })).toHaveAttribute(
+				"aria-selected",
+				"true",
+			);
+		});
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole("button", { name: /close tooltip/i }),
+			).toBeInTheDocument();
+		});
+	});
+
+	it("restores search parameters and zoom level from the shared URL", async () => {
+		renderPage(IMAGE_ID, "?fp=FP-PUMP-01-INLET&q=pump&src=internal&z=1.5");
+
+		await waitFor(() => {
+			expect(screen.getByRole("tab", { name: /information/i })).toHaveAttribute(
+				"aria-selected",
+				"true",
+			);
+		});
+
+		await userEvent.click(screen.getByRole("tab", { name: /search/i }));
+
+		await waitFor(() => {
+			expect(
+				screen.getByRole("textbox", { name: /search fitting positions/i }),
+			).toHaveValue("pump");
+		});
+
+		expect(screen.getByRole("button", { name: "internal" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		expect(screen.getByRole("button", { name: "asset" })).toHaveAttribute(
+			"aria-pressed",
+			"false",
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText("1.5×")).toBeInTheDocument();
+		});
+	});
+
+	it("updates the URL when a POI is selected", async () => {
+		renderPage();
+
+		const marker = await screen.findByRole("button", {
+			name: "FP-PUMP-01-INLET",
+		});
+		await userEvent.click(marker);
+
+		await waitFor(() => {
+			expect(getProbeSearchParams().get("fp")).toBe("FP-PUMP-01-INLET");
+		});
+	});
+
+	it("updates the URL when search parameters change", async () => {
+		renderPage();
+
+		const input = await screen.findByRole("textbox", {
+			name: /search fitting positions/i,
+		});
+		await userEvent.type(input, "pump");
+		await userEvent.click(screen.getByRole("button", { name: "asset" }));
+
+		await waitFor(() => {
+			expect(getProbeSearchParams().get("q")).toBe("pump");
+			expect(getProbeSearchParams().get("src")).toBe("internal");
 		});
 	});
 

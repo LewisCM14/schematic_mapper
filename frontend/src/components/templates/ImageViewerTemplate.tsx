@@ -1,6 +1,9 @@
 import { Box, CircularProgress, Typography } from "@mui/material";
 import type { ReactNode } from "react";
-import type { CanvasMarker } from "../organisms/DiagramCanvasViewport";
+import type {
+	CanvasMarker,
+	CanvasRectangle,
+} from "../organisms/DiagramCanvasViewport";
 import DiagramCanvasViewport from "../organisms/DiagramCanvasViewport";
 import TopAppHeader from "../organisms/TopAppHeader";
 import ViewerFooterStatusBar from "../organisms/ViewerFooterStatusBar";
@@ -9,10 +12,15 @@ import ViewerLeftDrawer from "../organisms/ViewerLeftDrawer";
 interface ImageViewerTemplateProps {
 	title: string;
 	contextLabel?: string;
+	onBack?: () => void;
 	drawerWidth: number;
 	imageId: string;
 	selectedFpId: string | null;
 	onSelectFp: (fpId: string, x: number, y: number) => void;
+	searchQuery?: string;
+	onSearchQueryChange?: (value: string) => void;
+	activeSources?: string[];
+	onActiveSourcesChange?: (value: string[]) => void;
 	onSearchMetadata?: (
 		sourceStatus: Record<string, string>,
 		requestId: string,
@@ -26,6 +34,10 @@ interface ImageViewerTemplateProps {
 	isError: boolean;
 	imageSvgUrl?: string;
 	markers: CanvasMarker[];
+	rectangles?: CanvasRectangle[];
+	pinnedTooltipId?: string | null;
+	pinnedTooltipContent?: ReactNode;
+	requestedZoomScale?: number | null;
 	onMarkerClick: (id: string) => void;
 	onZoomChange: (zoom: number) => void;
 	panToTarget: { x: number; y: number } | null;
@@ -43,10 +55,15 @@ interface ImageViewerTemplateProps {
 function ImageViewerTemplate({
 	title,
 	contextLabel,
+	onBack,
 	drawerWidth,
 	imageId,
 	selectedFpId,
 	onSelectFp,
+	searchQuery,
+	onSearchQueryChange,
+	activeSources,
+	onActiveSourcesChange,
 	onSearchMetadata,
 	activeTab,
 	onTabChange,
@@ -56,6 +73,10 @@ function ImageViewerTemplate({
 	isError,
 	imageSvgUrl,
 	markers,
+	rectangles = [],
+	pinnedTooltipId = null,
+	pinnedTooltipContent,
+	requestedZoomScale = null,
 	onMarkerClick,
 	onZoomChange,
 	panToTarget,
@@ -71,6 +92,7 @@ function ImageViewerTemplate({
 			<TopAppHeader
 				title={title}
 				contextLabel={contextLabel}
+				onBack={onBack}
 				sourceStatus={
 					Object.keys(sourceStatus).length > 0 ? sourceStatus : undefined
 				}
@@ -83,6 +105,10 @@ function ImageViewerTemplate({
 					imageId={imageId}
 					selectedFpId={selectedFpId}
 					onSelectFp={onSelectFp}
+					searchQuery={searchQuery}
+					onSearchQueryChange={onSearchQueryChange}
+					activeSources={activeSources}
+					onActiveSourcesChange={onActiveSourcesChange}
 					onSearchMetadata={onSearchMetadata}
 					activeTab={activeTab}
 					onTabChange={onTabChange}
@@ -114,6 +140,12 @@ function ImageViewerTemplate({
 						<DiagramCanvasViewport
 							imageSvgUrl={imageSvgUrl}
 							markers={markers}
+							rectangles={rectangles}
+							showMappedRectangles={false}
+							interactiveMappedRectangles
+							pinnedTooltipId={pinnedTooltipId}
+							pinnedTooltipContent={pinnedTooltipContent}
+							requestedZoomScale={requestedZoomScale}
 							onMarkerClick={onMarkerClick}
 							onZoomChange={onZoomChange}
 							panToTarget={panToTarget}
