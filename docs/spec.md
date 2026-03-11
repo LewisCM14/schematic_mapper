@@ -2465,11 +2465,103 @@ After Phase 14, the prototype achieves full conformance with all non-implementat
 - `ImageTileCard`: enhance card styling for consistent grid height with `minHeight` and `objectFit: "cover"` on `CardMedia`.
 - **Verification:** `npm run test` passes; `npm run build` succeeds.
 
-#### Completion Criteria for Phase 15
-All of the following must pass before Phase 15 is considered complete:
-- `uv run pytest` — all backend tests pass.
-- `uv run mypy .` — no type errors.
-- `uv run ruff check .` — no lint errors.
-- `npm run test` — all frontend tests pass.
-- `npm run build` — production build succeeds.
-- `npm run lint` — no Biome errors.
+
+### Phase 16 — Spec Documentation Alignment
+**Goal:** Update the non-implementation design sections of this specification to accurately reflect the current codebase. A full audit of the prototype against all non-implementation sections found the code to be structurally and functionally conformant. The remaining gaps are documentation drift where design sections were not updated during Phases 10–15.
+
+#### 16a: Query and Mutation Mapping — Remove `search` from Image Selection *(Medium)*
+*Addresses: The Query and Mutation Mapping for Image Selection Screen lists `useQuery: GET /api/images with filters (drawingType, search, cursor)`, but the `search` filter was removed from Image Selection in Phase 15f. The wireframe was updated but the query mapping was not.*
+
+- In the "Query and Mutation Mapping" subsection under "Image Selection Screen", change:
+    - `useQuery`: `GET /api/images` with filters (`drawingType`, `search`, `cursor`).
+    to:
+    - `useQuery`: `GET /api/images` with filters (`drawingType`, `cursor`).
+- **Verification:** Manual review confirms the spec text matches the codebase behaviour.
+
+#### 16b: Query and Mutation Mapping — Add Drawing Types Queries *(Medium)*
+*Addresses: Both `ImageSelectionPage` and `AdminUploadMappingPage` use `useQuery: GET /api/drawing-types` via the `useDrawingTypes` hook. This query is not listed in the Query and Mutation Mapping section for either screen.*
+
+- In the "Query and Mutation Mapping" subsection, add to "Image Selection Screen":
+    - `useQuery`: `GET /api/drawing-types` for drawing type dropdown.
+- Add the same entry to "Admin Upload and Mapping Screen":
+    - `useQuery`: `GET /api/drawing-types` for drawing type selection in Step 1.
+- **Verification:** Manual review confirms the spec text matches the codebase hook usage.
+
+#### 16c: Query and Mutation Mapping — Add Missing Admin Mutations *(Medium)*
+*Addresses: Two admin mutations exist in the codebase but are not listed in the Query and Mutation Mapping section for the Admin Upload and Mapping Screen.*
+
+- Add to "Admin Upload and Mapping Screen":
+    - `useMutation`: `DELETE /api/admin/fitting-positions/{fitting_position_id}` (delete individual fitting position).
+    - `useMutation`: `POST /api/admin/images` (single-request image upload for small files).
+- **Verification:** Manual review confirms the spec text matches the codebase hook and endpoint registrations.
+
+#### 16d: Caching Policy — Add Drawing Types Entry *(Low)*
+*Addresses: `GET /api/drawing-types` has cache timings in the codebase (`staleTime: 30 minutes`, `gcTime: 60 minutes`) but the Caching Policy (Client) section does not include an entry for this endpoint.*
+
+- Add the following entry to the "Caching Policy (Client)" subsection:
+    - `GET /api/drawing-types`
+        - `staleTime`: 30 minutes
+        - `gcTime`: 60 minutes
+- **Verification:** Manual review confirms the spec values match `config.ts` constants.
+
+#### 16e: Component Inventory — Add `SourceFilterChips` Molecule *(Low)*
+*Addresses: `SourceFilterChips` exists at `src/components/molecules/SourceFilterChips.tsx` with a co-located test file, is composed into `SearchResultsPanel`, and provides toggle chips for search source selection. It is not listed in the spec's Molecules component inventory.*
+
+- Add to the "Molecules" subsection of the "Components" section:
+    - `SourceFilterChips`: toggle chips for search source selection (`internal`, `asset`, `sensor`) with disabled state and tooltip for unavailable sources.
+- **Verification:** Manual review confirms the spec component list matches the codebase file inventory.
+
+#### Completion Criteria for Phase 16
+- All updates are text-only changes to the non-implementation design sections of this specification.
+- Every updated section accurately reflects the current codebase state.
+- No code changes are required.
+
+### Phase 16 — Spec Documentation Alignment
+**Goal:** Update the non-implementation design sections of this specification to accurately reflect the current codebase. A full audit of the prototype against all non-implementation sections found the code to be structurally and functionally conformant. The remaining gaps are documentation drift where design sections were not updated during Phases 10–15.
+
+#### 16a: Query and Mutation Mapping — Remove `search` from Image Selection *(Medium)*
+*Addresses: The Query and Mutation Mapping for Image Selection Screen lists `useQuery: GET /api/images with filters (drawingType, search, cursor)`, but the `search` filter was removed from Image Selection in Phase 15f. The wireframe was updated but the query mapping was not.*
+
+- In the "Query and Mutation Mapping" subsection under "Image Selection Screen", change:
+    - `useQuery`: `GET /api/images` with filters (`drawingType`, `search`, `cursor`).
+    to:
+    - `useQuery`: `GET /api/images` with filters (`drawingType`, `cursor`).
+- **Verification:** Manual review confirms the spec text matches the codebase behaviour.
+
+#### 16b: Query and Mutation Mapping — Add Drawing Types Queries *(Medium)*
+*Addresses: Both `ImageSelectionPage` and `AdminUploadMappingPage` use `useQuery: GET /api/drawing-types` via the `useDrawingTypes` hook. This query is not listed in the Query and Mutation Mapping section for either screen.*
+
+- In the "Query and Mutation Mapping" subsection, add to "Image Selection Screen":
+    - `useQuery`: `GET /api/drawing-types` for drawing type dropdown.
+- Add the same entry to "Admin Upload and Mapping Screen":
+    - `useQuery`: `GET /api/drawing-types` for drawing type selection in Step 1.
+- **Verification:** Manual review confirms the spec text matches the codebase hook usage.
+
+#### 16c: Query and Mutation Mapping — Add Missing Admin Mutations *(Medium)*
+*Addresses: Two admin mutations exist in the codebase but are not listed in the Query and Mutation Mapping section for the Admin Upload and Mapping Screen.*
+
+- Add to "Admin Upload and Mapping Screen":
+    - `useMutation`: `DELETE /api/admin/fitting-positions/{fitting_position_id}` (delete individual fitting position).
+    - `useMutation`: `POST /api/admin/images` (single-request image upload for small files).
+- **Verification:** Manual review confirms the spec text matches the codebase hook and endpoint registrations.
+
+#### 16d: Caching Policy — Add Drawing Types Entry *(Low)*
+*Addresses: `GET /api/drawing-types` has cache timings in the codebase (`staleTime: 30 minutes`, `gcTime: 60 minutes`) but the Caching Policy (Client) section does not include an entry for this endpoint.*
+
+- Add the following entry to the "Caching Policy (Client)" subsection:
+    - `GET /api/drawing-types`
+        - `staleTime`: 30 minutes
+        - `gcTime`: 60 minutes
+- **Verification:** Manual review confirms the spec values match `config.ts` constants.
+
+#### 16e: Component Inventory — Add `SourceFilterChips` Molecule *(Low)*
+*Addresses: `SourceFilterChips` exists at `src/components/molecules/SourceFilterChips.tsx` with a co-located test file, is composed into `SearchResultsPanel`, and provides toggle chips for search source selection. It is not listed in the spec's Molecules component inventory.*
+
+- Add to the "Molecules" subsection of the "Components" section:
+    - `SourceFilterChips`: toggle chips for search source selection (`internal`, `asset`, `sensor`) with disabled state and tooltip for unavailable sources.
+- **Verification:** Manual review confirms the spec component list matches the codebase file inventory.
+
+#### Completion Criteria for Phase 16
+- All updates are text-only changes to the non-implementation design sections of this specification.
+- Every updated section accurately reflects the current codebase state.
+- No code changes are required.
