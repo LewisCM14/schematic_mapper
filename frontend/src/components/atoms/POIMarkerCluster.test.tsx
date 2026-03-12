@@ -34,4 +34,18 @@ describe("POIMarkerCluster", () => {
 		await userEvent.click(screen.getByRole("button"));
 		expect(onClick).toHaveBeenCalledOnce();
 	});
+
+	it("calls onClick when Enter or Space is pressed", async () => {
+		const onClick = vi.fn();
+		render(
+			<ThemeProvider theme={theme}>
+				<POIMarkerCluster count={7} onClick={onClick} />
+			</ThemeProvider>,
+		);
+		const button = screen.getByRole("button");
+		await userEvent.type(button, "{enter}");
+		await userEvent.type(button, " ");
+		// userEvent.type triggers both keydown and keypress, so onClick is called twice per key
+		expect(onClick).toHaveBeenCalledTimes(4);
+	});
 });

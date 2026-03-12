@@ -97,7 +97,9 @@ export function useDeleteFittingPosition() {
 				queryKey: queryKeys.images.fittingPositions(variables.imageId),
 			});
 			queryClient.invalidateQueries({
-				queryKey: queryKeys.fittingPositions.detail(variables.fittingPositionId),
+				queryKey: queryKeys.fittingPositions.detail(
+					variables.fittingPositionId,
+				),
 			});
 			queryClient.invalidateQueries({
 				queryKey: ["search", variables.imageId],

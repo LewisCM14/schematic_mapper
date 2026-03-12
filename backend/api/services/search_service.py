@@ -52,7 +52,9 @@ def normalize(value: str, rules: list[str]) -> str:
     return result
 
 
-def _match_type(value: str, query: str, config: SourceSearchConfig | None = None) -> MatchType | None:
+def _match_type(
+    value: str, query: str, config: SourceSearchConfig | None = None
+) -> MatchType | None:
     rules = config.normalization_rules if config else ["case_fold", "trim"]
     norm_val = normalize(value, rules)
     norm_q = normalize(query, rules)

@@ -40,6 +40,15 @@ function renderBar(
 }
 
 describe("FilterBar", () => {
+	it("calls onSearchChange with empty string when clear button is clicked", async () => {
+		const onSearchChange = vi.fn();
+		const user = userEvent.setup();
+		renderBar(null, vi.fn(), "pump", onSearchChange);
+		// Find the clear button by its aria-label
+		const clearButton = screen.getByRole("button", { name: /clear search/i });
+		await user.click(clearButton);
+		expect(onSearchChange).toHaveBeenCalledWith("");
+	});
 	it("renders the drawing type dropdown", () => {
 		renderBar();
 		expect(

@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { FIXTURES, IMAGE_ID } from "../../../test/handlers";
 import { queryKeys } from "../queryKeys";
-import { useImage, useImages } from "./useImages";
+import { getNextPageParam, useImage, useImages } from "./useImages";
 
 function makeWrapper() {
 	const queryClient = new QueryClient({
@@ -18,6 +18,29 @@ function makeWrapper() {
 }
 
 describe("useImages", () => {
+	describe("getNextPageParam (unit)", () => {
+		it("returns next_cursor when has_more is true and next_cursor is present", () => {
+			expect(getNextPageParam({ has_more: true, next_cursor: "abc" })).toBe(
+				"abc",
+			);
+		});
+		it("returns undefined when has_more is true but next_cursor is missing", () => {
+			expect(getNextPageParam({ has_more: true })).toBeUndefined();
+		});
+		it("returns undefined when has_more is false", () => {
+			expect(
+				getNextPageParam({ has_more: false, next_cursor: "abc" }),
+			).toBeUndefined();
+			expect(getNextPageParam({ has_more: false })).toBeUndefined();
+		});
+	});
+	it("applies both drawingTypeId and search filters", async () => {
+		const { wrapper } = makeWrapper();
+		const { result } = renderHook(() => useImages(1, "cooling"), { wrapper });
+		await waitFor(() => expect(result.current.isSuccess).toBe(true));
+		expect(result.current.data).toBeDefined();
+	});
+
 	it("returns image list data on success", async () => {
 		const { wrapper } = makeWrapper();
 		const { result } = renderHook(() => useImages(), { wrapper });

@@ -38,9 +38,7 @@ class TestCleanupUploads:
         # Force updated_at to past
         ImageUpload.objects.filter(pk=session.pk).update(updated_at=stale_time)
 
-        UploadChunk.objects.create(
-            upload=session, part_number=1, data=b"chunk-data"
-        )
+        UploadChunk.objects.create(upload=session, part_number=1, data=b"chunk-data")
 
         call_command("cleanup_uploads")
 
@@ -48,9 +46,7 @@ class TestCleanupUploads:
         assert session.state == UPLOAD_STATE_ABORTED
         assert session.chunks.count() == 0
 
-    def test_does_not_touch_recent_sessions(
-        self, _drawing_type: DrawingType
-    ) -> None:
+    def test_does_not_touch_recent_sessions(self, _drawing_type: DrawingType) -> None:
         session = ImageUpload.objects.create(
             drawing_type=_drawing_type,
             component_name="Assembly",

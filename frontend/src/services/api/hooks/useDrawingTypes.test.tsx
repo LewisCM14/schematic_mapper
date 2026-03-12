@@ -26,7 +26,7 @@ describe("useDrawingTypes", () => {
 		const data = result.current.data;
 		expect(Array.isArray(data)).toBe(true);
 		expect(data).toHaveLength(1);
-		expect(data![0].type_name).toBe("composite");
+		expect(data?.[0].type_name).toBe("composite");
 	});
 
 	it("applies staleTime of 30 minutes and gcTime of 60 minutes", () => {
@@ -42,7 +42,7 @@ describe("useDrawingTypes", () => {
 		const cache = queryClient.getQueryCache();
 		const query = cache.find({ queryKey: ["drawing-types"] });
 		expect(query).toBeDefined();
-		const opts = query!.options as Record<string, unknown>;
+		const opts = query?.options as Record<string, unknown>;
 		expect(opts.staleTime).toBe(30 * 60 * 1000);
 		expect(opts.gcTime).toBe(60 * 60 * 1000);
 	});
@@ -61,7 +61,7 @@ describe("useDrawingTypes", () => {
 		const query = cache.find({ queryKey: ["drawing-types"] });
 		expect(query).toBeDefined();
 		// enabled defaults to true when not specified
-		const opts = query!.options as Record<string, unknown>;
+		const opts = query?.options as Record<string, unknown>;
 		expect(opts.enabled).not.toBe(false);
 	});
 });

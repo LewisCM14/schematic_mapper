@@ -33,6 +33,347 @@ function renderWorkbench() {
 }
 
 describe("MappingWorkbench", () => {
+	it("calls onMappingTabChange when a tab is clicked", async () => {
+		const onMappingTabChange = vi.fn();
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={0}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={onMappingTabChange}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		// Click the "Mapped" tab (second tab, index 1)
+		const tabs = screen.getAllByRole("tab");
+		await userEvent.click(tabs[1]);
+		expect(onMappingTabChange).toHaveBeenCalledWith(1);
+	});
+	it("calls onConfirmMarker when Enter is pressed in the label input", async () => {
+		const onConfirmMarker = vi.fn();
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[]}
+					pendingRect={{ x: 10, y: 20, width: 30, height: 40 }}
+					editingLabel="FP-ENTER"
+					labelErrorText={null}
+					mappingTab={0}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={onConfirmMarker}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		const input = screen.getByRole("textbox", { name: /marker label/i });
+		input.focus();
+		await userEvent.keyboard("{Enter}");
+		expect(onConfirmMarker).toHaveBeenCalled();
+	});
+
+	it("renders Remove for non-persisted mapped positions and triggers remove flow", async () => {
+		const onMappedPositionSelect = vi.fn();
+		const onRequestDeleteMappedPosition = vi.fn();
+		const onConfirmDeleteMappedPosition = vi.fn();
+		const onCancelDeleteMappedPosition = vi.fn();
+		const { rerender } = render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[
+						{
+							id: "FP-NEW",
+							x: 10,
+							y: 10,
+							width: 0,
+							height: 0,
+							label: "FP-NEW",
+							persisted: false,
+						},
+					]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={1}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={onMappedPositionSelect}
+					onRequestDeleteMappedPosition={onRequestDeleteMappedPosition}
+					onConfirmDeleteMappedPosition={onConfirmDeleteMappedPosition}
+					onCancelDeleteMappedPosition={onCancelDeleteMappedPosition}
+				/>
+			</ThemeProvider>,
+		);
+		await userEvent.click(screen.getByText("FP-NEW"));
+		expect(onMappedPositionSelect).toHaveBeenCalledWith("FP-NEW");
+		rerender(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[
+						{
+							id: "FP-NEW",
+							x: 10,
+							y: 10,
+							width: 0,
+							height: 0,
+							label: "FP-NEW",
+							persisted: false,
+						},
+					]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={1}
+					selectedMappedPositionId="FP-NEW"
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={onMappedPositionSelect}
+					onRequestDeleteMappedPosition={onRequestDeleteMappedPosition}
+					onConfirmDeleteMappedPosition={onConfirmDeleteMappedPosition}
+					onCancelDeleteMappedPosition={onCancelDeleteMappedPosition}
+				/>
+			</ThemeProvider>,
+		);
+		await userEvent.click(screen.getByRole("button", { name: /remove/i }));
+		expect(onRequestDeleteMappedPosition).toHaveBeenCalledWith("FP-NEW");
+		rerender(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[
+						{
+							id: "FP-NEW",
+							x: 10,
+							y: 10,
+							width: 0,
+							height: 0,
+							label: "FP-NEW",
+							persisted: false,
+						},
+					]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={1}
+					selectedMappedPositionId="FP-NEW"
+					deleteCandidateId="FP-NEW"
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={onMappedPositionSelect}
+					onRequestDeleteMappedPosition={onRequestDeleteMappedPosition}
+					onConfirmDeleteMappedPosition={onConfirmDeleteMappedPosition}
+					onCancelDeleteMappedPosition={onCancelDeleteMappedPosition}
+				/>
+			</ThemeProvider>,
+		);
+		expect(
+			screen.getByText(/are you sure you want to remove this mapping/i),
+		).toBeInTheDocument();
+		await userEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+		expect(onConfirmDeleteMappedPosition).toHaveBeenCalledWith("FP-NEW");
+		await userEvent.click(screen.getByRole("button", { name: /keep/i }));
+		expect(onCancelDeleteMappedPosition).toHaveBeenCalled();
+		// Check chip
+		expect(screen.getByText("New")).toBeInTheDocument();
+	});
+
+	it("renders Saved chip for persisted mapped positions", () => {
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[
+						{
+							id: "FP-SAVED",
+							x: 10,
+							y: 10,
+							width: 0,
+							height: 0,
+							label: "FP-SAVED",
+							persisted: true,
+						},
+					]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={1}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		expect(screen.getByText("Saved")).toBeInTheDocument();
+	});
+
+	it("renders empty state for no mapped positions in Mapped tab", () => {
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={1}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		expect(screen.getByText(/no markers placed yet/i)).toBeInTheDocument();
+	});
+
+	it("renders empty state for no mapped positions in Unmapped tab", () => {
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[]}
+					pendingRect={null}
+					editingLabel=""
+					labelErrorText={null}
+					mappingTab={0}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={vi.fn()}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		expect(
+			screen.getByText(/drag on the canvas to draw the first selection box/i),
+		).toBeInTheDocument();
+	});
+
+	it("calls onCancelMarker when Cancel button is clicked in pending rectangle form", async () => {
+		const onCancelMarker = vi.fn();
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[]}
+					pendingRect={{ x: 10, y: 20, width: 30, height: 40 }}
+					editingLabel="FP-CANCEL"
+					labelErrorText={null}
+					mappingTab={0}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={onCancelMarker}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+		expect(onCancelMarker).toHaveBeenCalled();
+	});
+	it("calls onCancelMarker when Escape is pressed in the label input", async () => {
+		const onCancelMarker = vi.fn();
+		render(
+			<ThemeProvider theme={theme}>
+				<MappingWorkbench
+					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
+					mappedPositions={[]}
+					pendingRect={{ x: 10, y: 20, width: 30, height: 40 }}
+					editingLabel="FP-ESCAPE"
+					labelErrorText={null}
+					mappingTab={0}
+					selectedMappedPositionId={null}
+					deleteCandidateId={null}
+					deleteInProgress={false}
+					onMappingTabChange={vi.fn()}
+					onRectangleDraw={vi.fn()}
+					onEditingLabelChange={vi.fn()}
+					onConfirmMarker={vi.fn()}
+					onCancelMarker={onCancelMarker}
+					onMappedPositionSelect={vi.fn()}
+					onRequestDeleteMappedPosition={vi.fn()}
+					onConfirmDeleteMappedPosition={vi.fn()}
+					onCancelDeleteMappedPosition={vi.fn()}
+				/>
+			</ThemeProvider>,
+		);
+		const input = screen.getByRole("textbox", { name: /marker label/i });
+		input.focus();
+		await userEvent.keyboard("{Escape}");
+		expect(onCancelMarker).toHaveBeenCalled();
+	});
 	it("renders Unmapped and Mapped tabs", () => {
 		renderWorkbench();
 		expect(
@@ -57,7 +398,14 @@ describe("MappingWorkbench", () => {
 				<MappingWorkbench
 					imageSvgUrl="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E"
 					mappedPositions={[
-						{ id: "FP-001", x: 50, y: 50, width: 20, height: 10, label: "FP-001" },
+						{
+							id: "FP-001",
+							x: 50,
+							y: 50,
+							width: 20,
+							height: 10,
+							label: "FP-001",
+						},
 					]}
 					pendingRect={null}
 					editingLabel=""
@@ -115,9 +463,15 @@ describe("MappingWorkbench", () => {
 
 	it("renders an interaction mode toggle and defaults to draw mode", () => {
 		renderWorkbench();
-		expect(screen.getByRole("group", { name: "mapping interaction mode" })).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "draw box mode" })).toHaveAttribute("aria-pressed", "true");
-		expect(screen.getByRole("button", { name: "pan and zoom mode" })).toHaveAttribute("aria-pressed", "false");
+		expect(
+			screen.getByRole("group", { name: "mapping interaction mode" }),
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "draw box mode" }),
+		).toHaveAttribute("aria-pressed", "true");
+		expect(
+			screen.getByRole("button", { name: "pan and zoom mode" }),
+		).toHaveAttribute("aria-pressed", "false");
 	});
 
 	it("shows label validation feedback for duplicate mappings", () => {
@@ -146,19 +500,31 @@ describe("MappingWorkbench", () => {
 			</ThemeProvider>,
 		);
 
-		expect(screen.getByText("Label text must be unique per image.")).toBeInTheDocument();
+		expect(
+			screen.getByText("Label text must be unique per image."),
+		).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
 	});
 
 	it("allows switching between pan and draw modes", async () => {
 		renderWorkbench();
 
-		await userEvent.click(screen.getByRole("button", { name: "pan and zoom mode" }));
-		expect(screen.getByRole("button", { name: "pan and zoom mode" })).toHaveAttribute("aria-pressed", "true");
-		expect(screen.getByRole("button", { name: "draw box mode" })).toHaveAttribute("aria-pressed", "false");
+		await userEvent.click(
+			screen.getByRole("button", { name: "pan and zoom mode" }),
+		);
+		expect(
+			screen.getByRole("button", { name: "pan and zoom mode" }),
+		).toHaveAttribute("aria-pressed", "true");
+		expect(
+			screen.getByRole("button", { name: "draw box mode" }),
+		).toHaveAttribute("aria-pressed", "false");
 
-		await userEvent.click(screen.getByRole("button", { name: "draw box mode" }));
-		expect(screen.getByRole("button", { name: "draw box mode" })).toHaveAttribute("aria-pressed", "true");
+		await userEvent.click(
+			screen.getByRole("button", { name: "draw box mode" }),
+		);
+		expect(
+			screen.getByRole("button", { name: "draw box mode" }),
+		).toHaveAttribute("aria-pressed", "true");
 	});
 
 	it("supports selecting a mapped position and showing delete confirmation", async () => {

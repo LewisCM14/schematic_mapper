@@ -36,7 +36,11 @@ function ImageTileCard({ image, onClick }: ImageTileCardProps) {
 							sx={{ height: 120, objectFit: "cover" }}
 						/>
 					) : (
-						<Skeleton variant="rectangular" height={120} sx={{ width: "100%" }} />
+						<Skeleton
+							variant="rectangular"
+							height={120}
+							sx={{ width: "100%" }}
+						/>
 					)}
 				</Box>
 				<CardContent>

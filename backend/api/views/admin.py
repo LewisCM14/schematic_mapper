@@ -170,7 +170,9 @@ def bulk_fitting_positions(request: Request) -> Response:
             status=400,
         )
 
-    label_texts = [item["label_text"].strip().lower() for item in data["fitting_positions"]]
+    label_texts = [
+        item["label_text"].strip().lower() for item in data["fitting_positions"]
+    ]
     if len(label_texts) != len(set(label_texts)):
         return Response(
             {

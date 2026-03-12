@@ -104,7 +104,7 @@ export const BulkFittingPositionsResultSchema = z.object({
 export const ImageListPageSchema = z.object({
 	results: z.array(ImageSchema),
 	has_more: z.boolean(),
-	next_cursor: z.string().nullable(),
+	next_cursor: z.string().optional(),
 });
 
 export const FittingPositionListSchema = z.array(FittingPositionSchema);

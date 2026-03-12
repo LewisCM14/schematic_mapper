@@ -50,7 +50,7 @@ describe("useHealth", () => {
 		const cache = queryClient.getQueryCache();
 		const query = cache.find({ queryKey: ["health"] });
 		expect(query).toBeDefined();
-		const opts = query!.options as Record<string, unknown>;
+		const opts = query?.options as Record<string, unknown>;
 		expect(opts.enabled).not.toBe(false);
 	});
 });

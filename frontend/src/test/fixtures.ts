@@ -75,7 +75,7 @@ export const FIXTURES = {
 		results: [],
 		source_status: { internal: "ok", asset: "ok" },
 		has_more: false,
-		next_cursor: null,
+		next_cursor: undefined,
 		request_id: "test-request-id-001",
 	},
 	uploadSession: {

@@ -59,6 +59,7 @@ def clear_asset_cache() -> None:
     """Clear the asset adapter cache — intended for tests."""
     _asset_cache.clear()
 
+
 # ── Circuit breaker settings ─────────────────────────────────────────────────
 FAILURE_THRESHOLD = 3
 COOLDOWN_SECONDS = 30

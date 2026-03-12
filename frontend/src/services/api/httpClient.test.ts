@@ -1,3 +1,50 @@
+describe("httpClient (exported instance)", () => {
+	it("adds X-Request-ID header to requests", async () => {
+		const adapter = vi.fn().mockResolvedValue({
+			status: 200,
+			data: {},
+			headers: {},
+			config: {},
+		});
+		httpClient.defaults.adapter = adapter;
+		await httpClient.get("/test");
+		const calledConfig = adapter.mock.calls[0][0];
+		expect(calledConfig.headers["X-Request-ID"]).toBeDefined();
+		expect(typeof calledConfig.headers["X-Request-ID"]).toBe("string");
+		expect(calledConfig.headers["X-Request-ID"]).toMatch(/^[0-9a-f-]{36}$/);
+	});
+
+	it("warns and rejects on 403 response", async () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const adapter = vi.fn().mockRejectedValue(
+			Object.assign(new Error("Forbidden"), {
+				isAxiosError: true,
+				response: { status: 403, data: {} },
+				config: { url: "/api/protected" },
+			}),
+		);
+		httpClient.defaults.adapter = adapter;
+		await expect(httpClient.get("/protected")).rejects.toThrow();
+		expect(warnSpy).toHaveBeenCalledWith("Auth error 403: /api/protected");
+		warnSpy.mockRestore();
+	});
+
+	it("propagates error unchanged on non-auth errors (exported instance)", async () => {
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const adapter = vi.fn().mockRejectedValue(
+			Object.assign(new Error("Server Error"), {
+				isAxiosError: true,
+				response: { status: 500, data: {} },
+				config: { url: "/api/data" },
+			}),
+		);
+		httpClient.defaults.adapter = adapter;
+		await expect(httpClient.get("/data")).rejects.toThrow("Server Error");
+		expect(warnSpy).not.toHaveBeenCalled();
+		warnSpy.mockRestore();
+	});
+});
+
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import httpClient from "./httpClient";

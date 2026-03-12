@@ -146,6 +146,8 @@ class TestBulkFittingPositionItemSerializer:
                 "label_text": "PUMP-01-INLET",
                 "x_coordinate": "100.500",
                 "y_coordinate": "200.250",
+                "width": "10.000",
+                "height": "20.000",
             }
         )
         assert serializer.is_valid()
@@ -156,6 +158,8 @@ class TestBulkFittingPositionItemSerializer:
                 "label_text": "PUMP-01-INLET",
                 "x_coordinate": "100.500",
                 "y_coordinate": "200.250",
+                "width": "10.000",
+                "height": "20.000",
             }
         )
         assert not serializer.is_valid()
@@ -168,6 +172,8 @@ class TestBulkFittingPositionItemSerializer:
                 "label_text": "PUMP-01-INLET",
                 "x_coordinate": "not-a-number",
                 "y_coordinate": "200.250",
+                "width": "10.000",
+                "height": "20.000",
             }
         )
         assert not serializer.is_valid()

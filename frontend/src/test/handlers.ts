@@ -20,7 +20,7 @@ export const handlers = [
 		HttpResponse.json({
 			results: [FIXTURES.image],
 			has_more: false,
-			next_cursor: null,
+			next_cursor: undefined,
 		}),
 	),
 
@@ -54,10 +54,9 @@ export const handlers = [
 		HttpResponse.json(FIXTURES.uploadComplete, { status: 201 }),
 	),
 
-	http.delete(
-		"/api/admin/uploads/:id",
-		() => new HttpResponse(null, { status: 204 }),
-	),
+	http.delete("/api/admin/uploads/:id", () => {
+		return new HttpResponse(null, { status: 204 });
+	}),
 
 	http.post("/api/admin/fitting-positions/bulk", () =>
 		HttpResponse.json({ created: 0, updated: 0 }),

@@ -12,7 +12,7 @@ const AdminUploadMappingPage = lazy(
 	() => import("./pages/AdminUploadMappingPage"),
 );
 
-function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+export function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
 	return (
 		<Alert
 			severity="error"
@@ -27,7 +27,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
 	);
 }
 
-function PageLoader() {
+export function PageLoader() {
 	return (
 		<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
 			<CircularProgress />

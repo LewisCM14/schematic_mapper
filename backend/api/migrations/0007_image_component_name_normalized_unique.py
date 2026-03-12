@@ -5,7 +5,6 @@ from django.db.models.functions import Lower, Trim
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("api", "0006_add_fp_image_id_index"),
     ]

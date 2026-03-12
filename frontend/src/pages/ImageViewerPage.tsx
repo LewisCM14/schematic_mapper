@@ -22,10 +22,11 @@ function normalizeSearchSources(value: string[] | string | null | undefined) {
 		: typeof value === "string"
 			? value.split(",")
 			: [];
-	const normalized = values.filter((source): source is (typeof DEFAULT_SEARCH_SOURCES)[number] =>
-		DEFAULT_SEARCH_SOURCES.includes(
-			source as (typeof DEFAULT_SEARCH_SOURCES)[number],
-		),
+	const normalized = values.filter(
+		(source): source is (typeof DEFAULT_SEARCH_SOURCES)[number] =>
+			DEFAULT_SEARCH_SOURCES.includes(
+				source as (typeof DEFAULT_SEARCH_SOURCES)[number],
+			),
 	);
 	return normalized.length > 0 ? normalized : [...DEFAULT_SEARCH_SOURCES];
 }
@@ -79,61 +80,69 @@ function ImageViewerPage() {
 			src?: string[] | null;
 			z?: number | null;
 		}) => {
-			setSearchParams((prev) => {
-				const nextParams = new URLSearchParams(prev);
-				if ("fp" in updates) {
-					if (updates.fp) {
-						nextParams.set("fp", updates.fp);
-					} else {
-						nextParams.delete("fp");
+			setSearchParams(
+				(prev) => {
+					const nextParams = new URLSearchParams(prev);
+					if ("fp" in updates) {
+						if (updates.fp) {
+							nextParams.set("fp", updates.fp);
+						} else {
+							nextParams.delete("fp");
+						}
 					}
-				}
-				if ("q" in updates) {
-					const nextQuery = updates.q?.trim() ?? "";
-					if (nextQuery) {
-						nextParams.set("q", nextQuery);
-					} else {
-						nextParams.delete("q");
+					if ("q" in updates) {
+						const nextQuery = updates.q?.trim() ?? "";
+						if (nextQuery) {
+							nextParams.set("q", nextQuery);
+						} else {
+							nextParams.delete("q");
+						}
 					}
-				}
-				if ("src" in updates) {
-					const normalizedSources = normalizeSearchSources(updates.src ?? null);
-					const isDefaultSourceSelection =
-						normalizedSources.length === DEFAULT_SEARCH_SOURCES.length &&
-						DEFAULT_SEARCH_SOURCES.every((source) =>
-							normalizedSources.includes(source),
+					if ("src" in updates) {
+						const normalizedSources = normalizeSearchSources(
+							updates.src ?? null,
 						);
-					if (isDefaultSourceSelection) {
-						nextParams.delete("src");
-					} else {
-						nextParams.set("src", normalizedSources.join(","));
+						const isDefaultSourceSelection =
+							normalizedSources.length === DEFAULT_SEARCH_SOURCES.length &&
+							DEFAULT_SEARCH_SOURCES.every((source) =>
+								normalizedSources.includes(source),
+							);
+						if (isDefaultSourceSelection) {
+							nextParams.delete("src");
+						} else {
+							nextParams.set("src", normalizedSources.join(","));
+						}
 					}
-				}
-				if ("z" in updates) {
-					if (
-						updates.z == null ||
-						!Number.isFinite(updates.z) ||
-						updates.z <= 0 ||
-						Math.abs(updates.z - 1) < 0.01
-					) {
-						nextParams.delete("z");
-					} else {
-						nextParams.set("z", formatZoomParam(updates.z));
+					if ("z" in updates) {
+						if (
+							updates.z == null ||
+							!Number.isFinite(updates.z) ||
+							updates.z <= 0 ||
+							Math.abs(updates.z - 1) < 0.01
+						) {
+							nextParams.delete("z");
+						} else {
+							nextParams.set("z", formatZoomParam(updates.z));
+						}
 					}
-				}
-				return nextParams;
-			}, { replace: true });
+					return nextParams;
+				},
+				{ replace: true },
+			);
 		},
 		[setSearchParams],
 	);
 
-	const handleMarkerClick = useCallback((fittingPositionId: string) => {
-		setSelectedFpId(fittingPositionId);
-		setActiveTab(1);
-		setPinnedTooltipId(null);
-		lastUrlHandledPoiRef.current = fittingPositionId;
-		updateViewerUrl({ fp: fittingPositionId });
-	}, [updateViewerUrl]);
+	const handleMarkerClick = useCallback(
+		(fittingPositionId: string) => {
+			setSelectedFpId(fittingPositionId);
+			setActiveTab(1);
+			setPinnedTooltipId(null);
+			lastUrlHandledPoiRef.current = fittingPositionId;
+			updateViewerUrl({ fp: fittingPositionId });
+		},
+		[updateViewerUrl],
+	);
 
 	const handleSearchMetadata = useCallback(
 		(status: Record<string, string>, reqId: string, refreshedAt: Date) => {
@@ -144,14 +153,17 @@ function ImageViewerPage() {
 		[],
 	);
 
-	const handleSelectFp = useCallback((fpId: string, x: number, y: number) => {
-		setSelectedFpId(fpId);
-		setActiveTab(1);
-		setPanToTarget({ x, y });
-		setPinnedTooltipId(fpId);
-		lastUrlHandledPoiRef.current = fpId;
-		updateViewerUrl({ fp: fpId });
-	}, [updateViewerUrl]);
+	const handleSelectFp = useCallback(
+		(fpId: string, x: number, y: number) => {
+			setSelectedFpId(fpId);
+			setActiveTab(1);
+			setPanToTarget({ x, y });
+			setPinnedTooltipId(fpId);
+			lastUrlHandledPoiRef.current = fpId;
+			updateViewerUrl({ fp: fpId });
+		},
+		[updateViewerUrl],
+	);
 
 	const handleSearchQueryChange = useCallback(
 		(value: string) => {
@@ -229,11 +241,11 @@ function ImageViewerPage() {
 			positions
 				?.filter((pos) => pos.width <= 0 || pos.height <= 0)
 				.map((pos) => ({
-				id: pos.fitting_position_id,
-				x: pos.x_coordinate,
-				y: pos.y_coordinate,
-				status: "mapped" as const,
-			})) ?? [],
+					id: pos.fitting_position_id,
+					x: pos.x_coordinate,
+					y: pos.y_coordinate,
+					status: "mapped" as const,
+				})) ?? [],
 		[positions],
 	);
 
@@ -300,7 +312,9 @@ function ImageViewerPage() {
 
 	const pinnedTooltipContent = useMemo(() => {
 		if (!pinnedTooltipId) return null;
-		const pos = positions?.find((item) => item.fitting_position_id === pinnedTooltipId);
+		const pos = positions?.find(
+			(item) => item.fitting_position_id === pinnedTooltipId,
+		);
 		return (
 			<POITooltipCard
 				labelText={pos?.label_text ?? pinnedTooltipId}

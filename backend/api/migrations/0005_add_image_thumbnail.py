@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('api', '0004_imageupload_uploader_identity'),
+        ("api", "0004_imageupload_uploader_identity"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='image',
-            name='thumbnail',
+            model_name="image",
+            name="thumbnail",
             field=models.BinaryField(blank=True, null=True),
         ),
     ]

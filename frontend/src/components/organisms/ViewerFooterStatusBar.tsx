@@ -10,7 +10,7 @@ interface ViewerFooterStatusBarProps {
 	zoomLevel: number;
 }
 
-function formatRelativeTime(date: Date): string {
+export function formatRelativeTime(date: Date): string {
 	const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
 	if (diffSec < 10) return "just now";
 	if (diffSec < 60) return `${diffSec}s ago`;

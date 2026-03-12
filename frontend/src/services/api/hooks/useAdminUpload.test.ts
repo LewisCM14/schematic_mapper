@@ -1,3 +1,40 @@
+import { useDeleteFittingPosition } from "./useAdminUpload";
+
+describe("useDeleteFittingPosition", () => {
+	it("calls DELETE /api/admin/fitting-positions/:id and succeeds", async () => {
+		const { wrapper } = makeWrapper();
+		const { result } = renderHook(() => useDeleteFittingPosition(), {
+			wrapper,
+		});
+		result.current.mutate({ fittingPositionId: "fit-1", imageId: IMAGE_ID });
+		await waitFor(() => expect(result.current.isSuccess).toBe(true));
+	});
+
+	it("invalidates fitting-positions and search queries on success", async () => {
+		const { wrapper, queryClient } = makeWrapper();
+		const spy = vi.spyOn(queryClient, "invalidateQueries");
+		const { result } = renderHook(() => useDeleteFittingPosition(), {
+			wrapper,
+		});
+		const fittingPositionId = "fit-1";
+		result.current.mutate({ fittingPositionId, imageId: IMAGE_ID });
+		await waitFor(() => expect(result.current.isSuccess).toBe(true));
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				queryKey: queryKeys.images.fittingPositions(IMAGE_ID),
+			}),
+		);
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({
+				queryKey: queryKeys.fittingPositions.detail(fittingPositionId),
+			}),
+		);
+		expect(spy).toHaveBeenCalledWith(
+			expect.objectContaining({ queryKey: ["search", IMAGE_ID] }),
+		);
+	});
+});
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement } from "react";

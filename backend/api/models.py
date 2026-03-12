@@ -142,4 +142,4 @@ class UploadChunk(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"Part {self.part_number} of {self.upload_id}"
+        return f"Part {self.part_number} of {self.upload.upload_id}"

@@ -73,6 +73,8 @@ describe("FittingPositionSchema", () => {
 		fitting_position_id: "FP-001",
 		x_coordinate: 100,
 		y_coordinate: 200,
+		width: 50,
+		height: 25,
 		label_text: "pump-inlet",
 		is_active: true,
 	};
@@ -88,14 +90,28 @@ describe("FittingPositionSchema", () => {
 			...VALID_FP,
 			x_coordinate: "100.5",
 			y_coordinate: "200.0",
+			width: "50.5",
+			height: "25.0",
 		});
 		expect(result.x_coordinate).toBe(100.5);
 		expect(result.y_coordinate).toBe(200.0);
+		expect(result.width).toBe(50.5);
+		expect(result.height).toBe(25.0);
 	});
 
 	it("throws when x_coordinate is not numeric", () => {
 		expect(() =>
 			FittingPositionSchema.parse({ ...VALID_FP, x_coordinate: "notanumber" }),
+		).toThrow();
+	});
+	it("throws when width is not numeric", () => {
+		expect(() =>
+			FittingPositionSchema.parse({ ...VALID_FP, width: "notanumber" }),
+		).toThrow();
+	});
+	it("throws when height is not numeric", () => {
+		expect(() =>
+			FittingPositionSchema.parse({ ...VALID_FP, height: "notanumber" }),
 		).toThrow();
 	});
 });
@@ -108,7 +124,7 @@ describe("SearchResponseSchema", () => {
 		results: [],
 		source_status: { internal: "ok" },
 		has_more: false,
-		next_cursor: null,
+		next_cursor: undefined,
 		request_id: "req-001",
 	};
 
@@ -212,6 +228,8 @@ describe("FittingPositionDetailSchema", () => {
 		label_text: "pump-inlet",
 		x_coordinate: 100,
 		y_coordinate: 200,
+		width: 50,
+		height: 25,
 		asset: null,
 		source_status: { asset: "ok" },
 	};

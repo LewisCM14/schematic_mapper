@@ -122,9 +122,7 @@ class TestCircuitBreaker:
             # One success resets the counter
             mock_cursor.fetchone.return_value = None
             mock_connections.__getitem__.return_value.cursor.side_effect = None
-            mock_connections.__getitem__.return_value.cursor.return_value = (
-                mock_cursor
-            )
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result = fetch_asset_details("FP-001")
             assert result.source_status == "ok"
 
@@ -138,9 +136,7 @@ class TestCircuitBreaker:
             # Still below threshold, so next call should attempt the query
             mock_cursor.fetchone.return_value = None
             mock_connections.__getitem__.return_value.cursor.side_effect = None
-            mock_connections.__getitem__.return_value.cursor.return_value = (
-                mock_cursor
-            )
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             result = fetch_asset_details("FP-001")
             assert result.source_status == "ok"
 
@@ -163,9 +159,7 @@ class TestCircuitBreaker:
             mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
             mock_cursor.__exit__ = MagicMock(return_value=False)
             mock_cursor.fetchone.return_value = None
-            mock_connections.__getitem__.return_value.cursor.return_value = (
-                mock_cursor
-            )
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
 
             result = fetch_asset_details("FP-001")
             # The query should have been attempted
@@ -247,9 +241,7 @@ class TestAssetAdapterContract:
         mock_cursor.fetchone.return_value = None
 
         with patch("api.adapters.asset_adapter.connections") as mock_connections:
-            mock_connections.__getitem__.return_value.cursor.return_value = (
-                mock_cursor
-            )
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor
             fetch_asset_details("FP-001")
 
         calls = [str(c) for c in mock_cursor.execute.call_args_list]
@@ -318,9 +310,7 @@ class TestReadThroughCache:
                 "Primary",
                 "Inlet",
             )
-            mock_connections.__getitem__.return_value.cursor.return_value = (
-                mock_cursor2
-            )
+            mock_connections.__getitem__.return_value.cursor.return_value = mock_cursor2
             result = fetch_asset_details("FP-001")
 
         assert result.record is not None

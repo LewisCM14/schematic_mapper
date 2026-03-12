@@ -12,6 +12,9 @@ frontend/dist/
 frontend/dist-ssr/
 frontend/*.local
 
+# Vitest coverage
+frontend/coverage/
+
 # Logs
 logs
 *.log

@@ -1,5 +1,7 @@
 """Upload orchestration: session lifecycle, chunk assembly, and verification."""
 
+from uuid import UUID
+
 import base64
 import hashlib
 import logging
@@ -40,16 +42,14 @@ def normalize_component_name(component_name: str) -> str:
 def image_component_name_exists(component_name: str) -> bool:
     normalized_name = component_name.casefold()
     return (
-        Image.objects.annotate(
-            normalized_component_name=Lower(Trim("component_name"))
-        )
+        Image.objects.annotate(normalized_component_name=Lower(Trim("component_name")))
         .filter(normalized_component_name=normalized_name)
         .exists()
     )
 
 
 def active_upload_name_exists(
-    component_name: str, *, exclude_upload_id: object | None = None
+    component_name: str, *, exclude_upload_id: str | UUID | None = None
 ) -> bool:
     normalized_name = component_name.casefold()
     active_states = [
@@ -66,7 +66,7 @@ def active_upload_name_exists(
 
 
 def has_component_name_conflict(
-    component_name: str, *, exclude_upload_id: object | None = None
+    component_name: str, *, exclude_upload_id: str | UUID | None = None
 ) -> bool:
     return image_component_name_exists(component_name) or active_upload_name_exists(
         component_name,
@@ -268,7 +268,9 @@ def complete_upload(
     }, 201
 
 
-def abort_upload(*, upload_id: object, request_id: str) -> tuple[dict[str, object] | None, int]:
+def abort_upload(
+    *, upload_id: object, request_id: str
+) -> tuple[dict[str, object] | None, int]:
     """Abort an upload session. Returns (payload_or_None, http_status)."""
     session = get_object_or_404(ImageUpload, pk=upload_id)
     if session.state == UPLOAD_STATE_COMPLETED:
@@ -321,7 +323,10 @@ def admin_upload_image(
         return {"error": "Invalid base64 encoding", "code": "invalid_base64"}, 400
 
     if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
-        return {"error": "File exceeds maximum upload size", "code": "file_too_large"}, 400
+        return {
+            "error": "File exceeds maximum upload size",
+            "code": "file_too_large",
+        }, 400
 
     actual_checksum = hashlib.sha256(file_bytes).hexdigest()
     if actual_checksum != expected_checksum:

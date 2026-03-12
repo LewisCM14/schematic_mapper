@@ -10,7 +10,7 @@ import {
 	Tooltip,
 	Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ImageTileCard from "../components/molecules/ImageTileCard";
 import ValidationSummaryRow from "../components/molecules/ValidationSummaryRow";
@@ -90,11 +90,14 @@ function AdminUploadMappingPage() {
 	const [editingLabel, setEditingLabel] = useState("");
 	const [mappingError, setMappingError] = useState<string | null>(null);
 	const [mappingTab, setMappingTab] = useState(0); // 0 = Unmapped, 1 = Mapped
-	const [selectedMappedPositionId, setSelectedMappedPositionId] = useState<string | null>(null);
-	const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
-	const [pendingDeletedPersistedMappings, setPendingDeletedPersistedMappings] = useState<
-		MappedPos[]
-	>([]);
+	const [selectedMappedPositionId, setSelectedMappedPositionId] = useState<
+		string | null
+	>(null);
+	const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(
+		null,
+	);
+	const [pendingDeletedPersistedMappings, setPendingDeletedPersistedMappings] =
+		useState<MappedPos[]>([]);
 	const { data: selectedImage } = useImage(selectedImageId ?? "");
 	const { data: existingFittingPositions = [] } = useFittingPositions(
 		selectedImageId ?? "",
@@ -119,14 +122,14 @@ function AdminUploadMappingPage() {
 			selectedImage &&
 			selectedImage.image_id === upload.completedImageId
 				? {
-					image_id: selectedImage.image_id,
-					drawing_type: selectedImage.drawing_type,
-					component_name: selectedImage.component_name,
-					width_px: selectedImage.width_px,
-					height_px: selectedImage.height_px,
-					uploaded_at: selectedImage.uploaded_at,
-					thumbnail_url: selectedImage.thumbnail_url,
-				}
+						image_id: selectedImage.image_id,
+						drawing_type: selectedImage.drawing_type,
+						component_name: selectedImage.component_name,
+						width_px: selectedImage.width_px,
+						height_px: selectedImage.height_px,
+						uploaded_at: selectedImage.uploaded_at,
+						thumbnail_url: selectedImage.thumbnail_url,
+					}
 				: null;
 		return uploadedImageSummary &&
 			!selectableImages.some(
@@ -147,7 +150,7 @@ function AdminUploadMappingPage() {
 		return label.trim().toLocaleLowerCase();
 	}
 
-	function resetMappingState() {
+	const resetMappingState = React.useCallback(() => {
 		setPersistedMappings([]);
 		setDraftMappings([]);
 		setPendingDeletedPersistedMappings([]);
@@ -157,7 +160,7 @@ function AdminUploadMappingPage() {
 		setMappingTab(0);
 		setSelectedMappedPositionId(null);
 		setDeleteCandidateId(null);
-	}
+	}, []);
 
 	function getMappingCenter(position: MappedPos) {
 		return {
@@ -170,8 +173,8 @@ function AdminUploadMappingPage() {
 		const center = getMappingCenter(position);
 		return position.width > 0 && position.height > 0
 			? `${position.label} - ${position.width} x ${position.height} px, center at (${Math.round(
-				center.x,
-			)}, ${Math.round(center.y)})`
+					center.x,
+				)}, ${Math.round(center.y)})`
 			: `${position.label} - center at (${Math.round(center.x)}, ${Math.round(center.y)})`;
 	}
 
@@ -246,13 +249,17 @@ function AdminUploadMappingPage() {
 			(position) => position.id === positionId,
 		);
 		if (!existingPosition) {
-			setDraftMappings((prev) => prev.filter((position) => position.id !== positionId));
+			setDraftMappings((prev) =>
+				prev.filter((position) => position.id !== positionId),
+			);
 			setDeleteCandidateId(null);
 			setSelectedMappedPositionId(null);
 			return;
 		}
 		setPendingDeletedPersistedMappings((prev) => [...prev, existingPosition]);
-		setPersistedMappings((prev) => prev.filter((position) => position.id !== positionId));
+		setPersistedMappings((prev) =>
+			prev.filter((position) => position.id !== positionId),
+		);
 		setDeleteCandidateId(null);
 		setSelectedMappedPositionId(null);
 	}
@@ -309,7 +316,7 @@ function AdminUploadMappingPage() {
 		if (workflowMode !== "edit") {
 			setPersistedMappings([]);
 		}
-	}, [selectedImageId, workflowMode]);
+	}, [selectedImageId, workflowMode, resetMappingState]);
 
 	useEffect(() => {
 		if (workflowMode !== "edit" || !selectedImageId) return;
@@ -562,7 +569,6 @@ function AdminUploadMappingPage() {
 							<CircularProgress size={28} />
 						</Box>
 					)}
-
 				</Paper>
 			)}
 
@@ -580,7 +586,8 @@ function AdminUploadMappingPage() {
 					{pendingDeletedPersistedMappings.length > 0 && (
 						<Box sx={{ mb: 2 }}>
 							<Typography variant="body2" sx={{ mb: 1 }}>
-								{pendingDeletedPersistedMappings.length} saved fitting position(s) will be deleted when you save.
+								{pendingDeletedPersistedMappings.length} saved fitting
+								position(s) will be deleted when you save.
 							</Typography>
 							<Typography variant="subtitle2">Marked for Deletion</Typography>
 							{pendingDeletedPersistedMappings.map((position) => (

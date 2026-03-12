@@ -4,14 +4,13 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('api', '0005_add_image_thumbnail'),
+        ("api", "0005_add_image_thumbnail"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='fittingposition',
-            index=models.Index(fields=['image'], name='idx_fp_image_id'),
+            model_name="fittingposition",
+            index=models.Index(fields=["image"], name="idx_fp_image_id"),
         ),
     ]

@@ -1,3 +1,47 @@
+// --- Filtering utilities for testable coverage ---
+export interface ViewportRect {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+export function filterRectanglesByViewport(
+	rectangles: CanvasRectangle[],
+	viewport: ViewportRect | null,
+): CanvasRectangle[] {
+	if (!viewport) return rectangles;
+	return rectangles.filter((rectangle) => {
+		const right = rectangle.x + rectangle.width;
+		const bottom = rectangle.y + rectangle.height;
+		return (
+			right >= viewport.left &&
+			rectangle.x <= viewport.right &&
+			bottom >= viewport.top &&
+			rectangle.y <= viewport.bottom
+		);
+	});
+}
+
+import type { ClusterOrMarker } from "./clusterMarkers";
+
+export function filterMarkersByViewport(
+	items: ClusterOrMarker[],
+	viewport: ViewportRect | null,
+): ClusterOrMarker[] {
+	if (!viewport) return items;
+	return items.filter((item) => {
+		const x = item.type === "cluster" ? item.x : item.marker.x;
+		const y = item.type === "cluster" ? item.y : item.marker.y;
+		return (
+			x >= viewport.left &&
+			x <= viewport.right &&
+			y >= viewport.top &&
+			y <= viewport.bottom
+		);
+	});
+}
+
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
@@ -65,7 +109,7 @@ const CLUSTER_THRESHOLD = 40;
 const VIEWPORT_BUFFER = 100;
 
 /** Viewport rectangle in image-space coordinates. */
-interface ViewportRect {
+export interface ViewportRect {
 	left: number;
 	top: number;
 	right: number;
@@ -117,7 +161,8 @@ function DiagramCanvasViewport({
 	const [liveRectangle, setLiveRectangle] = useState<CanvasRectangle | null>(
 		null,
 	);
-	const interactionMode = interactionModeProp ?? (onRectangleDraw ? "draw" : "pan");
+	const interactionMode =
+		interactionModeProp ?? (onRectangleDraw ? "draw" : "pan");
 	const isDrawMode = interactionMode === "draw";
 	const isDrawModeRef = useRef(isDrawMode);
 
@@ -204,13 +249,27 @@ function DiagramCanvasViewport({
 			pz.handleDown(event as PointerEvent);
 		};
 
-		addPointerListeners(panZoomHost, pz.eventNames.down, handlePanzoomPointerDown);
-		addPointerListeners(document, pz.eventNames.move, pz.handleMove as EventListener, {
-			passive: true,
-		});
-		addPointerListeners(document, pz.eventNames.up, pz.handleUp as EventListener, {
-			passive: true,
-		});
+		addPointerListeners(
+			panZoomHost,
+			pz.eventNames.down,
+			handlePanzoomPointerDown,
+		);
+		addPointerListeners(
+			document,
+			pz.eventNames.move,
+			pz.handleMove as EventListener,
+			{
+				passive: true,
+			},
+		);
+		addPointerListeners(
+			document,
+			pz.eventNames.up,
+			pz.handleUp as EventListener,
+			{
+				passive: true,
+			},
+		);
 
 		const updateViewport = () => {
 			if (!container) return;
@@ -274,7 +333,7 @@ function DiagramCanvasViewport({
 
 	useEffect(() => {
 		setImageReady(false);
-	}, [imageSvgUrl]);
+	}, []);
 
 	useEffect(() => {
 		const img = imgRef.current;
@@ -282,7 +341,7 @@ function DiagramCanvasViewport({
 		if (imageReady || img.complete) {
 			scheduleZoomToFit();
 		}
-	}, [imageReady, imageSvgUrl, panZoomHost, scheduleZoomToFit]);
+	}, [imageReady, panZoomHost, scheduleZoomToFit]);
 
 	// Compute clustered markers, then cull to viewport
 	const clusteredItems = useMemo(
@@ -290,19 +349,10 @@ function DiagramCanvasViewport({
 		[markers, currentScale],
 	);
 
-	const visibleItems = useMemo(() => {
-		if (!viewport) return clusteredItems;
-		return clusteredItems.filter((item) => {
-			const x = item.type === "cluster" ? item.x : item.marker.x;
-			const y = item.type === "cluster" ? item.y : item.marker.y;
-			return (
-				x >= viewport.left &&
-				x <= viewport.right &&
-				y >= viewport.top &&
-				y <= viewport.bottom
-			);
-		});
-	}, [clusteredItems, viewport]);
+	const visibleItems = useMemo(
+		() => filterMarkersByViewport(clusteredItems, viewport),
+		[clusteredItems, viewport],
+	);
 
 	const visibleRectangles = useMemo(() => {
 		const allRectangles = [
@@ -310,25 +360,18 @@ function DiagramCanvasViewport({
 			...(draftRectangle ? [draftRectangle] : []),
 			...(liveRectangle ? [liveRectangle] : []),
 		];
-		if (!viewport) return allRectangles;
-		return allRectangles.filter((rectangle) => {
-			const right = rectangle.x + rectangle.width;
-			const bottom = rectangle.y + rectangle.height;
-			return (
-				right >= viewport.left &&
-				rectangle.x <= viewport.right &&
-				bottom >= viewport.top &&
-				rectangle.y <= viewport.bottom
-			);
-		});
+		return filterRectanglesByViewport(allRectangles, viewport);
 	}, [draftRectangle, liveRectangle, rectangles, viewport]);
 
 	const visibleInteractiveRectangles = useMemo(
 		() =>
 			interactiveMappedRectangles
 				? visibleRectangles.filter(
-					(rectangle) => rectangle.status === "mapped" && rectangle.width > 0 && rectangle.height > 0,
-				)
+						(rectangle) =>
+							rectangle.status === "mapped" &&
+							rectangle.width > 0 &&
+							rectangle.height > 0,
+					)
 				: [],
 		[interactiveMappedRectangles, visibleRectangles],
 	);
@@ -475,53 +518,53 @@ function DiagramCanvasViewport({
 		[getCanvasCoordinates, onMarkerDrag],
 	);
 
-	const handlePointerUp = useCallback((e: React.PointerEvent) => {
-		if (drawRef.current) {
-			const current = getCanvasCoordinates(e.clientX, e.clientY);
-			const completedRectangle = current
-				? {
-					x: Math.min(drawRef.current.startX, current.x),
-					y: Math.min(drawRef.current.startY, current.y),
-					width: Math.abs(current.x - drawRef.current.startX),
-					height: Math.abs(current.y - drawRef.current.startY),
-				}
-				: liveRectangle
+	const handlePointerUp = useCallback(
+		(e: React.PointerEvent) => {
+			if (drawRef.current) {
+				const current = getCanvasCoordinates(e.clientX, e.clientY);
+				const completedRectangle = current
 					? {
-						x: liveRectangle.x,
-						y: liveRectangle.y,
-						width: liveRectangle.width,
-						height: liveRectangle.height,
-					}
-					: null;
-			if (
-				completedRectangle &&
-				completedRectangle.width >= 4 &&
-				completedRectangle.height >= 4
-			) {
-				onRectangleDraw?.({
-					x: completedRectangle.x,
-					y: completedRectangle.y,
-					width: completedRectangle.width,
-					height: completedRectangle.height,
-				});
+							x: Math.min(drawRef.current.startX, current.x),
+							y: Math.min(drawRef.current.startY, current.y),
+							width: Math.abs(current.x - drawRef.current.startX),
+							height: Math.abs(current.y - drawRef.current.startY),
+						}
+					: liveRectangle
+						? {
+								x: liveRectangle.x,
+								y: liveRectangle.y,
+								width: liveRectangle.width,
+								height: liveRectangle.height,
+							}
+						: null;
+				if (
+					completedRectangle &&
+					completedRectangle.width >= 4 &&
+					completedRectangle.height >= 4
+				) {
+					onRectangleDraw?.({
+						x: completedRectangle.x,
+						y: completedRectangle.y,
+						width: completedRectangle.width,
+						height: completedRectangle.height,
+					});
+				}
+				drawRef.current = null;
+				setLiveRectangle(null);
+				return;
 			}
-			drawRef.current = null;
-			setLiveRectangle(null);
-			return;
-		}
-		if (dragRef.current) {
-			dragRef.current = null;
-			panzoomRef.current?.setOptions({ disablePan: false });
-		}
-	}, [getCanvasCoordinates, liveRectangle, onRectangleDraw]);
+			if (dragRef.current) {
+				dragRef.current = null;
+				panzoomRef.current?.setOptions({ disablePan: false });
+			}
+		},
+		[getCanvasCoordinates, liveRectangle, onRectangleDraw],
+	);
 
 	const handleViewportPointerDown = useCallback(
 		(e: React.PointerEvent<HTMLDivElement>) => {
 			if (!onRectangleDraw || !isDrawMode) return;
-			if (
-				e.target !== panZoomHost &&
-				!(e.target instanceof HTMLImageElement)
-			)
+			if (e.target !== panZoomHost && !(e.target instanceof HTMLImageElement))
 				return;
 			e.preventDefault();
 			e.stopPropagation();
@@ -606,13 +649,9 @@ function DiagramCanvasViewport({
 					position: "relative",
 					display: "inline-block",
 					transformOrigin: "0 0",
-					cursor:
-						isDrawMode || onCanvasClick
-							? "crosshair"
-							: "move",
+					cursor: isDrawMode || onCanvasClick ? "crosshair" : "move",
 					"&:active": {
-						cursor:
-							isDrawMode || onCanvasClick ? "crosshair" : "move",
+						cursor: isDrawMode || onCanvasClick ? "crosshair" : "move",
 					},
 					userSelect: "none",
 				}}
@@ -646,25 +685,25 @@ function DiagramCanvasViewport({
 									: theme.palette.map.poi.default;
 
 						return (
-					<Box
-						key={rectangle.id}
-						aria-label={`rectangle ${rectangle.id}`}
-						data-testid={`rectangle-${rectangle.id}`}
-						sx={{
-							position: "absolute",
-							left: rectangle.x,
-							top: rectangle.y,
-							width: rectangle.width,
-							height: rectangle.height,
-							border: `${isSelected ? 3 : 2}px solid`,
-							borderColor: rectangleColor,
-							borderStyle:
-								rectangle.status === "unmapped" ? "dashed" : "solid",
-							background: `color-mix(in srgb, ${rectangleColor} ${isSelected ? 22 : 12}%, transparent)`,
-							boxSizing: "border-box",
-							pointerEvents: "none",
-						}}
-					/>
+							<Box
+								key={rectangle.id}
+								aria-label={`rectangle ${rectangle.id}`}
+								data-testid={`rectangle-${rectangle.id}`}
+								sx={{
+									position: "absolute",
+									left: rectangle.x,
+									top: rectangle.y,
+									width: rectangle.width,
+									height: rectangle.height,
+									border: `${isSelected ? 3 : 2}px solid`,
+									borderColor: rectangleColor,
+									borderStyle:
+										rectangle.status === "unmapped" ? "dashed" : "solid",
+									background: `color-mix(in srgb, ${rectangleColor} ${isSelected ? 22 : 12}%, transparent)`,
+									boxSizing: "border-box",
+									pointerEvents: "none",
+								}}
+							/>
 						);
 					})}
 
@@ -749,7 +788,7 @@ function DiagramCanvasViewport({
 					const button = (
 						<IconButton
 							key={marker.id}
-								className="panzoom-exclude"
+							className="panzoom-exclude"
 							size="small"
 							onClick={(e) => {
 								e.stopPropagation();

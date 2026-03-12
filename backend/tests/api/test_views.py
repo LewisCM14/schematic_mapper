@@ -70,7 +70,9 @@ class TestListDrawingTypesView:
         response = client.get("/api/drawing-types")
         assert response.status_code == 200
 
-    def test_returns_seeded_types(self, client: Client, drawing_type: DrawingType) -> None:
+    def test_returns_seeded_types(
+        self, client: Client, drawing_type: DrawingType
+    ) -> None:
         DrawingType.objects.create(type_name="system")
         response = client.get("/api/drawing-types")
         data = response.json()
@@ -947,9 +949,7 @@ class TestGetUploadSessionView:
         assert data["received_parts"] == [1, 3]
 
     def test_returns_404_for_unknown_upload(self, client: Client) -> None:
-        response = client.get(
-            f"/api/admin/uploads/{uuid.uuid4()}"
-        )
+        response = client.get(f"/api/admin/uploads/{uuid.uuid4()}")
         assert response.status_code == 404
 
 
@@ -1292,7 +1292,9 @@ class TestBulkFittingPositionsView:
 
 @pytest.mark.django_db
 class TestDeleteFittingPositionView:
-    def test_deletes_existing_fitting_position(self, client: Client, image: Image) -> None:
+    def test_deletes_existing_fitting_position(
+        self, client: Client, image: Image
+    ) -> None:
         fitting_position = FittingPosition.objects.create(
             fitting_position_id="FP-DELETE-01",
             image=image,

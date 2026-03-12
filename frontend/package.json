@@ -9,6 +9,7 @@
 		"preview": "vite preview",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage --environment jsdom",
 		"lint": "biome check src/",
 		"format": "biome check --write src/"
 	},
@@ -35,6 +36,7 @@
 		"@types/react": "^19.2.7",
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^5.1.1",
+		"@vitest/coverage-v8": "^4.0.18",
 		"jsdom": "^28.1.0",
 		"msw": "^2.12.10",
 		"typescript": "~5.9.3",

@@ -31,11 +31,18 @@ export function useImages(drawingTypeId?: number, search?: string) {
 			return fetchImages(Object.keys(params).length ? params : undefined);
 		},
 		initialPageParam: undefined as string | undefined,
-		getNextPageParam: (lastPage) =>
-			lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined,
+		getNextPageParam,
 		staleTime: STALE_TIME_IMAGE_LIST,
 		gcTime: GC_TIME_IMAGE_LIST,
 	});
+}
+
+// Exported for testing
+export function getNextPageParam(lastPage: {
+	has_more: boolean;
+	next_cursor?: string;
+}) {
+	return lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined;
 }
 
 export function useImage(imageId: string) {

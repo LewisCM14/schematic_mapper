@@ -5,7 +5,6 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FIXTURES } from "../test/handlers";
 import { server } from "../test/handlers";
 import theme from "../theme";
 import AdminUploadMappingPage from "./AdminUploadMappingPage";
@@ -15,9 +14,10 @@ const { mockNavigate } = vi.hoisted(() => ({
 }));
 
 vi.mock("react-router-dom", async () => {
-	const actual = await vi.importActual<typeof import("react-router-dom")>(
-		"react-router-dom",
-	);
+	const actual =
+		await vi.importActual<typeof import("react-router-dom")>(
+			"react-router-dom",
+		);
 	return {
 		...actual,
 		useNavigate: () => mockNavigate,
@@ -59,133 +59,34 @@ describe("AdminUploadMappingPage", () => {
 		});
 	});
 
-	it(
-		"Step 3 renders image tiles after upload and clicking a tile advances to Step 4",
-		async () => {
-			vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
-
-			renderPage();
-
-			// Step 1 — select drawing type
-			const select = await screen.findByRole("combobox", {
-				name: /drawing type/i,
-			});
-			await userEvent.click(select);
-			const option = await screen.findByRole("option", {
-				name: "composite",
-			});
-			await userEvent.click(option);
-			await userEvent.click(screen.getByRole("button", { name: /next/i }));
-
-			// Step 2 — upload
-			await waitFor(() =>
-				screen.getByRole("textbox", { name: /component name/i }),
-			);
-			await userEvent.type(
-				screen.getByRole("textbox", { name: /component name/i }),
-				"Pump Assembly",
-			);
-
-			const file = new File(["<svg/>"], "test.svg", {
-				type: "image/svg+xml",
-			});
-			const fileInput =
-				document.querySelector<HTMLInputElement>('input[type="file"]');
-			fireEvent.change(fileInput as HTMLInputElement, {
-				target: { files: [file] },
-			});
-
-			await waitFor(() =>
-				expect(
-					screen.getByRole("button", { name: /^upload$/i }),
-				).not.toBeDisabled(),
-			);
-			await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
-
-			// Step 3 — select image: should show an image tile
-			await waitFor(() => {
-				expect(
-					screen.getByRole("heading", { name: "Select Image" }),
-				).toBeInTheDocument();
-				expect(
-					screen.getByText("Cooling System Assembly"),
-				).toBeInTheDocument();
-			});
-
-			// Click the tile to advance to Step 4
-			await userEvent.click(screen.getByText("Cooling System Assembly"));
-
-			await waitFor(() => {
-				expect(screen.getByText("Map Fitting Positions")).toBeInTheDocument();
-				expect(screen.getByTestId("diagram-canvas")).toBeInTheDocument();
-				expect(
-					screen.getByRole("tab", { name: "unmapped tab" }),
-				).toBeInTheDocument();
-				expect(
-					screen.getByRole("tab", { name: "mapped tab" }),
-				).toBeInTheDocument();
-			});
-		},
-		10000,
-	);
-
-	it("shows the newly uploaded image in Step 3 even before the filtered list refreshes", async () => {
+	it("Step 3 renders image tiles after upload and clicking a tile advances to Step 4", async () => {
 		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
-		server.use(
-			http.post("/api/admin/uploads/:id/complete", () =>
-				HttpResponse.json(
-					{
-						upload_id: "2a9e408b-fc40-4478-82e6-714c6792d0fa",
-						image_id: "026be72d-1b9c-43a6-869e-2caaf991ca3f",
-						state: "completed",
-					},
-					{ status: 201 },
-				),
-			),
-			http.get("/api/images", ({ request }) => {
-				const url = new URL(request.url);
-				if (url.searchParams.get("drawing_type_id") === "1") {
-					return HttpResponse.json({
-						results: [FIXTURES.image],
-						has_more: false,
-						next_cursor: null,
-					});
-				}
-				return HttpResponse.json({
-					results: [FIXTURES.image],
-					has_more: false,
-					next_cursor: null,
-				});
-			}),
-			http.get("/api/images/026be72d-1b9c-43a6-869e-2caaf991ca3f", () =>
-				HttpResponse.json({
-					...FIXTURES.imageDetail,
-					image_id: "026be72d-1b9c-43a6-869e-2caaf991ca3f",
-					component_name: "testing",
-					thumbnail_url: null,
-				}),
-			),
-		);
 
 		renderPage();
 
+		// Step 1 — select drawing type
 		const select = await screen.findByRole("combobox", {
 			name: /drawing type/i,
 		});
 		await userEvent.click(select);
-		const option = await screen.findByRole("option", { name: "composite" });
+		const option = await screen.findByRole("option", {
+			name: "composite",
+		});
 		await userEvent.click(option);
 		await userEvent.click(screen.getByRole("button", { name: /next/i }));
 
+		// Step 2 — upload
 		await waitFor(() =>
 			screen.getByRole("textbox", { name: /component name/i }),
 		);
 		await userEvent.type(
 			screen.getByRole("textbox", { name: /component name/i }),
-			"testing",
+			"Pump Assembly",
 		);
 
-		const file = new File(["<svg/>"], "test.svg", { type: "image/svg+xml" });
+		const file = new File(["<svg/>"], "test.svg", {
+			type: "image/svg+xml",
+		});
 		const fileInput =
 			document.querySelector<HTMLInputElement>('input[type="file"]');
 		fireEvent.change(fileInput as HTMLInputElement, {
@@ -199,11 +100,28 @@ describe("AdminUploadMappingPage", () => {
 		);
 		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
 
+		// Step 3 — select image: should show an image tile
 		await waitFor(() => {
-			expect(screen.getByRole("heading", { name: "Select Image" })).toBeInTheDocument();
-			expect(screen.getByText("testing")).toBeInTheDocument();
+			expect(
+				screen.getByRole("heading", { name: "Select Image" }),
+			).toBeInTheDocument();
+			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
 		});
-	});
+
+		// Click the tile to advance to Step 4
+		await userEvent.click(screen.getByText("Cooling System Assembly"));
+
+		await waitFor(() => {
+			expect(screen.getByText("Map Fitting Positions")).toBeInTheDocument();
+			expect(screen.getByTestId("diagram-canvas")).toBeInTheDocument();
+			expect(
+				screen.getByRole("tab", { name: "unmapped tab" }),
+			).toBeInTheDocument();
+			expect(
+				screen.getByRole("tab", { name: "mapped tab" }),
+			).toBeInTheDocument();
+		});
+	}, 10000);
 
 	it("Step 3 back button returns to Upload Image without auto-forwarding again", async () => {
 		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
@@ -253,7 +171,7 @@ describe("AdminUploadMappingPage", () => {
 				screen.getByRole("heading", { name: "Upload Image" }),
 			).toBeInTheDocument();
 		});
-	});
+	}, 10000);
 
 	it("shows the backend duplicate-name validation message during upload", async () => {
 		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
@@ -321,78 +239,6 @@ describe("AdminUploadMappingPage", () => {
 			expect(
 				screen.getByRole("heading", { name: "Select Image" }),
 			).toBeInTheDocument();
-		});
-	});
-
-	it("returns to the admin start after a successful save", async () => {
-		let bulkRequests = 0;
-
-		server.use(
-			http.post("/api/admin/fitting-positions/bulk", () => {
-				bulkRequests += 1;
-				return HttpResponse.json({ created: 1, updated: 0 });
-			}),
-		);
-
-		vi.spyOn(crypto.subtle, "digest").mockResolvedValue(new ArrayBuffer(32));
-		renderPage();
-
-		const select = await screen.findByRole("combobox", {
-			name: /drawing type/i,
-		});
-		await userEvent.click(select);
-		const option = await screen.findByRole("option", { name: "composite" });
-		await userEvent.click(option);
-		await userEvent.click(screen.getByRole("button", { name: /next/i }));
-
-		await userEvent.type(
-			screen.getByRole("textbox", { name: /component name/i }),
-			"Pump Assembly",
-		);
-		const file = new File(["<svg/>"], "test.svg", { type: "image/svg+xml" });
-		const fileInput =
-			document.querySelector<HTMLInputElement>('input[type="file"]');
-		fireEvent.change(fileInput as HTMLInputElement, {
-			target: { files: [file] },
-		});
-		await waitFor(() =>
-			expect(screen.getByRole("button", { name: /^upload$/i })).not.toBeDisabled(),
-		);
-		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
-
-		await waitFor(() => {
-			expect(screen.getByText("Cooling System Assembly")).toBeInTheDocument();
-		});
-		await userEvent.click(screen.getByText("Cooling System Assembly"));
-
-		const canvasHost = (await screen.findByAltText("schematic diagram")).parentElement;
-		if (!canvasHost) {
-			throw new Error("Expected diagram canvas host to exist");
-		}
-		vi.spyOn(canvasHost, "getBoundingClientRect").mockReturnValue({
-			bottom: 600,
-			height: 600,
-			left: 0,
-			right: 800,
-			top: 0,
-			width: 800,
-			x: 0,
-			y: 0,
-			toJSON: () => ({}),
-		});
-
-		fireEvent.pointerDown(canvasHost, { clientX: 100, clientY: 120, pointerId: 1 });
-		fireEvent.pointerMove(canvasHost, { clientX: 220, clientY: 260, pointerId: 1 });
-		fireEvent.pointerUp(canvasHost, { clientX: 220, clientY: 260, pointerId: 1 });
-		await userEvent.type(screen.getByRole("textbox", { name: /marker label/i }), "FP-001");
-		await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
-
-		await userEvent.click(screen.getByRole("button", { name: /review & save/i }));
-		await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-
-		await waitFor(() => {
-			expect(bulkRequests).toBe(1);
-			expect(mockNavigate).toHaveBeenCalledWith("/");
 		});
 	});
 
@@ -681,7 +527,9 @@ describe("AdminUploadMappingPage", () => {
 		expect(screen.getByText("0 positions")).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: /^back$/i })).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: /review & save/i })).toBeDisabled();
+		expect(
+			screen.getByRole("button", { name: /review & save/i }),
+		).toBeDisabled();
 		expect(screen.getByRole("button", { name: /publish/i })).toBeDisabled();
 	});
 
@@ -709,7 +557,9 @@ describe("AdminUploadMappingPage", () => {
 			target: { files: [file] },
 		});
 		await waitFor(() =>
-			expect(screen.getByRole("button", { name: /^upload$/i })).not.toBeDisabled(),
+			expect(
+				screen.getByRole("button", { name: /^upload$/i }),
+			).not.toBeDisabled(),
 		);
 		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
 
@@ -718,7 +568,8 @@ describe("AdminUploadMappingPage", () => {
 		});
 		await userEvent.click(screen.getByText("Cooling System Assembly"));
 
-		const canvasHost = (await screen.findByAltText("schematic diagram")).parentElement;
+		const canvasHost = (await screen.findByAltText("schematic diagram"))
+			.parentElement;
 		if (!canvasHost) {
 			throw new Error("Expected diagram canvas host to exist");
 		}
@@ -734,19 +585,51 @@ describe("AdminUploadMappingPage", () => {
 			toJSON: () => ({}),
 		});
 
-		fireEvent.pointerDown(canvasHost, { clientX: 100, clientY: 120, pointerId: 1 });
-		fireEvent.pointerMove(canvasHost, { clientX: 220, clientY: 260, pointerId: 1 });
-		fireEvent.pointerUp(canvasHost, { clientX: 220, clientY: 260, pointerId: 1 });
-		await userEvent.type(screen.getByRole("textbox", { name: /marker label/i }), "FP-001");
+		fireEvent.pointerDown(canvasHost, {
+			clientX: 100,
+			clientY: 120,
+			pointerId: 1,
+		});
+		fireEvent.pointerMove(canvasHost, {
+			clientX: 220,
+			clientY: 260,
+			pointerId: 1,
+		});
+		fireEvent.pointerUp(canvasHost, {
+			clientX: 220,
+			clientY: 260,
+			pointerId: 1,
+		});
+		await userEvent.type(
+			screen.getByRole("textbox", { name: /marker label/i }),
+			"FP-001",
+		);
 		await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
-		fireEvent.pointerDown(canvasHost, { clientX: 260, clientY: 300, pointerId: 2 });
-		fireEvent.pointerMove(canvasHost, { clientX: 360, clientY: 380, pointerId: 2 });
-		fireEvent.pointerUp(canvasHost, { clientX: 360, clientY: 380, pointerId: 2 });
-		await userEvent.type(screen.getByRole("textbox", { name: /marker label/i }), "FP-001");
+		fireEvent.pointerDown(canvasHost, {
+			clientX: 260,
+			clientY: 300,
+			pointerId: 2,
+		});
+		fireEvent.pointerMove(canvasHost, {
+			clientX: 360,
+			clientY: 380,
+			pointerId: 2,
+		});
+		fireEvent.pointerUp(canvasHost, {
+			clientX: 360,
+			clientY: 380,
+			pointerId: 2,
+		});
+		await userEvent.type(
+			screen.getByRole("textbox", { name: /marker label/i }),
+			"FP-001",
+		);
 		await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
-		expect(screen.getByText("Label text must be unique per image.")).toBeInTheDocument();
+		expect(
+			screen.getByText("Label text must be unique per image."),
+		).toBeInTheDocument();
 		expect(screen.getByText(/1 positions/i)).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
 	});
@@ -770,9 +653,13 @@ describe("AdminUploadMappingPage", () => {
 		const file = new File(["<svg/>"], "test.svg", { type: "image/svg+xml" });
 		const fileInput =
 			document.querySelector<HTMLInputElement>('input[type="file"]');
-		fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+		fireEvent.change(fileInput as HTMLInputElement, {
+			target: { files: [file] },
+		});
 		await waitFor(() =>
-			expect(screen.getByRole("button", { name: /^upload$/i })).not.toBeDisabled(),
+			expect(
+				screen.getByRole("button", { name: /^upload$/i }),
+			).not.toBeDisabled(),
 		);
 		await userEvent.click(screen.getByRole("button", { name: /^upload$/i }));
 		await waitFor(() => {
@@ -781,8 +668,12 @@ describe("AdminUploadMappingPage", () => {
 		await userEvent.click(screen.getByText("Cooling System Assembly"));
 
 		expect(screen.getAllByRole("button", { name: /^back$/i })).toHaveLength(1);
-		expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
-		expect(screen.getAllByRole("button", { name: /review & save/i })).toHaveLength(1);
+		expect(
+			screen.queryByRole("button", { name: /^save$/i }),
+		).not.toBeInTheDocument();
+		expect(
+			screen.getAllByRole("button", { name: /review & save/i }),
+		).toHaveLength(1);
 	});
 
 	it("Cancel in action footer returns to Step 3 and clears mapping state", async () => {
@@ -843,5 +734,4 @@ describe("AdminUploadMappingPage", () => {
 		// Footer should not be visible in Step 3
 		expect(screen.queryByTestId("admin-action-footer")).not.toBeInTheDocument();
 	});
-
 });

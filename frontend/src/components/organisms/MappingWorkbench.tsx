@@ -1,4 +1,14 @@
-import { Box, Button, Chip, Tab, Tabs, TextField, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
+import {
+	Box,
+	Button,
+	Chip,
+	Tab,
+	Tabs,
+	TextField,
+	ToggleButton,
+	ToggleButtonGroup,
+	Typography,
+} from "@mui/material";
 import { useState } from "react";
 import type { CanvasMarker, CanvasRectangle } from "./DiagramCanvasViewport";
 import DiagramCanvasViewport from "./DiagramCanvasViewport";
@@ -59,7 +69,9 @@ function MappingWorkbench({
 	onConfirmDeleteMappedPosition,
 	onCancelDeleteMappedPosition,
 }: MappingWorkbenchProps) {
-	const [interactionMode, setInteractionMode] = useState<"pan" | "draw">("draw");
+	const [interactionMode, setInteractionMode] = useState<"pan" | "draw">(
+		"draw",
+	);
 	const workbenchHeight = "70vh";
 	const rectangles: CanvasRectangle[] = mappedPositions
 		.filter((p) => p.width > 0 && p.height > 0)
@@ -84,15 +96,15 @@ function MappingWorkbench({
 	);
 	const panToTarget = selectedMappedPosition
 		? {
-			x:
-				selectedMappedPosition.width > 0
-					? selectedMappedPosition.x + selectedMappedPosition.width / 2
-					: selectedMappedPosition.x,
-			y:
-				selectedMappedPosition.height > 0
-					? selectedMappedPosition.y + selectedMappedPosition.height / 2
-					: selectedMappedPosition.y,
-		}
+				x:
+					selectedMappedPosition.width > 0
+						? selectedMappedPosition.x + selectedMappedPosition.width / 2
+						: selectedMappedPosition.x,
+				y:
+					selectedMappedPosition.height > 0
+						? selectedMappedPosition.y + selectedMappedPosition.height / 2
+						: selectedMappedPosition.y,
+			}
 		: null;
 
 	return (
@@ -181,8 +193,8 @@ function MappingWorkbench({
 						) : (
 							<Typography variant="body2" color="text.secondary">
 								{mappedPositions.length === 0
-										? "Drag on the canvas to draw the first selection box."
-										: "Drag on the canvas to add another selection box."}
+									? "Drag on the canvas to draw the first selection box."
+									: "Drag on the canvas to add another selection box."}
 							</Typography>
 						))}
 					{mappingTab === 1 &&
@@ -256,9 +268,17 @@ function MappingWorkbench({
 												</Box>
 											)}
 											{isConfirmingDelete && (
-												<Box sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 1 }}>
+												<Box
+													sx={{
+														mt: 1,
+														display: "flex",
+														flexDirection: "column",
+														gap: 1,
+													}}
+												>
 													<Typography variant="caption" color="text.secondary">
-														Are you sure you want to {p.persisted ? "delete" : "remove"} this mapping?
+														Are you sure you want to{" "}
+														{p.persisted ? "delete" : "remove"} this mapping?
 													</Typography>
 													<Box sx={{ display: "flex", gap: 1 }}>
 														<Button
@@ -308,8 +328,8 @@ function MappingWorkbench({
 					<Box>
 						<Typography variant="subtitle2">Interaction Mode</Typography>
 						<Typography variant="caption" color="text.secondary">
-							Switch to Pan &amp; Zoom to reposition the drawing, then return to Draw Box
-							 to mark a fitting position.
+							Switch to Pan &amp; Zoom to reposition the drawing, then return to
+							Draw Box to mark a fitting position.
 						</Typography>
 					</Box>
 					<ToggleButtonGroup
@@ -339,16 +359,18 @@ function MappingWorkbench({
 					panToTarget={panToTarget}
 					selectedMarkerId={selectedMappedPositionId}
 					onMarkerClick={onMappedPositionSelect}
-					draftRectangle={pendingRect
-						? {
-							id: "__pending__",
-							x: pendingRect.x,
-							y: pendingRect.y,
-							width: pendingRect.width,
-							height: pendingRect.height,
-							status: "unmapped",
-						}
-						: null}
+					draftRectangle={
+						pendingRect
+							? {
+									id: "__pending__",
+									x: pendingRect.x,
+									y: pendingRect.y,
+									width: pendingRect.width,
+									height: pendingRect.height,
+									status: "unmapped",
+								}
+							: null
+					}
 					onRectangleDraw={onRectangleDraw}
 				/>
 			</Box>

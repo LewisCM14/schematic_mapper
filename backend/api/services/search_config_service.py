@@ -11,7 +11,9 @@ class SourceSearchConfig:
     searchable_columns: list[str]
     field_weights: dict[str, int]
     table_name: str | None = None
-    normalization_rules: list[str] = field(default_factory=lambda: ["case_fold", "trim"])
+    normalization_rules: list[str] = field(
+        default_factory=lambda: ["case_fold", "trim"]
+    )
 
 
 @final
