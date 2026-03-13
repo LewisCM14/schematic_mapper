@@ -28,27 +28,17 @@ function ImageSelectionPage() {
 		fetchNextPage,
 		isFetchingNextPage,
 	} = useImages(selectedTypeId !== "" ? selectedTypeId : undefined, undefined);
-	type ImageType = {
-		image_id: string;
-		drawing_type: {
-			drawing_type_id: number;
-			type_name: string;
-			description: string;
-			is_active: boolean;
-		};
-		component_name: string;
-		width_px: number;
-		height_px: number;
-		uploaded_at: string;
-		thumbnail_url: string | null;
-	};
 	const filteredImages =
-		filteredData?.pages.flatMap((p) =>
-			p && "results" in p ? (p.results as ImageType[]) : [],
-		) ?? [];
+		(
+			filteredData?.pages as
+				| import("../services/api/schemas").ImageListPage[]
+				| undefined
+		)?.flatMap((p) => p.results) ?? [];
 
 	const showGrid = selectedTypeId !== "";
-	const images = showGrid ? filteredImages : [];
+	const images = showGrid
+		? filteredImages
+		: ([] as import("../services/api/schemas").Image[]);
 
 	const stateSlot = (
 		<>

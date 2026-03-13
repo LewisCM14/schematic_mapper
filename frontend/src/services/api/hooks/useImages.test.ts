@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { FIXTURES, IMAGE_ID } from "../../../test/handlers";
 import { queryKeys } from "../queryKeys";
+import type { ImageListPage } from "../schemas";
 import { getNextPageParam, useImage, useImages } from "./useImages";
 
 function makeWrapper() {
@@ -20,18 +21,20 @@ function makeWrapper() {
 describe("useImages", () => {
 	describe("getNextPageParam (unit)", () => {
 		it("returns next_cursor when has_more is true and next_cursor is present", () => {
-			expect(getNextPageParam({ has_more: true, next_cursor: "abc" })).toBe(
-				"abc",
-			);
+			expect(
+				getNextPageParam({ results: [], has_more: true, next_cursor: "abc" }),
+			).toBe("abc");
 		});
 		it("returns undefined when has_more is true but next_cursor is missing", () => {
-			expect(getNextPageParam({ has_more: true })).toBeUndefined();
+			expect(getNextPageParam({ results: [], has_more: true })).toBeUndefined();
 		});
 		it("returns undefined when has_more is false", () => {
 			expect(
-				getNextPageParam({ has_more: false, next_cursor: "abc" }),
+				getNextPageParam({ results: [], has_more: false, next_cursor: "abc" }),
 			).toBeUndefined();
-			expect(getNextPageParam({ has_more: false })).toBeUndefined();
+			expect(
+				getNextPageParam({ results: [], has_more: false }),
+			).toBeUndefined();
 		});
 	});
 	it("applies both drawingTypeId and search filters", async () => {
@@ -45,7 +48,10 @@ describe("useImages", () => {
 		const { wrapper } = makeWrapper();
 		const { result } = renderHook(() => useImages(), { wrapper });
 		await waitFor(() => expect(result.current.isSuccess).toBe(true));
-		const images = result.current.data?.pages.flatMap((p) => p.results) ?? [];
+		const images =
+			(result.current.data?.pages as ImageListPage[] | undefined)?.flatMap(
+				(p) => p.results,
+			) ?? [];
 		expect(images).toHaveLength(1);
 		expect(images[0].image_id).toBe(IMAGE_ID);
 	});
@@ -61,7 +67,9 @@ describe("useImages", () => {
 		const { wrapper } = makeWrapper();
 		const { result } = renderHook(() => useImages(), { wrapper });
 		await waitFor(() => expect(result.current.isSuccess).toBe(true));
-		const firstPage = result.current.data?.pages[0];
+		const firstPage = result.current.data?.pages[0] as
+			| ImageListPage
+			| undefined;
 		expect(firstPage?.has_more).toBe(false);
 	});
 

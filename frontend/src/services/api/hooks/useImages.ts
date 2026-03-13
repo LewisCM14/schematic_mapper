@@ -7,6 +7,7 @@ import {
 } from "../config";
 import { fetchImage, fetchImages } from "../endpoints";
 import { queryKeys } from "../queryKeys";
+import type { ImageListPage } from "../schemas";
 
 export function useImages(drawingTypeId?: number, search?: string) {
 	const baseParams: Record<string, string> = {};
@@ -23,9 +24,10 @@ export function useImages(drawingTypeId?: number, search?: string) {
 				...(search ? { search } : {}),
 			}
 		: undefined;
-	return useInfiniteQuery({
+	return useInfiniteQuery<ImageListPage, Error>({
 		queryKey: queryKeys.images.list(filters),
-		queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
+		queryFn: (context) => {
+			const pageParam = context.pageParam as string | undefined;
 			const params = { ...baseParams };
 			if (pageParam) params.cursor = pageParam;
 			return fetchImages(Object.keys(params).length ? params : undefined);
@@ -38,10 +40,8 @@ export function useImages(drawingTypeId?: number, search?: string) {
 }
 
 // Exported for testing
-export function getNextPageParam(lastPage: {
-	has_more: boolean;
-	next_cursor?: string;
-}) {
+// Accepts the full ImageListPage type and normalizes next_cursor null to undefined
+export function getNextPageParam(lastPage: ImageListPage) {
 	return lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined;
 }
 

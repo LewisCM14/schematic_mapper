@@ -116,7 +116,11 @@ function AdminUploadMappingPage() {
 
 	const mergedSelectableImages = useMemo(() => {
 		const selectableImages =
-			selectableImagesData?.pages.flatMap((page) => page.results) ?? [];
+			(
+				selectableImagesData?.pages as
+					| import("../services/api/schemas").ImageListPage[]
+					| undefined
+			)?.flatMap((page) => page.results) ?? [];
 		const uploadedImageSummary =
 			upload.completedImageId &&
 			selectedImage &&
@@ -132,7 +136,7 @@ function AdminUploadMappingPage() {
 					}
 				: null;
 		return uploadedImageSummary &&
-			!selectableImages.some(
+			!(selectableImages as import("../services/api/schemas").Image[]).some(
 				(image) => image.image_id === uploadedImageSummary.image_id,
 			)
 			? [uploadedImageSummary, ...selectableImages]
@@ -477,7 +481,9 @@ function AdminUploadMappingPage() {
 						</Typography>
 					) : (
 						<Grid container spacing={2} alignItems="stretch">
-							{mergedSelectableImages.map((img) => (
+							{(
+								mergedSelectableImages as import("../services/api/schemas").Image[]
+							).map((img) => (
 								<Grid key={img.image_id} size={{ xs: 12, sm: 6, md: 4 }}>
 									<ImageTileCard
 										image={img}
