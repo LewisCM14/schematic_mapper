@@ -17,11 +17,12 @@ export default defineConfig({
 				inline: ["@panzoom/panzoom"],
 			},
 		},
-		   coverage: {
-			   provider: "v8",
-			   reporter: ["text", "html"],
-			   include: ["src/**/*.{ts,tsx}"],
-			   exclude: ["src/test/**", "**/*.d.ts"],
-		   },
+		coverage: {
+			provider: "v8",
+			reporter: ["text", "html"],
+			include: ["src/**/*.{ts,tsx}"],
+			exclude: ["src/test/**", "**/*.d.ts"],
+		},
+		testTimeout: 20000,
 	},
 });

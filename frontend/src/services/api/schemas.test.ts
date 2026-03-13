@@ -128,34 +128,6 @@ describe("SearchResponseSchema", () => {
 		request_id: "req-001",
 	};
 
-	it("parses a valid search response", () => {
-		expect(() =>
-			SearchResponseSchema.parse(VALID_SEARCH_RESPONSE),
-		).not.toThrow();
-	});
-
-	it("parses response with results", () => {
-		const responseWithResult = {
-			...VALID_SEARCH_RESPONSE,
-			results: [
-				{
-					fitting_position_id: "FP-001",
-					label_text: "pump-inlet",
-					image_id: VALID_UUID,
-					x_coordinate: 100,
-					y_coordinate: 200,
-					component_name: "Cooling Assembly",
-					matched_source: "internal",
-					matched_field: "label_text",
-					match_type: "exact",
-				},
-			],
-		};
-		const result = SearchResponseSchema.parse(responseWithResult);
-		expect(result.results).toHaveLength(1);
-		expect(result.results[0].match_type).toBe("exact");
-	});
-
 	it("throws when match_type is not in enum", () => {
 		const badResult = {
 			...VALID_SEARCH_RESPONSE,

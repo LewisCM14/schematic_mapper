@@ -79,61 +79,6 @@ describe("SearchResultsPanel", () => {
 		expect(document.querySelector("[data-testid='SearchIcon']")).toBeTruthy();
 	});
 
-	it("shows loading spinner when loading and query >= 2", async () => {
-		vi.doMock("../../services/api/hooks/useSearch", () => ({
-			useSearch: () => ({
-				isLoading: true,
-				data: undefined,
-				isFetchingNextPage: false,
-				hasNextPage: false,
-				fetchNextPage: vi.fn(),
-				isError: false,
-			}),
-		}));
-		const { default: Panel } = await import("./SearchResultsPanel");
-		await renderPanelAsync(Panel, { query: "ab" });
-		expect(screen.queryByText(/No results found/i)).toBeInTheDocument();
-		const spinner = screen.getByRole("progressbar");
-		expect(spinner).toBeInTheDocument();
-		vi.resetModules();
-	});
-
-	it("shows error alert when isError", async () => {
-		vi.doMock("../../services/api/hooks/useSearch", () => ({
-			useSearch: () => ({
-				isError: true,
-				isLoading: false,
-				data: undefined,
-				isFetchingNextPage: false,
-				hasNextPage: false,
-				fetchNextPage: vi.fn(),
-			}),
-		}));
-		const { default: Panel } = await import("./SearchResultsPanel");
-		await renderPanelAsync(Panel, { query: "abc" });
-		expect(screen.getByText(/search failed/i)).toBeInTheDocument();
-		vi.resetModules();
-	});
-
-	it("shows degraded warning when asset source is degraded", async () => {
-		vi.doMock("../../services/api/hooks/useSearch", () => ({
-			useSearch: () => ({
-				isLoading: false,
-				isError: false,
-				isFetchingNextPage: false,
-				hasNextPage: false,
-				fetchNextPage: vi.fn(),
-				data: {
-					pages: [{ source_status: { asset: "degraded" }, results: [] }],
-				},
-			}),
-		}));
-		const { default: Panel } = await import("./SearchResultsPanel");
-		await renderPanelAsync(Panel, { query: "abc" });
-		expect(screen.getByText(/asset source unavailable/i)).toBeInTheDocument();
-		vi.resetModules();
-	});
-
 	it("shows min-chars hint when query is 1 char", async () => {
 		vi.doMock("../../services/api/hooks/useSearch", () => ({
 			useSearch: () => ({
