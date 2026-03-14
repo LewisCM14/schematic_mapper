@@ -11,6 +11,9 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
+
+# Set the default Django settings module for WSGI
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
+# Create the WSGI application callable for use by WSGI servers (e.g., Gunicorn, uWSGI)
 application = get_wsgi_application()

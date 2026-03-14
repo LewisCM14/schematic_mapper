@@ -1,4 +1,8 @@
-"""Image and fitting-position read endpoints."""
+"""
+Image and fitting-position read endpoints for the Schematic Mapper API.
+Provides endpoints for listing and retrieving images, drawing types, and fitting positions.
+All endpoints are read-only and intended for frontend consumption.
+"""
 
 import base64
 import uuid
@@ -21,6 +25,10 @@ from api.serializers.image_serializers import (
 
 @api_view(["GET"])
 def list_drawing_types(request: Request) -> Response:
+    """
+    List all active drawing types, ordered by name.
+    Used to populate dropdowns or filters in the UI.
+    """
     qs = DrawingType.objects.filter(is_active=True).order_by("type_name")
     serializer = DrawingTypeSerializer(qs, many=True)
     return Response(serializer.data)
@@ -28,7 +36,12 @@ def list_drawing_types(request: Request) -> Response:
 
 @api_view(["GET"])
 def list_images(request: Request) -> Response:
+    """
+    List images with optional filtering by drawing type and search term.
+    Supports pagination via limit and cursor query parameters.
+    """
     qs = Image.objects.select_related("drawing_type").all()
+    # Optional filter by drawing_type_id
     drawing_type_id = request.query_params.get("drawing_type_id")
     if drawing_type_id is not None:
         try:
@@ -36,10 +49,12 @@ def list_images(request: Request) -> Response:
         except ValueError:
             return Response({"error": "drawing_type_id must be an integer"}, status=400)
 
+    # Optional search by component name
     search = request.query_params.get("search")
     if search:
         qs = qs.filter(component_name__icontains=search)
 
+    # Pagination: limit and cursor
     try:
         limit = max(1, min(100, int(request.query_params.get("limit", "25"))))
     except ValueError:
@@ -68,6 +83,10 @@ def list_images(request: Request) -> Response:
 
 @api_view(["GET"])
 def get_image(request: Request, image_id: uuid.UUID) -> Response:
+    """
+    Retrieve details for a single image by its UUID.
+    Returns all metadata and drawing type info.
+    """
     image = get_object_or_404(Image.objects.select_related("drawing_type"), pk=image_id)
     serializer = ImageDetailSerializer(image)
     return Response(serializer.data)
@@ -75,6 +94,10 @@ def get_image(request: Request, image_id: uuid.UUID) -> Response:
 
 @api_view(["GET"])
 def list_fitting_positions(request: Request, image_id: uuid.UUID) -> Response:
+    """
+    List all fitting positions for a given image.
+    Returns a list of position metadata for UI rendering.
+    """
     get_object_or_404(Image, pk=image_id)
     positions = FittingPosition.objects.filter(image_id=image_id)
     serializer = FittingPositionSerializer(positions, many=True)
@@ -85,6 +108,10 @@ def list_fitting_positions(request: Request, image_id: uuid.UUID) -> Response:
 def get_fitting_position_details(
     request: Request, fitting_position_id: str
 ) -> Response:
+    """
+    Retrieve detailed info for a single fitting position, including asset lookup.
+    Combines DB data with external asset details for UI display.
+    """
     fp = get_object_or_404(FittingPosition, pk=fitting_position_id)
     asset_result = fetch_asset_details(fitting_position_id)
 

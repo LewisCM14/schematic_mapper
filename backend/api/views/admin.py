@@ -1,4 +1,8 @@
-"""Admin endpoints: upload lifecycle, single-request upload, bulk fitting positions."""
+"""
+Admin endpoints for the Schematic Mapper backend.
+Implements the upload session lifecycle, chunked and single-request uploads, and bulk fitting position management.
+All endpoints are protected and intended for admin use only.
+"""
 
 import uuid
 
@@ -19,9 +23,15 @@ from api.serializers.upload_serializers import (
 )
 from api.services import upload_service
 
+# --- Upload Session Lifecycle ---
+
 
 @api_view(["POST"])
 def create_upload_session(request: Request) -> Response:
+    """
+    Start a new upload session for a large SVG image.
+    Validates input, enforces limits, and returns a session object for chunked upload.
+    """
     serializer = UploadSessionCreateSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
@@ -40,11 +50,13 @@ def create_upload_session(request: Request) -> Response:
             request_id=request_id,
         )
     except ValueError:
+        # File size exceeds allowed maximum
         return Response(
             {"error": "File size exceeds maximum allowed", "code": "file_too_large"},
             status=400,
         )
     except PermissionError:
+        # Too many concurrent upload sessions
         return Response(
             {
                 "error": "Maximum concurrent upload sessions reached",
@@ -54,6 +66,7 @@ def create_upload_session(request: Request) -> Response:
             status=429,
         )
     except FileExistsError:
+        # Duplicate component name
         return Response(
             {
                 "error": upload_service.DUPLICATE_COMPONENT_NAME_MESSAGE,
@@ -68,6 +81,10 @@ def create_upload_session(request: Request) -> Response:
 
 @api_view(["PUT"])
 def upload_chunk(request: Request, upload_id: uuid.UUID, part_number: int) -> Response:
+    """
+    Upload a single chunk of a file to an in-progress upload session.
+    Validates chunk data and updates the session state.
+    """
     serializer = UploadChunkSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
@@ -84,6 +101,10 @@ def upload_chunk(request: Request, upload_id: uuid.UUID, part_number: int) -> Re
 
 @api_view(["POST"])
 def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
+    """
+    Complete an upload session by assembling all chunks, verifying checksum, and committing the image.
+    Returns error if validation fails or commit is unsuccessful.
+    """
     serializer = UploadCompleteSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
@@ -98,6 +119,10 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
 
 @api_view(["GET", "DELETE"])
 def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
+    """
+    GET: Return details and progress for an upload session (received parts, file size, etc).
+    DELETE: Abort an upload session and delete all associated chunks.
+    """
     if request.method == "GET":
         detail = upload_service.get_session_detail(upload_id=upload_id)
         session = detail["session"]
@@ -107,7 +132,7 @@ def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
         data["received_parts"] = detail["received_parts"]
         return Response(data)
 
-    # DELETE — abort
+    # DELETE — abort upload session
     request_id = request.META.get("HTTP_X_REQUEST_ID", "-")
     payload, status = upload_service.abort_upload(
         upload_id=upload_id,
@@ -118,8 +143,15 @@ def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
     return Response(status=status)
 
 
+# --- Single-Request Admin Upload ---
+
+
 @api_view(["POST"])
 def admin_upload_image(request: Request) -> Response:
+    """
+    Upload an image in a single request (no chunking).
+    Used for small files or admin-only workflows.
+    """
     serializer = AdminImageUploadSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
@@ -150,8 +182,16 @@ def admin_upload_image(request: Request) -> Response:
     )
 
 
+# --- Bulk Fitting Position Management ---
+
+
 @api_view(["POST"])
 def bulk_fitting_positions(request: Request) -> Response:
+    """
+    Bulk create or update fitting positions for a given image.
+    Validates for duplicate IDs and labels in the payload.
+    Returns the number of created and updated records.
+    """
     serializer = BulkFittingPositionSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
@@ -159,6 +199,7 @@ def bulk_fitting_positions(request: Request) -> Response:
     data = serializer.validated_data
     image = get_object_or_404(Image, pk=data["image_id"])
 
+    # Check for duplicate fitting_position_id values
     fp_ids = [item["fitting_position_id"] for item in data["fitting_positions"]]
     if len(fp_ids) != len(set(fp_ids)):
         return Response(
@@ -170,6 +211,7 @@ def bulk_fitting_positions(request: Request) -> Response:
             status=400,
         )
 
+    # Check for duplicate label_text values (case-insensitive, trimmed)
     label_texts = [
         item["label_text"].strip().lower() for item in data["fitting_positions"]
     ]
@@ -208,6 +250,10 @@ def bulk_fitting_positions(request: Request) -> Response:
 
 @api_view(["DELETE"])
 def delete_fitting_position(request: Request, fitting_position_id: str) -> Response:
+    """
+    Delete a fitting position by its ID.
+    Returns 204 on success.
+    """
     fitting_position = get_object_or_404(FittingPosition, pk=fitting_position_id)
     fitting_position.delete()
     return Response(status=204)

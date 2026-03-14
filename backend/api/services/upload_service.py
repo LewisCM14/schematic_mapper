@@ -1,4 +1,8 @@
-"""Upload orchestration: session lifecycle, chunk assembly, and verification."""
+"""
+UploadService: orchestrates the admin upload workflow for SVG images.
+Handles session lifecycle, chunked upload, checksum validation, and commit to the Image table.
+Implements resumable, reliable uploads for large files as required by the spec.
+"""
 
 from uuid import UUID
 
@@ -11,7 +15,18 @@ from django.db import IntegrityError
 from django.db.models.functions import Lower, Trim
 from django.shortcuts import get_object_or_404
 
-from api.constants import MAX_CONCURRENT_UPLOADS, MAX_UPLOAD_SIZE_BYTES
+from api.constants import (
+    MAX_CONCURRENT_UPLOADS,
+    MAX_UPLOAD_SIZE_BYTES,
+    DUPLICATE_COMPONENT_NAME_CODE,
+    DUPLICATE_COMPONENT_NAME_MESSAGE,
+)
+
+# Explicitly export these for mypy
+__all__ = [
+    "DUPLICATE_COMPONENT_NAME_CODE",
+    "DUPLICATE_COMPONENT_NAME_MESSAGE",
+]
 from api.models import (
     UPLOAD_STATE_ABORTED,
     UPLOAD_STATE_COMPLETED,
@@ -24,22 +39,25 @@ from api.models import (
     ImageUpload,
     UploadChunk,
 )
+
 from api.services.image_service import generate_thumbnail, parse_svg_dimensions
 
 logger = logging.getLogger("api")
 
-DUPLICATE_COMPONENT_NAME_CODE = "duplicate_component_name"
-DUPLICATE_COMPONENT_NAME_MESSAGE = (
-    "Component name already exists. Names must be unique ignoring letter case "
-    "and surrounding whitespace."
-)
-
 
 def normalize_component_name(component_name: str) -> str:
+    """
+    Normalize a component name by trimming whitespace.
+    Used to enforce uniqueness regardless of user input formatting.
+    """
     return component_name.strip()
 
 
 def image_component_name_exists(component_name: str) -> bool:
+    """
+    Check if a committed Image exists with the given (normalized, casefolded) component name.
+    Used to enforce uniqueness of component names across all images.
+    """
     normalized_name = component_name.casefold()
     return (
         Image.objects.annotate(normalized_component_name=Lower(Trim("component_name")))
@@ -51,6 +69,10 @@ def image_component_name_exists(component_name: str) -> bool:
 def active_upload_name_exists(
     component_name: str, *, exclude_upload_id: str | UUID | None = None
 ) -> bool:
+    """
+    Check if an in-progress upload session exists with the same component name.
+    Used to prevent duplicate uploads before commit.
+    """
     normalized_name = component_name.casefold()
     active_states = [
         UPLOAD_STATE_INITIATED,
@@ -68,6 +90,10 @@ def active_upload_name_exists(
 def has_component_name_conflict(
     component_name: str, *, exclude_upload_id: str | UUID | None = None
 ) -> bool:
+    """
+    Returns True if the component name is already used by a committed image or an active upload session.
+    Used to enforce uniqueness across both committed and in-progress uploads.
+    """
     return image_component_name_exists(component_name) or active_upload_name_exists(
         component_name,
         exclude_upload_id=exclude_upload_id,
@@ -84,7 +110,13 @@ def create_session(
     idempotency_key: str,
     request_id: str,
 ) -> tuple[ImageUpload, int]:
-    """Create an upload session. Returns (session, http_status)."""
+    """
+    Create a new upload session for an SVG image.
+    - Enforces max file size and concurrent session limits.
+    - Ensures idempotency (repeated calls with same key return same session).
+    - Checks for duplicate component names (committed or in-progress).
+    Returns: (ImageUpload session, HTTP status code)
+    """
     if file_size > MAX_UPLOAD_SIZE_BYTES:
         raise ValueError("file_too_large")
 
@@ -126,9 +158,14 @@ def create_session(
 def store_chunk(
     *, upload_id: object, part_number: int, chunk_data_b64: str, request_id: str
 ) -> tuple[dict[str, object], int]:
-    """Decode and store a chunk. Returns (payload, http_status)."""
+    """
+    Store a single chunk of an in-progress upload.
+    - Decodes base64 chunk data and saves it to the UploadChunk table.
+    - Moves session to 'uploading' state if not already.
+    Returns: (payload, HTTP status code)
+    """
     session = get_object_or_404(ImageUpload, pk=upload_id)
-    if session.state not in (UPLOAD_STATE_UPLOADING, "initiated"):
+    if session.state not in (UPLOAD_STATE_UPLOADING, UPLOAD_STATE_INITIATED):
         return {"error": f"Cannot upload chunk in state '{session.state}'"}, 409
 
     try:
@@ -148,7 +185,7 @@ def store_chunk(
         request_id,
     )
 
-    if session.state == "initiated":
+    if session.state == UPLOAD_STATE_INITIATED:
         session.state = UPLOAD_STATE_UPLOADING
         session.save(update_fields=["state", "updated_at"])
 
@@ -162,7 +199,12 @@ def store_chunk(
 def complete_upload(
     *, upload_id: object, request_id: str
 ) -> tuple[dict[str, object], int]:
-    """Assemble chunks, verify checksum, create Image. Returns (payload, http_status)."""
+    """
+    Complete an upload session by assembling all chunks, verifying checksum, and creating the Image record.
+    - Fails if chunks are missing, checksum does not match, or file is not SVG.
+    - Handles duplicate name conflicts and cleans up chunk data after commit.
+    Returns: (payload, HTTP status code)
+    """
     t_start = time.monotonic()
     session = get_object_or_404(ImageUpload, pk=upload_id)
 
@@ -173,12 +215,13 @@ def complete_upload(
             "state": session.state,
         }, 200
 
-    if session.state not in (UPLOAD_STATE_UPLOADING, "initiated"):
+    if session.state not in (UPLOAD_STATE_UPLOADING, UPLOAD_STATE_INITIATED):
         return {"error": f"Cannot complete upload in state '{session.state}'"}, 409
 
     session.state = UPLOAD_STATE_VERIFYING
     session.save(update_fields=["state", "updated_at"])
 
+    # Assemble all chunks in order
     chunks = list(session.chunks.order_by("part_number"))
     if not chunks:
         session.state = UPLOAD_STATE_FAILED
@@ -188,6 +231,7 @@ def complete_upload(
 
     assembled = b"".join(bytes(c.data) for c in chunks)
 
+    # Verify checksum
     actual_checksum = hashlib.sha256(assembled).hexdigest()
     if actual_checksum != session.expected_checksum:
         session.state = UPLOAD_STATE_FAILED
@@ -202,6 +246,7 @@ def complete_upload(
         )
         return {"error": "Checksum mismatch", "code": "checksum_mismatch"}, 422
 
+    # Check file type (SVG)
     content_lower = assembled[:512].lower()
     is_svg = b"<svg" in content_lower or b"<?xml" in content_lower
     if not is_svg:
@@ -212,6 +257,7 @@ def complete_upload(
 
     width_px, height_px = parse_svg_dimensions(assembled)
 
+    # Re-normalize and check for name conflicts again before commit
     session.component_name = normalize_component_name(session.component_name)
     if has_component_name_conflict(
         session.component_name, exclude_upload_id=session.upload_id
@@ -271,7 +317,11 @@ def complete_upload(
 def abort_upload(
     *, upload_id: object, request_id: str
 ) -> tuple[dict[str, object] | None, int]:
-    """Abort an upload session. Returns (payload_or_None, http_status)."""
+    """
+    Abort an upload session and delete all associated chunks.
+    - Fails if the upload is already completed.
+    Returns: (None or error payload, HTTP status code)
+    """
     session = get_object_or_404(ImageUpload, pk=upload_id)
     if session.state == UPLOAD_STATE_COMPLETED:
         return {"error": "Cannot abort a completed upload"}, 409
@@ -288,7 +338,10 @@ def abort_upload(
 
 
 def get_session_detail(*, upload_id: object) -> dict[str, object]:
-    """Return upload session detail including received part numbers."""
+    """
+    Return upload session detail including received part numbers.
+    Used by the frontend to show upload progress and status.
+    """
     session = get_object_or_404(ImageUpload, pk=upload_id)
     received_parts = list(
         session.chunks.order_by("part_number").values_list("part_number", flat=True)

@@ -1,4 +1,7 @@
-"""Serializers for Image, DrawingType, and FittingPosition resources."""
+"""
+Serializers for DrawingType, Image, and FittingPosition models.
+These define the API contract for diagram selection, viewing, and admin workflows.
+"""
 
 from typing import Any
 
@@ -8,12 +11,22 @@ from api.models import DrawingType, FittingPosition, Image
 
 
 class DrawingTypeSerializer(serializers.ModelSerializer[DrawingType]):
+    """
+    Serializes DrawingType model for API responses.
+    Used in dropdowns and admin workflows.
+    """
+
     class Meta:
         model = DrawingType
         fields = ["drawing_type_id", "type_name", "description", "is_active"]
 
 
 class ImageSerializer(serializers.ModelSerializer[Image]):
+    """
+    Serializes Image model for list and selection views.
+    Used in the main image selection screen.
+    """
+
     drawing_type = DrawingTypeSerializer(read_only=True)
     thumbnail_url = serializers.SerializerMethodField()
 
@@ -39,6 +52,11 @@ class ImageSerializer(serializers.ModelSerializer[Image]):
 
 
 class ImageDetailSerializer(serializers.ModelSerializer[Image]):
+    """
+    Serializes Image model with all metadata for detail view.
+    Used in the diagram viewer context panel.
+    """
+
     drawing_type = DrawingTypeSerializer(read_only=True)
     image_svg = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
@@ -69,6 +87,11 @@ class ImageDetailSerializer(serializers.ModelSerializer[Image]):
 
 
 class FittingPositionSerializer(serializers.ModelSerializer[FittingPosition]):
+    """
+    Serializes FittingPosition model for POI marker overlays.
+    Used to render markers on the diagram canvas.
+    """
+
     class Meta:
         model = FittingPosition
         fields = [
@@ -83,6 +106,11 @@ class FittingPositionSerializer(serializers.ModelSerializer[FittingPosition]):
 
 
 class AssetInfoSerializer(serializers.Serializer[Any]):
+    """
+    Serializes asset information for a fitting position (sidebar/tooltips).
+    Accepts a dict payload (not a model instance) for flexibility.
+    """
+
     asset_record_id = serializers.CharField()
     high_level_component = serializers.CharField()
     sub_system_name = serializers.CharField()
@@ -90,6 +118,11 @@ class AssetInfoSerializer(serializers.Serializer[Any]):
 
 
 class FittingPositionDetailSerializer(serializers.Serializer[Any]):
+    """
+    Serializes detailed POI info for tooltips and sidebar panels.
+    Accepts a dict payload (not a model instance) for flexibility.
+    """
+
     fitting_position_id = serializers.CharField()
     label_text = serializers.CharField()
     x_coordinate = serializers.DecimalField(max_digits=10, decimal_places=3)

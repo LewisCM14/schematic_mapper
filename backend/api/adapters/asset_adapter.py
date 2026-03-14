@@ -9,6 +9,12 @@ from django.db import OperationalError, ProgrammingError, connections
 
 from api.cache import TTLCache
 
+"""
+Asset adapter: queries the mock asset database for fitting position details and search.
+Implements circuit breaker and caching for resilience and performance.
+This adapter abstracts all access to the external asset DB (mocked in prototype).
+"""
+
 
 @dataclass
 class AssetRecord:

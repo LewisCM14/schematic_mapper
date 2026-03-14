@@ -18,7 +18,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+
+# Project-level URL patterns
 urlpatterns = [
+    # Django admin interface
     path("admin/", admin.site.urls),
+    # API endpoints (delegated to the api app's urls.py)
     path("api/", include("api.urls")),
 ]
