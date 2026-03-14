@@ -1,3 +1,12 @@
+/**
+ * ImageSelectionTemplate.tsx
+ *
+ * Provides a layout template for the image selection workflow, including header, filters, grid, and admin access.
+ *
+ * - Renders the top app header, description, filter bar, and image grid.
+ * - Supports admin upload access and custom state slot rendering.
+ * - Used for selecting images to map or annotate.
+ */
 import { Box, Button, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import type { DrawingType, Image } from "../../services/api/schemas";
@@ -24,6 +33,25 @@ interface ImageSelectionTemplateProps {
 	imagesErrorMessage?: string;
 }
 
+/**
+ * Renders the image selection workflow template with header, filters, grid, and admin access.
+ * @param title The page title
+ * @param description Description text for the workflow
+ * @param drawingTypes Array of available drawing types
+ * @param selectedTypeId The currently selected drawing type ID
+ * @param onTypeChange Handler for drawing type changes
+ * @param images Array of images to display
+ * @param onImageClick Handler for image selection
+ * @param hasNextPage Whether there are more images to load (optional)
+ * @param isFetchingNextPage Whether the next page is loading (optional)
+ * @param onLoadMore Handler for loading more images (optional)
+ * @param onOpenAdmin Handler for opening the admin upload (optional)
+ * @param showGrid Whether to show the image grid
+ * @param stateSlot Custom React node for state display
+ * @param imagesLoading Whether images are loading (optional)
+ * @param imagesError Whether there was an error loading images (optional)
+ * @param imagesErrorMessage Error message for image loading (optional)
+ */
 function ImageSelectionTemplate({
 	title,
 	description,

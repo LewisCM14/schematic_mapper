@@ -1,3 +1,13 @@
+/**
+ * SearchResultItem.tsx
+ *
+ * Renders a clickable list item representing a single search result.
+ *
+ * - Displays the result label, component name, match type, and matched source.
+ * - Highlights match type with a colored chip (exact, prefix, or default).
+ * - Invokes the provided onSelect callback when clicked.
+ * - Used in search result lists and autocomplete dropdowns.
+ */
 import {
 	Box,
 	Chip,
@@ -12,6 +22,11 @@ interface SearchResultItemProps {
 	onSelect: (result: SearchResultItem) => void;
 }
 
+/**
+ * Renders a clickable list item for a search result, showing label, component, match type, and source.
+ * @param result The search result data to display
+ * @param onSelect Callback invoked when the item is clicked
+ */
 function SearchResultItemComponent({
 	result,
 	onSelect,

@@ -1,3 +1,13 @@
+/**
+ * POITooltipCard.tsx
+ *
+ * Renders a styled tooltip card for a point-of-interest (POI) marker on the map.
+ *
+ * - Shows the component name, label text, and fitting position ID.
+ * - Optionally includes a close button for dismissing the tooltip.
+ * - Uses Material UI Paper, Chip, and Typography for consistent styling.
+ * - Used in map overlays and POI detail popups.
+ */
 import CloseIcon from "@mui/icons-material/Close";
 import { Chip, IconButton, Paper, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -9,6 +19,14 @@ interface POITooltipCardProps {
 	onClose?: () => void;
 }
 
+/**
+ * Renders a styled tooltip card for a POI marker, showing component, label, and ID.
+ * Optionally includes a close button for dismissing the tooltip.
+ * @param labelText The label text for the POI
+ * @param componentName The component name
+ * @param fittingPositionId The unique fitting position ID
+ * @param onClose Optional handler for closing the tooltip
+ */
 function POITooltipCard({
 	labelText,
 	componentName,

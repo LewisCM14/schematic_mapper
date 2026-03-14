@@ -1,3 +1,12 @@
+/**
+ * DiagramCanvasViewport.tsx
+ *
+ * Provides an interactive, zoomable, and pannable SVG canvas for displaying schematic diagrams with markers and rectangles.
+ *
+ * - Supports marker clustering, rectangle drawing, and selection.
+ * - Integrates Panzoom for smooth navigation and scaling.
+ * - Used for mapping, annotation, and visualizing POIs on diagrams.
+ */
 // --- Filtering utilities for testable coverage ---
 export interface ViewportRect {
 	left: number;
@@ -6,6 +15,12 @@ export interface ViewportRect {
 	bottom: number;
 }
 
+/**
+ * Filters rectangles to those visible within the current viewport.
+ * @param rectangles Array of CanvasRectangle objects
+ * @param viewport The current viewport rectangle (or null for no filtering)
+ * @returns Array of rectangles within the viewport
+ */
 export function filterRectanglesByViewport(
 	rectangles: CanvasRectangle[],
 	viewport: ViewportRect | null,
@@ -25,6 +40,12 @@ export function filterRectanglesByViewport(
 
 import type { ClusterOrMarker } from "./clusterMarkers";
 
+/**
+ * Filters marker clusters and single markers to those visible within the viewport.
+ * @param items Array of ClusterOrMarker objects
+ * @param viewport The current viewport rectangle (or null for no filtering)
+ * @returns Array of items within the viewport
+ */
 export function filterMarkersByViewport(
 	items: ClusterOrMarker[],
 	viewport: ViewportRect | null,
@@ -116,6 +137,29 @@ export interface ViewportRect {
 	bottom: number;
 }
 
+/**
+ * Renders an interactive, zoomable SVG canvas for schematic diagrams with markers and rectangles.
+ * Handles clustering, selection, drawing, and pan/zoom interactions.
+ *
+ * @param imageSvgUrl URL of the SVG image to display
+ * @param markers Array of marker objects to render
+ * @param rectangles Array of rectangles to render (optional)
+ * @param showMappedRectangles Whether to show mapped rectangles (default: true)
+ * @param interactiveMappedRectangles Whether mapped rectangles are interactive (default: false)
+ * @param pinnedTooltipId ID of the marker/rectangle to show a pinned tooltip for (optional)
+ * @param pinnedTooltipContent Content to display in the pinned tooltip (optional)
+ * @param requestedZoomScale Programmatically requested zoom scale (optional)
+ * @param draftRectangle Rectangle being drawn (optional)
+ * @param interactionMode Interaction mode: "pan" or "draw" (optional)
+ * @param onMarkerClick Handler for marker click events (optional)
+ * @param onCanvasClick Handler for canvas click events (optional)
+ * @param onMarkerDrag Handler for marker drag events (optional)
+ * @param onRectangleDraw Handler for rectangle draw completion (optional)
+ * @param panToTarget Coordinates to pan to (optional)
+ * @param onZoomChange Handler for zoom scale changes (optional)
+ * @param selectedMarkerId ID of the currently selected marker (optional)
+ * @param renderMarkerWrapper Function to wrap marker buttons (optional)
+ */
 function DiagramCanvasViewport({
 	imageSvgUrl,
 	markers,

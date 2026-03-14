@@ -1,3 +1,12 @@
+/**
+ * SourceFilterChips.tsx
+ *
+ * Renders a set of filter chips for toggling data sources in a search or filter UI.
+ *
+ * - Displays available sources as interactive chips (selectable/deselectable).
+ * - Disabled sources are shown with a tooltip and cannot be selected.
+ * - Used for filtering search results or data by source type.
+ */
 import { Chip, Tooltip } from "@mui/material";
 
 interface SourceFilterChipsProps {
@@ -7,6 +16,13 @@ interface SourceFilterChipsProps {
 	onToggle: (source: string) => void;
 }
 
+/**
+ * Renders filter chips for available and disabled sources, allowing toggling of selected sources.
+ * @param availableSources List of sources that can be toggled
+ * @param disabledSources List of sources that are disabled (optional)
+ * @param selectedSources List of currently selected sources
+ * @param onToggle Callback invoked when a source chip is toggled
+ */
 function SourceFilterChips({
 	availableSources,
 	disabledSources = [],

@@ -1,3 +1,12 @@
+/**
+ * AdminUploadMappingPage.tsx
+ *
+ * Implements the admin workflow for uploading schematic images and mapping fitting positions.
+ *
+ * - Guides the user through selecting a drawing type, uploading/selecting an image, mapping positions, and saving.
+ * - Integrates upload, mapping, validation, and save logic with step-based navigation.
+ * - Used as the main admin page for managing schematic image mappings.
+ */
 import {
 	Alert,
 	Box,
@@ -47,6 +56,10 @@ interface MappedPos {
 
 type WorkflowMode = "upload" | "edit";
 
+/**
+ * Renders the admin upload and mapping workflow page for schematic images.
+ * Handles step-based navigation, upload, mapping, validation, and save logic.
+ */
 function AdminUploadMappingPage() {
 	const navigate = useNavigate();
 	const [showDisclaimer, setShowDisclaimer] = useState(true);

@@ -1,6 +1,15 @@
 /**
- * Orchestrates the multi-step chunked upload workflow:
- * create session → upload chunks → finalize.
+ * useChunkedUpload.ts
+ *
+ * Custom React hook to orchestrate the multi-step chunked upload workflow for large files:
+ *   create session → upload chunks → finalize.
+ *
+ * - Handles file hashing, chunking, and base64 encoding in the browser.
+ * - Manages upload state, progress, error handling, and abort/reset actions.
+ * - Integrates with React Query mutation hooks for all backend upload endpoints.
+ * - Returns state and actions for use in admin upload UIs.
+ *
+ * Use this hook in admin upload pages to provide a robust, resumable upload experience.
  */
 
 import axios from "axios";
@@ -15,6 +24,12 @@ import {
 } from "./useAdminUpload";
 
 // Exported at the true top level for test coverage
+
+/**
+ * Extracts a user-friendly error message from an Axios error or generic error.
+ * @param error The error thrown during upload
+ * @returns String message suitable for display to the user
+ */
 export function getUploadErrorMessage(error: unknown): string {
 	if (axios.isAxiosError(error)) {
 		const apiError = error.response?.data;
@@ -53,6 +68,11 @@ export interface ChunkedUploadActions {
 	reset: () => void;
 }
 
+/**
+ * Custom React hook to manage the full chunked upload workflow for large files.
+ * Handles session creation, chunk upload, finalization, error handling, and abort/reset.
+ * @returns [state, actions] tuple for use in upload UIs
+ */
 export function useChunkedUpload(): [ChunkedUploadState, ChunkedUploadActions] {
 	const [progress, setProgress] = useState(0);
 	const [error, setError] = useState<string | null>(null);
@@ -69,6 +89,9 @@ export function useChunkedUpload(): [ChunkedUploadState, ChunkedUploadActions] {
 		uploadChunkMut.isPending ||
 		completeUploadMut.isPending;
 
+	/**
+	 * Start the chunked upload process: hash file, create session, upload chunks, finalize.
+	 */
 	async function start({
 		drawingTypeId,
 		componentName,
@@ -122,6 +145,9 @@ export function useChunkedUpload(): [ChunkedUploadState, ChunkedUploadActions] {
 		}
 	}
 
+	/**
+	 * Abort the current upload session and reset state.
+	 */
 	async function abort(): Promise<void> {
 		if (!uploadId) return;
 		await abortUploadMut.mutateAsync(uploadId);
@@ -130,6 +156,9 @@ export function useChunkedUpload(): [ChunkedUploadState, ChunkedUploadActions] {
 		setError(null);
 	}
 
+	/**
+	 * Reset all local upload state (for new upload or after error).
+	 */
 	function reset(): void {
 		setUploadId(null);
 		setProgress(0);

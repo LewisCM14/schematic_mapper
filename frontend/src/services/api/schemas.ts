@@ -1,3 +1,22 @@
+/**
+ * schemas.ts
+ *
+ * Zod schemas and TypeScript types for all API request/response payloads in the Schematic Mapper frontend.
+ *
+ * - Provides runtime validation and static typing for all backend API data structures.
+ * - Ensures type-safe, robust data handling in React Query hooks and service functions.
+ * - All schemas mirror the backend OpenAPI/DRF contract for strict frontend-backend alignment.
+ *
+ * Sections:
+ *   - Health check
+ *   - Drawing types
+ *   - Images (list/detail)
+ *   - Fitting positions (list/detail)
+ *   - Search
+ *   - Admin upload
+ *
+ * Update this file whenever backend API schemas change to keep the frontend in sync.
+ */
 import { z } from "zod";
 export type ImageListPage = z.infer<typeof ImageListPageSchema>;
 

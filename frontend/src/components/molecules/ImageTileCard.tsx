@@ -1,3 +1,13 @@
+/**
+ * ImageTileCard.tsx
+ *
+ * Renders a clickable card for an image in a gallery or grid view in the Schematic Mapper frontend.
+ *
+ * - Shows thumbnail (or skeleton), component name, drawing type badge, and dimensions.
+ * - Uses Material UI Card, CardMedia, and TypeBadge for consistent styling.
+ * - Calls onClick with the image ID when selected.
+ * - Used in image selection and admin pages.
+ */
 import {
 	Box,
 	Card,
@@ -15,6 +25,11 @@ interface ImageTileCardProps {
 	onClick: (imageId: string) => void;
 }
 
+/**
+ * Renders a clickable card for an image, showing thumbnail, name, type, and dimensions.
+ * @param image The image object to display
+ * @param onClick Handler called with imageId when the card is clicked
+ */
 function ImageTileCard({ image, onClick }: ImageTileCardProps) {
 	return (
 		<Card sx={{ height: "100%" }}>

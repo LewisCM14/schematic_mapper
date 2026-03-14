@@ -1,3 +1,12 @@
+/**
+ * POIMarkerPin.tsx
+ *
+ * Renders a circular SVG pin for a point-of-interest (POI) on a map.
+ *
+ * - Color is theme-driven and changes if selected.
+ * - Memoized for performance in large map overlays.
+ * - Used for individual POI markers in map UIs.
+ */
 import { useTheme } from "@mui/material/styles";
 import { memo } from "react";
 
@@ -5,6 +14,10 @@ interface POIMarkerPinProps {
 	selected: boolean;
 }
 
+/**
+ * Renders a circular SVG pin for a POI, colored by selection state.
+ * @param selected Whether the pin is selected (changes color)
+ */
 const POIMarkerPin = memo(function POIMarkerPin({
 	selected,
 }: POIMarkerPinProps) {

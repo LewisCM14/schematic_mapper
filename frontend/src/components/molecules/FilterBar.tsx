@@ -1,3 +1,12 @@
+/**
+ * FilterBar.tsx
+ *
+ * Combined filter/search bar for image lists in the Schematic Mapper frontend.
+ *
+ * - Provides a dropdown for drawing type selection and an optional search input.
+ * - Uses Material UI FormControl, Select, and a custom SearchInput for consistent UX.
+ * - Used in image galleries and admin pages to filter and search images.
+ */
 import { Box, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import type { DrawingType } from "../../services/api/schemas";
 import SearchInput from "../atoms/SearchInput";
@@ -10,6 +19,15 @@ interface FilterBarProps {
 	onSearchChange?: (value: string) => void;
 }
 
+/**
+ * Renders a filter/search bar for image lists.
+ * Includes a drawing type dropdown and optional search input.
+ * @param drawingTypes List of available drawing types
+ * @param selectedTypeId Currently selected drawing type ID
+ * @param onTypeChange Handler for drawing type selection
+ * @param searchValue Current search input value (optional)
+ * @param onSearchChange Handler for search input changes (optional)
+ */
 function FilterBar({
 	drawingTypes,
 	selectedTypeId,

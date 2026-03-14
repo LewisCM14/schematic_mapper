@@ -1,3 +1,12 @@
+/**
+ * ImageViewerPage.tsx
+ *
+ * Displays the main viewer page for a schematic image, including search, navigation, and interactive canvas.
+ *
+ * - Handles URL state, marker/rectangle selection, zoom, and search/filter logic.
+ * - Integrates with the viewer template, fitting position data, and navigation.
+ * - Used as the main interactive viewer for schematic images and their mapped positions.
+ */
 import { Snackbar, Tooltip } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +44,10 @@ function formatZoomParam(value: number) {
 	return value.toFixed(2).replace(/\.0+$|(?<=\.[0-9])0+$/g, "");
 }
 
+/**
+ * Renders the schematic image viewer page with search, navigation, and interactive canvas.
+ * Handles URL state, marker/rectangle selection, zoom, and search/filter logic.
+ */
 function ImageViewerPage() {
 	const { imageId } = useParams<{ imageId: string }>();
 	const navigate = useNavigate();

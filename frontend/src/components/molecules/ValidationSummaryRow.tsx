@@ -1,3 +1,12 @@
+/**
+ * ValidationSummaryRow.tsx
+ *
+ * Displays a summary row for validation results, including total, warning, and error counts.
+ *
+ * - Shows the total number of positions.
+ * - Optionally displays warning and error chips if counts are greater than zero.
+ * - Used in validation panels or summary sections to provide quick feedback.
+ */
 import { Box, Chip, Typography } from "@mui/material";
 
 interface ValidationSummaryRowProps {
@@ -6,6 +15,12 @@ interface ValidationSummaryRowProps {
 	errorCount?: number;
 }
 
+/**
+ * Renders a summary row for validation results, showing total, warning, and error counts.
+ * @param totalCount The total number of positions
+ * @param warningCount The number of warnings (optional, default 0)
+ * @param errorCount The number of errors (optional, default 0)
+ */
 function ValidationSummaryRow({
 	totalCount,
 	warningCount = 0,

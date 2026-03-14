@@ -1,3 +1,23 @@
+/**
+ * App.tsx
+ *
+ * Main application entry point for the Schematic Mapper frontend (React).
+ *
+ * - Sets up top-level routing for all pages (image selection, viewer, admin upload).
+ * - Uses React Router v6 for client-side navigation.
+ * - Implements code-splitting with React.lazy and Suspense for performance.
+ * - Wraps each route in an ErrorBoundary for robust error handling.
+ * - Uses Material UI for UI components and consistent styling.
+ *
+ * Key routes:
+ *   /           → ImageSelectionPage
+ *   /viewer/:id → ImageViewerPage
+ *   /admin      → AdminUploadMappingPage
+ *
+ * All routes are lazy-loaded and display a loading spinner while loading.
+ * Any uncaught error in a page is shown as a dismissible alert with retry.
+ */
+
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -12,6 +32,12 @@ const AdminUploadMappingPage = lazy(
 	() => import("./pages/AdminUploadMappingPage"),
 );
 
+/**
+ * Fallback UI for error boundaries.
+ * Displays an error alert with a retry button when a child component throws.
+ * @param error The error thrown by a child component
+ * @param resetErrorBoundary Function to reset the error boundary state
+ */
 export function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
 	return (
 		<Alert
@@ -27,6 +53,10 @@ export function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
 	);
 }
 
+/**
+ * Loader UI shown while a page is being lazy-loaded.
+ * Displays a centered Material UI spinner.
+ */
 export function PageLoader() {
 	return (
 		<Box sx={{ display: "flex", justifyContent: "center", mt: 8 }}>
@@ -35,6 +65,15 @@ export function PageLoader() {
 	);
 }
 
+/**
+ * Main application component.
+ * Sets up all routes and error boundaries for the Schematic Mapper frontend.
+ *
+ * - Uses React Router v6 for navigation.
+ * - Each page is lazy-loaded for performance.
+ * - ErrorBoundary ensures user-friendly error handling per route.
+ * - PageLoader is shown while loading each page.
+ */
 function App() {
 	return (
 		<Suspense fallback={<PageLoader />}>

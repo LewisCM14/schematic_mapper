@@ -1,3 +1,13 @@
+/**
+ * MappingWorkbench.tsx
+ *
+ * Provides a workbench UI for mapping fitting positions on a schematic image.
+ *
+ * - Allows users to draw, label, and manage mapped positions (rectangles and markers).
+ * - Supports tabbed navigation for unmapped/mapped positions, label editing, and deletion.
+ * - Integrates with DiagramCanvasViewport for interactive canvas operations.
+ * - Used in admin workflows for creating and editing fitting position mappings.
+ */
 import {
 	Box,
 	Button,
@@ -49,6 +59,29 @@ interface MappingWorkbenchProps {
 	onCancelDeleteMappedPosition: () => void;
 }
 
+/**
+ * Renders the mapping workbench for fitting position selection and management.
+ * Handles drawing, labeling, selecting, and deleting mapped positions.
+ *
+ * @param imageSvgUrl URL of the schematic SVG image
+ * @param mappedPositions Array of mapped positions (rectangles and markers)
+ * @param pendingRect Rectangle currently being drawn (optional)
+ * @param editingLabel Current label input for a new mapping
+ * @param labelErrorText Error text for the label input (optional)
+ * @param mappingTab Index of the active tab (0: Unmapped, 1: Mapped)
+ * @param selectedMappedPositionId ID of the selected mapped position (optional)
+ * @param deleteCandidateId ID of the position pending deletion confirmation (optional)
+ * @param deleteInProgress Whether a delete operation is in progress (optional)
+ * @param onMappingTabChange Handler for tab changes
+ * @param onRectangleDraw Handler for completing a rectangle draw
+ * @param onEditingLabelChange Handler for label input changes
+ * @param onConfirmMarker Handler for confirming a new marker
+ * @param onCancelMarker Handler for canceling a new marker
+ * @param onMappedPositionSelect Handler for selecting a mapped position
+ * @param onRequestDeleteMappedPosition Handler for requesting deletion
+ * @param onConfirmDeleteMappedPosition Handler for confirming deletion
+ * @param onCancelDeleteMappedPosition Handler for canceling deletion
+ */
 function MappingWorkbench({
 	imageSvgUrl,
 	mappedPositions,

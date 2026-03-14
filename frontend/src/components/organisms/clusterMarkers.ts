@@ -1,3 +1,12 @@
+/**
+ * clusterMarkers.ts
+ *
+ * Provides utilities for clustering and representing markers on a diagram canvas.
+ *
+ * - Defines types for marker clusters and single markers.
+ * - Exports a function to group nearby markers into clusters using a grid-based spatial hash.
+ * - Used for efficient rendering and interaction with large numbers of markers on a canvas.
+ */
 import type { CanvasMarker } from "./DiagramCanvasViewport";
 
 export interface MarkerCluster {
@@ -22,6 +31,11 @@ export type ClusterOrMarker = MarkerCluster | SingleMarker;
  * Divides coordinates into square cells of size `threshold / scale` and
  * assigns each marker to a cell. Markers in the same cell form a cluster.
  * Runs in O(n) time regardless of marker count or cluster density.
+ *
+ * @param markers Array of CanvasMarker objects to cluster
+ * @param scale The current canvas scale (affects clustering granularity)
+ * @param threshold The pixel threshold for clustering (default: 40)
+ * @returns Array of ClusterOrMarker objects (either clusters or single markers)
  */
 export function clusterMarkers(
 	markers: CanvasMarker[],

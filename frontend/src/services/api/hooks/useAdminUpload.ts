@@ -1,3 +1,14 @@
+/**
+ * useAdminUpload.ts
+ *
+ * React Query mutation hooks for all admin upload and fitting position operations in the Schematic Mapper frontend.
+ *
+ * - Encapsulates all upload-related mutations (create session, upload chunk, complete, abort).
+ * - Handles cache invalidation and prefetching for image and fitting position data after mutations.
+ * - Ensures UI stays in sync with backend state after admin actions.
+ *
+ * Use these hooks in admin upload and mapping pages for robust, type-safe mutation flows.
+ */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
 	abortUpload,
@@ -12,6 +23,9 @@ import {
 } from "../endpoints";
 import { queryKeys } from "../queryKeys";
 
+/**
+ * Mutation hook to create a new upload session (admin image upload).
+ */
 export function useCreateUploadSession() {
 	return useMutation({
 		mutationFn: (params: CreateUploadSessionParams) =>
@@ -19,6 +33,9 @@ export function useCreateUploadSession() {
 	});
 }
 
+/**
+ * Mutation hook to upload a single chunk to an in-progress upload session.
+ */
 export function useUploadChunk() {
 	return useMutation({
 		mutationFn: ({
@@ -33,6 +50,10 @@ export function useUploadChunk() {
 	});
 }
 
+/**
+ * Mutation hook to complete an upload session (finalize and commit image).
+ * Invalidates image list and prefetches the new image detail on success.
+ */
 export function useCompleteUpload() {
 	const queryClient = useQueryClient();
 	return useMutation({
@@ -53,12 +74,19 @@ export function useCompleteUpload() {
 	});
 }
 
+/**
+ * Mutation hook to abort (cancel) an in-progress upload session.
+ */
 export function useAbortUpload() {
 	return useMutation({
 		mutationFn: (uploadId: string) => abortUpload(uploadId),
 	});
 }
 
+/**
+ * Mutation hook to save (bulk upsert) fitting positions for an image.
+ * Invalidates fitting positions, search, and fitting-positions caches on success.
+ */
 export function useSaveBulkFittingPositions() {
 	const queryClient = useQueryClient();
 	return useMutation({
@@ -83,6 +111,10 @@ export function useSaveBulkFittingPositions() {
 	});
 }
 
+/**
+ * Mutation hook to delete a fitting position from an image.
+ * Invalidates fitting positions, fitting position detail, and search caches on success.
+ */
 export function useDeleteFittingPosition() {
 	const queryClient = useQueryClient();
 	return useMutation({

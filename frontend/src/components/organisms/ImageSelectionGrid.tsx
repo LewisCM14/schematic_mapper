@@ -1,3 +1,13 @@
+/**
+ * ImageSelectionGrid.tsx
+ *
+ * Displays a grid of image tiles for selection, with loading, error, and pagination states.
+ *
+ * - Shows images as cards in a responsive grid layout.
+ * - Handles loading skeletons, error alerts, and empty states.
+ * - Supports pagination with a "Load more" button.
+ * - Used in image selection dialogs or panels.
+ */
 import { Alert, Button, Grid, Skeleton, Typography } from "@mui/material";
 import type { Image } from "../../services/api/schemas";
 import ImageTileCard from "../molecules/ImageTileCard";
@@ -13,6 +23,17 @@ interface ImageSelectionGridProps {
 	errorMessage?: string;
 }
 
+/**
+ * Renders a grid of image tiles for selection, with loading, error, and pagination states.
+ * @param images Array of images to display
+ * @param onImageClick Handler for when an image is clicked
+ * @param hasNextPage Whether there are more images to load (optional)
+ * @param isFetchingNextPage Whether the next page is currently loading (optional)
+ * @param onLoadMore Handler for loading more images (optional)
+ * @param isLoading Whether images are currently loading (optional)
+ * @param isError Whether there was an error loading images (optional)
+ * @param errorMessage Error message to display (optional)
+ */
 function ImageSelectionGrid({
 	images,
 	onImageClick,

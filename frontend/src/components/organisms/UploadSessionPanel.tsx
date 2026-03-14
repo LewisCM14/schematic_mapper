@@ -1,3 +1,11 @@
+/**
+ * UploadSessionPanel.tsx
+ *
+ * Provides a UI panel for uploading a new image file and entering a component name.
+ *
+ * - Handles file selection, upload progress, error display, and abort/back actions.
+ * - Used in admin workflows for uploading schematic images.
+ */
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import { Alert, Box, Button, CircularProgress, TextField } from "@mui/material";
 import UploadProgressRow from "../molecules/UploadProgressRow";
@@ -18,6 +26,24 @@ interface UploadSessionPanelProps {
 	abortDisabled: boolean;
 }
 
+/**
+ * Renders a panel for uploading a new image file and entering a component name.
+ * Handles file selection, upload progress, error display, and abort/back actions.
+ *
+ * @param componentName The current component name input
+ * @param onComponentNameChange Handler for component name changes
+ * @param fileName The name of the selected file (or null)
+ * @param onFileChange Handler for file input changes
+ * @param uploadProgress Current upload progress percentage
+ * @param uploadError Error message for upload failures (or null)
+ * @param isUploading Whether an upload is in progress
+ * @param showAbort Whether to show the abort button
+ * @param onUpload Handler for starting the upload
+ * @param onAbort Handler for aborting the upload
+ * @param onBack Handler for navigating back
+ * @param uploadDisabled Whether the upload button is disabled
+ * @param abortDisabled Whether the abort button is disabled
+ */
 function UploadSessionPanel({
 	componentName,
 	onComponentNameChange,

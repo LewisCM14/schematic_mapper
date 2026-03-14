@@ -1,3 +1,15 @@
+/**
+ * useImages.ts
+ *
+ * React Query hooks for fetching and caching image lists and image details from the backend.
+ *
+ * - useImages: Infinite query for paginated image lists, with optional filters (drawing type, search).
+ * - useImage: Query for a single image detail by ID.
+ * - getNextPageParam: Helper to extract the next cursor for pagination.
+ * - Applies cache and stale times for optimal UX and backend efficiency.
+ *
+ * Use these hooks in image selection, gallery, and detail pages.
+ */
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
 	GC_TIME_IMAGE_DETAIL,
@@ -9,6 +21,12 @@ import { fetchImage, fetchImages } from "../endpoints";
 import { queryKeys } from "../queryKeys";
 import type { ImageListPage } from "../schemas";
 
+/**
+ * Infinite query hook for paginated image lists, with optional filters.
+ * @param drawingTypeId Optional filter for drawing type
+ * @param search Optional search string
+ * @returns React Query infinite query result for image list pages
+ */
 export function useImages(drawingTypeId?: number, search?: string) {
 	const baseParams: Record<string, string> = {};
 	if (drawingTypeId !== undefined) {
@@ -39,12 +57,19 @@ export function useImages(drawingTypeId?: number, search?: string) {
 	});
 }
 
-// Exported for testing
-// Accepts the full ImageListPage type and normalizes next_cursor null to undefined
+/**
+ * Helper to extract the next page cursor for infinite image list queries.
+ * Accepts the full ImageListPage type and normalizes next_cursor null to undefined.
+ */
 export function getNextPageParam(lastPage: ImageListPage) {
 	return lastPage.has_more ? (lastPage.next_cursor ?? undefined) : undefined;
 }
 
+/**
+ * Query hook for fetching a single image detail by ID.
+ * @param imageId The image UUID
+ * @returns React Query result for the image detail
+ */
 export function useImage(imageId: string) {
 	return useQuery({
 		queryKey: queryKeys.images.detail(imageId),

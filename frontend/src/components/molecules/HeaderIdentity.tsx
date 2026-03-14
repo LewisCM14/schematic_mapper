@@ -1,3 +1,11 @@
+/**
+ * HeaderIdentity.tsx
+ *
+ * Renders the application logo, title, and optional context label for the Schematic Mapper header.
+ *
+ * - Uses AppLogo and Material UI Typography for branding and context.
+ * - Used in app bars, page headers, and dialogs for consistent identity.
+ */
 import { Box, Typography } from "@mui/material";
 import AppLogo from "../atoms/AppLogo";
 
@@ -6,6 +14,11 @@ interface HeaderIdentityProps {
 	contextLabel?: string;
 }
 
+/**
+ * Renders the app logo, title, and optional context label for headers.
+ * @param title Main title text
+ * @param contextLabel Optional context/section label
+ */
 function HeaderIdentity({ title, contextLabel }: HeaderIdentityProps) {
 	return (
 		<Box sx={{ display: "flex", alignItems: "center" }}>

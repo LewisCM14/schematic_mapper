@@ -1,3 +1,12 @@
+/**
+ * POIDetailPanel.tsx
+ *
+ * Displays detailed information for a selected fitting position (POI) on the diagram.
+ *
+ * - Fetches and shows fitting position details, including asset info and coordinates.
+ * - Handles loading, error, and degraded data states.
+ * - Used in side panels or dialogs for POI inspection.
+ */
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
 	Alert,
@@ -14,6 +23,11 @@ interface POIDetailPanelProps {
 	fittingPositionId: string | null;
 }
 
+/**
+ * Renders a detail panel for a selected fitting position (POI), showing asset and coordinate info.
+ * Handles loading, error, and degraded data states.
+ * @param fittingPositionId The ID of the fitting position to display details for
+ */
 function POIDetailPanel({ fittingPositionId }: POIDetailPanelProps) {
 	const { data, isLoading, isError } =
 		useFittingPositionDetails(fittingPositionId);

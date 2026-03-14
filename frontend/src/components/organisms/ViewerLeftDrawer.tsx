@@ -1,3 +1,12 @@
+/**
+ * ViewerLeftDrawer.tsx
+ *
+ * Provides a permanent left-side drawer with tabbed navigation for search and POI details.
+ *
+ * - Contains tabs for searching fitting positions and viewing detailed information.
+ * - Integrates SearchResultsPanel and POIDetailPanel.
+ * - Used as the main navigation and info panel in the viewer layout.
+ */
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import { Box, Drawer, Tab, Tabs } from "@mui/material";
@@ -25,6 +34,22 @@ interface ViewerLeftDrawerProps {
 	onTabChange?: (tab: number) => void;
 }
 
+/**
+ * Renders a permanent left-side drawer with tabbed navigation for search and POI details.
+ * Integrates search and information panels for the viewer.
+ *
+ * @param width The width of the drawer
+ * @param imageId The ID of the image being viewed
+ * @param selectedFpId The currently selected fitting position ID
+ * @param onSelectFp Handler for selecting a fitting position
+ * @param searchQuery Controlled search query (optional)
+ * @param onSearchQueryChange Handler for search query changes (optional)
+ * @param activeSources Controlled list of active sources (optional)
+ * @param onActiveSourcesChange Handler for source filter changes (optional)
+ * @param onSearchMetadata Handler for search metadata updates (optional)
+ * @param activeTab Externally controlled tab index (optional)
+ * @param onTabChange Handler for tab changes (optional)
+ */
 function ViewerLeftDrawer({
 	width,
 	imageId,

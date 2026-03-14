@@ -1,3 +1,12 @@
+/**
+ * ViewerFooterStatusBar.tsx
+ *
+ * Displays a footer status bar with source health, request ID, refresh time, and zoom level.
+ *
+ * - Shows health indicators for each data source.
+ * - Displays request ID, last refreshed time, and current zoom level.
+ * - Used at the bottom of the viewer for real-time status feedback.
+ */
 import { Box, Paper } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import MetricText from "../atoms/MetricText";
@@ -10,6 +19,11 @@ interface ViewerFooterStatusBarProps {
 	zoomLevel: number;
 }
 
+/**
+ * Formats a Date as a relative time string (e.g., "just now", "2 min ago").
+ * @param date The date to format
+ * @returns Human-readable relative time string
+ */
 export function formatRelativeTime(date: Date): string {
 	const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
 	if (diffSec < 10) return "just now";
@@ -20,6 +34,13 @@ export function formatRelativeTime(date: Date): string {
 	return `${diffHr} hr ago`;
 }
 
+/**
+ * Renders a footer status bar with source health, request ID, refresh time, and zoom level.
+ * @param sourceStatus Record of source statuses (ok, degraded, error)
+ * @param requestId The current request ID (or null)
+ * @param lastRefreshed The last refreshed time (or null)
+ * @param zoomLevel The current zoom level
+ */
 export default function ViewerFooterStatusBar({
 	sourceStatus,
 	requestId,

@@ -1,3 +1,11 @@
+/**
+ * ImageSelectionPage.tsx
+ *
+ * Displays the main page for selecting a drawing type and browsing available schematic images.
+ *
+ * - Fetches drawing types and images, manages selection state, and renders the image selection template.
+ * - Used as the main entry point for users to browse and select schematics.
+ */
 import { Box, CircularProgress } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -5,6 +13,10 @@ import ImageSelectionTemplate from "../components/templates/ImageSelectionTempla
 import { useDrawingTypes } from "../services/api/hooks/useDrawingTypes";
 import { useImages } from "../services/api/hooks/useImages";
 
+/**
+ * Renders the image selection page for browsing and selecting schematic images by drawing type.
+ * Handles fetching, selection, and navigation logic.
+ */
 function ImageSelectionPage() {
 	const navigate = useNavigate();
 	const [selectedTypeId, setSelectedTypeId] = useState<number | "">("");

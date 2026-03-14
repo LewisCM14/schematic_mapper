@@ -1,3 +1,11 @@
+/**
+ * TopAppHeader.tsx
+ *
+ * Renders the top application header bar with navigation, title, status, and user controls.
+ *
+ * - Shows back or menu button, title, context label, source status chips, help, and user menu.
+ * - Used as the main app bar for navigation and context display.
+ */
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import MenuIcon from "@mui/icons-material/Menu";
@@ -14,6 +22,13 @@ interface TopAppHeaderProps {
 	onBack?: () => void;
 }
 
+/**
+ * Renders the top application header bar with navigation, title, status, and user controls.
+ * @param title The main title to display
+ * @param contextLabel Optional context label for the header
+ * @param sourceStatus Optional record of source statuses (ok, degraded, error)
+ * @param onBack Optional handler for back navigation
+ */
 function TopAppHeader({
 	title,
 	contextLabel,

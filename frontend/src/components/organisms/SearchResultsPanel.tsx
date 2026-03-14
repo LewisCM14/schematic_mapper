@@ -1,3 +1,12 @@
+/**
+ * SearchResultsPanel.tsx
+ *
+ * Provides a search interface for fitting positions, with filtering, infinite scroll, and result selection.
+ *
+ * - Integrates search input, source filters, and result list with infinite scroll.
+ * - Handles loading, error, and degraded data states.
+ * - Used in side panels or dialogs for searching and selecting fitting positions.
+ */
 import { Alert, Box, CircularProgress, List, Typography } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useSearch } from "../../services/api/hooks/useSearch";
@@ -21,6 +30,18 @@ interface SearchResultsPanelProps {
 	) => void;
 }
 
+/**
+ * Renders a search panel for fitting positions, with filtering, infinite scroll, and result selection.
+ * Handles loading, error, and degraded data states.
+ *
+ * @param imageId The ID of the image to search within
+ * @param onSelectFp Handler for selecting a fitting position (id, x, y)
+ * @param query Controlled search query (optional)
+ * @param onQueryChange Handler for search query changes (optional)
+ * @param activeSources Controlled list of active sources (optional)
+ * @param onActiveSourcesChange Handler for source filter changes (optional)
+ * @param onSearchMetadata Handler for search metadata updates (optional)
+ */
 function SearchResultsPanel({
 	imageId,
 	onSelectFp,

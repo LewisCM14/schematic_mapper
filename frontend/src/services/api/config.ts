@@ -1,6 +1,17 @@
-/** Centralised query-cache and operational constants. */
+/**
+ * config.ts
+ *
+ * Centralized query-cache and operational constants for the Schematic Mapper frontend API layer.
+ *
+ * - Defines React Query cache policies (staleTime, gcTime) for each resource type.
+ * - Contains operational constants for search, pagination, and upload chunking.
+ * - All values are tuned for optimal UX and backend efficiency.
+ *
+ * Update this file to adjust cache durations, search defaults, or upload chunking.
+ */
 
 // ── React Query cache policies ───────────────────────────────────────────────
+// ── Operational constants ────────────────────────────────────────────────────
 
 /** Drawing types rarely change — cache aggressively. */
 export const STALE_TIME_DRAWING_TYPES = 30 * 60 * 1000; // 30 min

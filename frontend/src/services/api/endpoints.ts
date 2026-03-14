@@ -1,3 +1,15 @@
+/**
+ * endpoints.ts
+ *
+ * All API service functions for the Schematic Mapper frontend.
+ *
+ * - Each function wraps an HTTP request to a backend endpoint and parses the response with a Zod schema.
+ * - Ensures type-safe, validated data for all React Query hooks and UI components.
+ * - Groups endpoints by resource: health, drawing types, images, fitting positions, search, admin upload.
+ * - All request/response shapes are kept in sync with backend contract (see schemas.ts).
+ *
+ * Update this file whenever backend endpoints or request/response shapes change.
+ */
 import httpClient from "./httpClient";
 import {
 	BulkFittingPositionsResultSchema,
