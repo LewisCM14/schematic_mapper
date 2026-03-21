@@ -25,7 +25,6 @@ There is currently no method of visualizing component information over mechanica
 In its end state the Schematic Mapping application is to be a scalable and extendable platform that can be integrated with enterprise data sources to visualize component information and health data on mechanical drawings. Serving as both a training aid and informing engineers of possible compounding health issues.
 
 ## Requirements
-
 **High Level**
 
 1. Must be a web application.
@@ -68,7 +67,33 @@ In its end state the Schematic Mapping application is to be a scalable and exten
 
 **Authorization**
 
-1. The application must integrate with an existing enterprise user service solution underpinned by ADFS and Active Directory.
+1. The application must use Windows Authentication via IIS, integrating directly with Active Directory for user authentication. All authentication is handled by IIS; the application does not implement its own login or token validation. User identity is provided to the backend via IIS environment variables or headers (e.g., REMOTE_USER).
+2. For authorization, the backend queries Active Directory via LDAP (using LDAPS) to determine user group membership and map to application roles. **Only users in the following two AD groups are permitted access:**
+    - **app_admin**: Members are granted admin access to all application features, including admin workflows and image upload/mapping.
+    - **app_viewer**: Members are granted standard user access (read-only, no admin privileges).
+    - Users not in either group are denied access to the application.
+
+**Local Development and Testing (Without IIS/AD/LDAP)**
+
+To support local development and testing without requiring IIS, Active Directory, or LDAP, the backend must provide a development mode that bypasses or mocks authentication and authorization. This enables developers to run the application and all tests locally with minimal setup.
+
+- A configuration option (e.g., environment variable `AUTH_MODE=dev`) must be available to switch the backend into development mode.
+- In development mode:
+    - Authentication middleware should inject a mock user identity (e.g., `dev_admin` or `dev_viewer`).
+    - Authorization middleware should assign the appropriate role (admin or viewer) based on a second environment variable (e.g., `DEV_USER_ROLE=admin` or `viewer`).
+    - LDAP/AD lookups are skipped or mocked.
+- This mode must be used for local development, automated testing, and CI pipelines.
+- The frontend and backend must both work out-of-the-box in this mode, requiring only local database setup.
+
+**Example .env for Local Development:**
+```env
+AUTH_MODE=dev
+DEV_USER_IDENTITY=dev_admin
+DEV_USER_ROLE=admin
+```
+
+**Security Note:**
+Development mode must never be enabled in production or on any externally accessible environment.
 
 ### Requirements Summary
 
@@ -77,7 +102,7 @@ In its end state the Schematic Mapping application is to be a scalable and exten
 | High Level | Web app, scalable to enterprise, optimized for MS Edge/desktop, runs on Windows/IIS, extensible data integration, license-free tech |
 | User Interface | Display 15MB vector drawings with pan/zoom supporting up to 3,000 POI markers per diagram; viewport culling and grid-based clustering for ≤100 ms render latency; tooltips on hover; left panel with tabs for data sources, search, click interactions |
 | Data Access | Internal MSSQL for images/mappings, external Oracle API for assets, GraphQL for sensors |
-| Authorization | Integration with ADFS/Active Directory |
+| Authorization | Windows Authentication via IIS and Active Directory; **only users in app_admin or app_viewer AD groups are permitted**; LDAP (LDAPS) for group membership |
 
 The requirements above inform the selection of the tech stack detailed below.
 
@@ -88,7 +113,7 @@ Layer | Technologies |
 Database| MSSQL & Oracle
 Server Side| Python & Django & Pytest with Ruff (Linting/Formatting) & Mypy (Type Checking)
 Client Side| TypeScript & React with MaterialUI components on Vite & Vitest, Biome (Linting/Formatting)
-Authorization| *Existing ADFS & Active Directory Service*
+Authorization| Windows Authentication via IIS and Active Directory
 
 ---
 
@@ -96,11 +121,16 @@ Authorization| *Existing ADFS & Active Directory Service*
 
 ```mermaid
 ---
-title: Level 0 Architecture
+title: Level 0 Architecture (IIS/AD)
 ---
 flowchart LR
     subgraph CLIENT[Client Machine]
         B[MS Edge Browser]
+    end
+
+    subgraph IIS[IIS Web Server]
+        IISAUTH[Windows Authentication]
+        IISPROXY[Reverse Proxy]
     end
 
     subgraph APP[Schematic Mapper Application]
@@ -115,22 +145,13 @@ flowchart LR
         SENSORDB[(MSSQL: Sensor Information)]
     end
 
-    subgraph AUTH[Authentication Services]
-        AUTHSVC[Auth Service API: Python FastAPI]
-        IDP[ADFS + Active Directory]
-    end
-
-    B -->|Loads application| UI
-    B -->|HTTPS API Calls| API
+    B -->|Loads application| IIS
+    IIS -->|Serves static files| UI
+    B -->|HTTPS API Calls| IIS
+    IIS -->|"Authenticated requests [REMOTE_USER]"| API
     UI -->|Requests data| API
-
-    B -->|Frontend sign in| AUTHSVC
-    AUTHSVC -->|SSO with enterprise identity| IDP
-    IDP -->|Identity token / claims| AUTHSVC
-    AUTHSVC -->|Issue token| B
-
-    API -->|Validate token / session| AUTHSVC
-    AUTHSVC -->|AuthN and claims response| API
+    API -->|LDAP group lookup| LDAP
+    LDAP -->|LDAPS| AD
 
     API <-->|Read & Write| APPDB
     API -->|Read asset data| ORADB
@@ -139,7 +160,7 @@ flowchart LR
     API -->|Aggregated response| UI
 ```
 
-*Alt: Level 0 Architecture diagram showing client browser, application server with React UI and Django API, and enterprise data sources including MSSQL, Oracle, and GraphQL.*
+*Alt: Level 0 Architecture diagram showing IIS handling authentication and proxying to React UI and Django API, with enterprise data sources.*
 
 ### Database Layer
 
@@ -374,13 +395,15 @@ Sensor mapping notes:
 
 ### Server Side Layer
 
-*Uses `REST` as the primary API style for the Django application. Keeping upstream integrations behind internal service adapters, including the existing sensor GraphQL source.*
+*Uses `REST` as the primary API style for the Django application. All authentication and authorization are handled by IIS using Windows Authentication and Active Directory. The backend receives user identity via IIS-provided environment variables or headers (e.g., REMOTE_USER). Upstream integrations remain behind internal service adapters, including the existing sensor GraphQL source.*
 
 #### Server Side Architecture
 
 1. API layer (`Django REST Framework`)
     - Exposes stable endpoints for React UI and Admin workflows.
-    - Performs auth checks using the enterprise auth service.
+    - Receives authenticated user identity from IIS (REMOTE_USER or equivalent header).
+    - Uses a Python LDAP library (django-auth-ldap) to query Active Directory for group membership on each request (or caches per session).
+    - Maps AD group membership to Django user roles for authorization (e.g., admin access).
 
 2. Application service layer
     - Implements business workflows: image upload, fitting position mapping, POI aggregation.
@@ -672,6 +695,50 @@ api/
     - Contract tests:
         - Validate expected response shapes for external sources.
         - Detect upstream schema changes early.
+
+1. Authentication and Authorization test cases
+    - Backend endpoints correctly read user identity from IIS-provided environment variables or headers (e.g., REMOTE_USER).
+    - Backend queries Active Directory via LDAP (LDAPS) for group membership and maps to application roles.
+    - Group/role mapping from Active Directory is respected for admin-only endpoints.
+    - Requests without valid IIS authentication are rejected.
+
+    **Testing IIS/LDAP/AD Authentication and Authorization**
+    - IIS authentication is simulated in tests by setting the `REMOTE_USER` header or environment variable in the Django test client.
+    - LDAP/AD group membership is mocked by patching the LDAP backend (e.g., `django-auth-ldap`) to return the desired group memberships for test users.
+    - Pytest fixtures are provided for both `app_admin` and `app_viewer` roles, allowing tests to easily exercise both permission levels on protected routes.
+    - Example fixture for `app_admin`:
+        ```python
+        import pytest
+        from unittest.mock import patch
+
+        @pytest.fixture
+        def admin_user_client(client):
+            with patch('django_auth_ldap.backend.LDAPBackend.get_group_permissions') as mock_groups:
+                mock_groups.return_value = {'app_admin'}
+                client.defaults['REMOTE_USER'] = 'adminuser'
+                yield client
+        ```
+    - Example fixture for `app_viewer`:
+        ```python
+        @pytest.fixture
+        def viewer_user_client(client):
+            with patch('django_auth_ldap.backend.LDAPBackend.get_group_permissions') as mock_groups:
+                mock_groups.return_value = {'app_viewer'}
+                client.defaults['REMOTE_USER'] = 'vieweruser'
+                yield client
+        ```
+    - Example usage in a test:
+        ```python
+        def test_admin_route_access(admin_user_client):
+            response = admin_user_client.get('/api/admin/protected-route/')
+            assert response.status_code == 200
+
+        def test_admin_route_denied_for_viewer(viewer_user_client):
+            response = viewer_user_client.get('/api/admin/protected-route/')
+            assert response.status_code == 403
+        ```
+    - These fixtures should be placed in `tests/conftest.py` and used in any test file that needs to verify group-based authorization logic.
+    - This approach allows full coverage of authentication and authorization logic without requiring a real IIS or AD server.
 
 1. Search-specific test cases
     - Search evaluates all configured internal searchable columns for the selected image scope.
@@ -1130,9 +1197,12 @@ Accessibility and consistency:
 
 ##### Security and Transport
 
-- Attach auth token on each request via interceptor/wrapper.
-- Handle `401/403` globally and route to sign-in flow.
-- Never cache sensitive auth payloads in local storage.
+- All authentication is handled by IIS using Windows Authentication (Active Directory). The application does not implement its own login or token validation.
+- The backend trusts the IIS-provided user identity (REMOTE_USER or equivalent header).
+- For authorization, the backend queries Active Directory via LDAPS (secure LDAP) for group membership and minimal user attributes only.
+- No auth tokens are used in API requests.
+- All API requests must be made over HTTPS.
+- Never cache sensitive user information in local storage.
 
 
 #### Testing Strategy (`vitest`)

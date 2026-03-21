@@ -14,6 +14,7 @@ from rest_framework.response import Response
 
 from api.adapters.asset_adapter import fetch_asset_details
 from api.models import DrawingType, FittingPosition, Image
+from api.permissions import viewer_required
 from api.serializers.image_serializers import (
     DrawingTypeSerializer,
     FittingPositionDetailSerializer,
@@ -24,6 +25,7 @@ from api.serializers.image_serializers import (
 
 
 @api_view(["GET"])
+@viewer_required
 def list_drawing_types(request: Request) -> Response:
     """
     List all active drawing types, ordered by name.
@@ -35,6 +37,7 @@ def list_drawing_types(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@viewer_required
 def list_images(request: Request) -> Response:
     """
     List images with optional filtering by drawing type and search term.
@@ -82,6 +85,7 @@ def list_images(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@viewer_required
 def get_image(request: Request, image_id: uuid.UUID) -> Response:
     """
     Retrieve details for a single image by its UUID.
@@ -93,6 +97,7 @@ def get_image(request: Request, image_id: uuid.UUID) -> Response:
 
 
 @api_view(["GET"])
+@viewer_required
 def list_fitting_positions(request: Request, image_id: uuid.UUID) -> Response:
     """
     List all fitting positions for a given image.
@@ -105,6 +110,7 @@ def list_fitting_positions(request: Request, image_id: uuid.UUID) -> Response:
 
 
 @api_view(["GET"])
+@viewer_required
 def get_fitting_position_details(
     request: Request, fitting_position_id: str
 ) -> Response:

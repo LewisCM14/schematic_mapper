@@ -7,9 +7,11 @@ from django.db import OperationalError, connections
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
+from api.permissions import viewer_required
 
 
 @api_view(["GET"])
+@viewer_required
 def health(request: Request) -> Response:
     """
     Health check endpoint for service monitoring.

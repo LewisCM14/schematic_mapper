@@ -35,7 +35,7 @@ INSTALLED_APPS = [
 
 
 # Middleware stack for request/response processing
-MIDDLEWARE = [
+_BASE_MIDDLEWARE = [
     "django.middleware.gzip.GZipMiddleware",  # Compress responses
     "django.middleware.security.SecurityMiddleware",  # Security headers
     "corsheaders.middleware.CorsMiddleware",  # CORS support
@@ -48,6 +48,56 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",  # Clickjacking protection
 ]
 
+
+# --- Middleware selection for authentication/authorization ---
+#
+# Django uses a list called MIDDLEWARE to decide what code runs before/after every request.
+# This section chooses which authentication/authorization middleware to use based on the environment.
+#
+# - In local development (when AUTH_MODE=dev):
+#     - Use DevAuthMiddleware, which fakes a user and role for easy testing.
+#     - DevAuthMiddleware is added at the very start of the middleware stack.
+#
+# - In production (any other AUTH_MODE):
+#     - Use IISAuthMiddleware to get the logged-in user from IIS web server headers.
+#     - Use LDAPAuthorizationMiddleware to check the user's AD group and set their role.
+#     - Both are inserted in the correct order after RequestIdMiddleware.
+#
+if env("AUTH_MODE", default=None) == "dev":
+    # Local development: fake user/role for easy testing
+    MIDDLEWARE = ["api.middleware.DevAuthMiddleware"] + _BASE_MIDDLEWARE
+else:
+    # Production: real authentication/authorization
+    _prod_middleware = _BASE_MIDDLEWARE.copy()
+    # Insert IISAuthMiddleware after RequestIdMiddleware
+    idx = _prod_middleware.index("api.middleware.RequestIdMiddleware") + 1
+    _prod_middleware.insert(idx, "api.middleware.IISAuthMiddleware")
+    # Insert LDAPAuthorizationMiddleware after IISAuthMiddleware
+    idx = _prod_middleware.index("api.middleware.IISAuthMiddleware") + 1
+    _prod_middleware.insert(idx, "api.middleware.LDAPAuthorizationMiddleware")
+    MIDDLEWARE = _prod_middleware
+
+
+# --- LDAP/Active Directory (AD) settings for group-based authorization ---
+#
+# These settings tell the app how to connect to Active Directory (AD) using LDAP.
+# AD is used to check which groups a user belongs to (for admin/viewer permissions).
+#
+# - LDAP_SERVER_URI: The address of the AD server (use LDAPS for security).
+# - LDAP_BIND_DN: The username of the service account used to connect to AD.
+# - LDAP_BIND_PASSWORD: The password for the service account.
+# - LDAP_BASE_DN: The root location in AD to search for users/groups.
+# - LDAP_ADMIN_GROUP: The name of the AD group for admins.
+# - LDAP_VIEWER_GROUP: The name of the AD group for viewers.
+#
+LDAP_SERVER_URI = env("LDAP_SERVER_URI", default="ldaps://ad.example.com:636")
+LDAP_BIND_DN = env(
+    "LDAP_BIND_DN", default="CN=svc_account,OU=Service Accounts,DC=example,DC=com"
+)
+LDAP_BIND_PASSWORD = env("LDAP_BIND_PASSWORD", default="")
+LDAP_BASE_DN = env("LDAP_BASE_DN", default="DC=example,DC=com")
+LDAP_ADMIN_GROUP = env("LDAP_ADMIN_GROUP", default="app_admin")
+LDAP_VIEWER_GROUP = env("LDAP_VIEWER_GROUP", default="app_viewer")
 
 # List of allowed origins for cross-origin requests (CORS)
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])

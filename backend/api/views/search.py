@@ -13,11 +13,13 @@ from rest_framework.response import Response
 
 from api.constants import VALID_SEARCH_SOURCES
 from api.models import Image
+from api.permissions import viewer_required
 from api.serializers.search_serializers import SearchResponseSerializer
 from api.services.search_service import search as run_search
 
 
 @api_view(["GET"])
+@viewer_required
 def search_view(request: Request) -> Response:
     """
     Search for fitting positions or assets within a given image.

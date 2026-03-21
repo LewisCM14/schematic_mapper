@@ -6,6 +6,7 @@ All endpoints are protected and intended for admin use only.
 
 import uuid
 
+from api.permissions import admin_required
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
@@ -27,6 +28,7 @@ from api.services import upload_service
 
 
 @api_view(["POST"])
+@admin_required
 def create_upload_session(request: Request) -> Response:
     """
     Start a new upload session for a large SVG image.
@@ -80,6 +82,7 @@ def create_upload_session(request: Request) -> Response:
 
 
 @api_view(["PUT"])
+@admin_required
 def upload_chunk(request: Request, upload_id: uuid.UUID, part_number: int) -> Response:
     """
     Upload a single chunk of a file to an in-progress upload session.
@@ -100,6 +103,7 @@ def upload_chunk(request: Request, upload_id: uuid.UUID, part_number: int) -> Re
 
 
 @api_view(["POST"])
+@admin_required
 def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
     """
     Complete an upload session by assembling all chunks, verifying checksum, and committing the image.
@@ -118,6 +122,7 @@ def complete_upload(request: Request, upload_id: uuid.UUID) -> Response:
 
 
 @api_view(["GET", "DELETE"])
+@admin_required
 def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
     """
     GET: Return details and progress for an upload session (received parts, file size, etc).
@@ -147,6 +152,7 @@ def upload_session_detail(request: Request, upload_id: uuid.UUID) -> Response:
 
 
 @api_view(["POST"])
+@admin_required
 def admin_upload_image(request: Request) -> Response:
     """
     Upload an image in a single request (no chunking).
@@ -186,6 +192,7 @@ def admin_upload_image(request: Request) -> Response:
 
 
 @api_view(["POST"])
+@admin_required
 def bulk_fitting_positions(request: Request) -> Response:
     """
     Bulk create or update fitting positions for a given image.
@@ -249,6 +256,7 @@ def bulk_fitting_positions(request: Request) -> Response:
 
 
 @api_view(["DELETE"])
+@admin_required
 def delete_fitting_position(request: Request, fitting_position_id: str) -> Response:
     """
     Delete a fitting position by its ID.

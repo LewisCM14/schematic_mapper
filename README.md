@@ -41,9 +41,14 @@ CREATE DATABASE schematic_mock_asset_db;
 
 ### 3. Configure environment variables
 
-Create `backend/.env` from the template below:
+Create `backend/.env` from the template below. This enables local development mode with mock authentication/authorization:
 
 ```env
+# Enable development mode authentication (do not use in production)
+AUTH_MODE=dev
+DEV_USER_IDENTITY=dev_admin
+DEV_USER_ROLE=admin
+
 SECRET_KEY=your-django-secret-key
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
@@ -63,6 +68,10 @@ DB_ASSET_NAME=schematic_mock_asset_db
 DB_ASSET_USER=your_db_user
 DB_ASSET_PASSWORD=your_db_password
 ```
+
+> **Note:**
+> - `AUTH_MODE=dev` enables local development mode, bypassing IIS/AD/LDAP authentication and authorization. The backend will inject a mock user identity and role from `DEV_USER_IDENTITY` and `DEV_USER_ROLE`.
+> - Never enable development mode in production or on any externally accessible environment.
 
 ### 4. Install dependencies and apply migrations
 

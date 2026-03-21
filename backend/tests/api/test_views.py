@@ -1,3 +1,4 @@
+from typing import Callable, Any
 import base64
 import hashlib
 import json
@@ -53,12 +54,51 @@ class TestRequestIdMiddleware:
 
 @pytest.mark.django_db
 class TestHealthView:
-    def test_returns_200(self, client: Client) -> None:
-        response = client.get("/api/health")
+    def test_returns_200(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/health", extra=environ)
         assert response.status_code == 200
 
-    def test_response_shape(self, client: Client) -> None:
-        response = client.get("/api/health")
+    def test_health_allows_admin(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/health", extra=environ)
+        assert response.status_code == 200
+
+    def test_health_allows_viewer(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/health", extra=environ)
+        assert response.status_code == 200
+
+    def test_health_forbidden_for_unauthorized(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client(
+            "DOMAIN\\otheruser", ["some_other_group"]
+        )
+        with patcher:
+            response = client.get("/api/health", extra=environ)
+        assert response.status_code == 403
+
+    def test_response_shape(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/health", extra=environ)
         data = response.json()
         assert data["status"] == "ok"
         assert data["database"] == "ok"
@@ -66,38 +106,86 @@ class TestHealthView:
 
 @pytest.mark.django_db
 class TestListDrawingTypesView:
-    def test_returns_200(self, client: Client, drawing_type: DrawingType) -> None:
-        response = client.get("/api/drawing-types")
+    def test_returns_200(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
         assert response.status_code == 200
 
+    def test_returns_200_viewer(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
+        assert response.status_code == 200
+
+    def test_forbidden_for_unauthorized(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
+        client, environ, patcher = auth_client(
+            "DOMAIN\\otheruser", ["some_other_group"]
+        )
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
+        assert response.status_code == 403
+
     def test_returns_seeded_types(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         DrawingType.objects.create(type_name="system")
-        response = client.get("/api/drawing-types")
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
         data = response.json()
         names = [dt["type_name"] for dt in data]
         assert "composite" in names
         assert "system" in names
 
-    def test_types_with_no_images_still_appear(self, client: Client) -> None:
+    def test_types_with_no_images_still_appear(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
         DrawingType.objects.create(type_name="standalone")
-        response = client.get("/api/drawing-types")
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
         data = response.json()
         names = [dt["type_name"] for dt in data]
         assert "standalone" in names
 
-    def test_inactive_types_excluded(self, client: Client) -> None:
+    def test_inactive_types_excluded(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
         DrawingType.objects.create(type_name="active_type")
         DrawingType.objects.create(type_name="inactive_type", is_active=False)
-        response = client.get("/api/drawing-types")
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
         data = response.json()
         names = [dt["type_name"] for dt in data]
         assert "active_type" in names
         assert "inactive_type" not in names
 
-    def test_response_shape(self, client: Client, drawing_type: DrawingType) -> None:
-        response = client.get("/api/drawing-types")
+    def test_response_shape(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
         data = response.json()
         assert isinstance(data, list)
         item = data[0]
@@ -106,10 +194,15 @@ class TestListDrawingTypesView:
         assert "description" in item
         assert "is_active" in item
 
-    def test_ordered_by_type_name(self, client: Client) -> None:
+    def test_ordered_by_type_name(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
         DrawingType.objects.create(type_name="z-type")
         DrawingType.objects.create(type_name="a-type")
-        response = client.get("/api/drawing-types")
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get("/api/drawing-types", extra=environ)
         data = response.json()
         names = [dt["type_name"] for dt in data]
         assert names == sorted(names)
@@ -117,25 +210,49 @@ class TestListDrawingTypesView:
 
 @pytest.mark.django_db
 class TestListImagesView:
-    def test_returns_200(self, client: Client, image: Image) -> None:
-        response = client.get("/api/images")
+    def test_returns_200(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images", extra=environ)
         assert response.status_code == 200
 
-    def test_returns_paginated_shape(self, client: Client, image: Image) -> None:
-        response = client.get("/api/images")
+    def test_returns_paginated_shape(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images", extra=environ)
         data = response.json()
         assert "results" in data
         assert "has_more" in data
         assert "next_cursor" in data
 
-    def test_results_list(self, client: Client, image: Image) -> None:
-        response = client.get("/api/images")
+    def test_results_list(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images", extra=environ)
         data = response.json()
         assert isinstance(data["results"], list)
         assert len(data["results"]) == 1
 
-    def test_response_shape(self, client: Client, image: Image) -> None:
-        response = client.get("/api/images")
+    def test_response_shape(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images", extra=environ)
         item = response.json()["results"][0]
         assert str(image.image_id) == item["image_id"]
         assert item["component_name"] == "Cooling Assembly"
@@ -146,21 +263,36 @@ class TestListImagesView:
         assert "thumbnail_url" in item
         assert item["thumbnail_url"] is None
 
-    def test_empty_list_when_no_images(self, client: Client) -> None:
-        response = client.get("/api/images")
+    def test_empty_list_when_no_images(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images", extra=environ)
         data = response.json()
         assert data["results"] == []
         assert data["has_more"] is False
         assert data["next_cursor"] is None
 
-    def test_first_page_no_cursor(self, client: Client, image: Image) -> None:
-        response = client.get("/api/images?limit=1")
+    def test_first_page_no_cursor(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images?limit=1", extra=environ)
         data = response.json()
         assert len(data["results"]) == 1
         assert data["has_more"] is False  # only 1 image total
         assert data["next_cursor"] is None
 
-    def test_cursor_pagination(self, client: Client, image: Image) -> None:
+    def test_cursor_pagination(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
         # Create a second image so we can paginate
         other_dt = DrawingType.objects.create(type_name="system")
         Image.objects.create(
@@ -171,18 +303,27 @@ class TestListImagesView:
             width_px=800,
             height_px=600,
         )
-        response = client.get("/api/images?limit=1")
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images?limit=1", extra=environ)
         data = response.json()
         assert len(data["results"]) == 1
         assert data["has_more"] is True
         assert data["next_cursor"] is not None
         # Fetch second page
-        response2 = client.get(f"/api/images?limit=1&cursor={data['next_cursor']}")
+        with patcher:
+            response2 = client.get(
+                f"/api/images?limit=1&cursor={data['next_cursor']}", extra=environ
+            )
         data2 = response2.json()
         assert len(data2["results"]) == 1
         assert data2["has_more"] is False
 
-    def test_filters_by_drawing_type_id(self, client: Client, image: Image) -> None:
+    def test_filters_by_drawing_type_id(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
         # Create a second drawing type and image that should be excluded
         other_dt = DrawingType.objects.create(type_name="system")
         Image.objects.create(
@@ -193,15 +334,23 @@ class TestListImagesView:
             width_px=800,
             height_px=600,
         )
-        response = client.get(
-            f"/api/images?drawing_type_id={image.drawing_type.drawing_type_id}"
-        )
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get(
+                f"/api/images?drawing_type_id={image.drawing_type.drawing_type_id}",
+                extra=environ,
+            )
         data = response.json()
         assert len(data["results"]) == 1
         assert data["results"][0]["image_id"] == str(image.image_id)
 
-    def test_returns_400_for_invalid_drawing_type_id(self, client: Client) -> None:
-        response = client.get("/api/images?drawing_type_id=notanint")
+    def test_returns_400_for_invalid_drawing_type_id(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\vieweruser", ["app_viewer"])
+        with patcher:
+            response = client.get("/api/images?drawing_type_id=notanint", extra=environ)
         assert response.status_code == 400
 
     def test_filters_by_search(self, client: Client, image: Image) -> None:
@@ -238,6 +387,7 @@ class TestGetImageView:
     def test_returns_200(self, client: Client, image: Image) -> None:
         response = client.get(f"/api/images/{image.image_id}")
         assert response.status_code == 200
+        assert response.json()["image_svg"] == "<svg/>"
 
     def test_returns_404_for_unknown_id(self, client: Client) -> None:
         response = client.get("/api/images/00000000-0000-0000-0000-000000000000")
@@ -255,6 +405,7 @@ class TestListFittingPositionsView:
     def test_returns_200(self, client: Client, image: Image) -> None:
         response = client.get(f"/api/images/{image.image_id}/fitting-positions")
         assert response.status_code == 200
+        assert response.json() == []
 
     def test_returns_404_for_unknown_image(self, client: Client) -> None:
         response = client.get(
@@ -301,6 +452,11 @@ class TestGetFittingPositionDetailsView:
     def test_returns_404_for_unknown_fp(self, client: Client) -> None:
         response = client.get("/api/fitting-positions/DOES-NOT-EXIST/details")
         assert response.status_code == 404
+        data = response.json()
+        assert "detail" in data
+        assert (
+            "not found" in data["detail"].lower() or "matches" in data["detail"].lower()
+        )
 
     def test_returns_200_with_asset_found(self, client: Client, image: Image) -> None:
         self._make_fp(image)
@@ -368,43 +524,66 @@ def _upload_payload(
 
 @pytest.mark.django_db
 class TestCreateUploadSessionView:
-    def test_creates_session(self, client: Client, drawing_type: DrawingType) -> None:
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps(_upload_payload(drawing_type)),
-            content_type="application/json",
-        )
+    def test_creates_session(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps(_upload_payload(drawing_type)),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 201
         data = response.json()
         assert data["state"] == "initiated"
         assert "upload_id" in data
 
     def test_idempotent_returns_existing(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
         payload = _upload_payload(drawing_type, key="idem-key")
-        client.post(
-            "/api/admin/uploads",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        with patcher:
+            client.post(
+                "/api/admin/uploads",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 200
         assert ImageUpload.objects.filter(idempotency_key="idem-key").count() == 1
 
-    def test_returns_400_for_missing_fields(self, client: Client) -> None:
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps({}),
-            content_type="application/json",
-        )
+    def test_returns_400_for_missing_fields(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps({}),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 400
 
-    def test_returns_404_for_unknown_drawing_type(self, client: Client) -> None:
+    def test_returns_404_for_unknown_drawing_type(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+    ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
         payload = {
             "drawing_type_id": 9999,
             "component_name": "X",
@@ -413,27 +592,36 @@ class TestCreateUploadSessionView:
             "expected_checksum": "a" * 64,
             "idempotency_key": "k1",
         }
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        with patcher:
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 404
 
     def test_returns_400_for_file_too_large(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
         payload = _upload_payload(drawing_type, key="large-key")
         payload["file_size"] = 50 * 1024 * 1024 + 1  # 1 byte over limit
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        with patcher:
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 400
 
     def test_rejects_duplicate_component_name_ignoring_case_and_whitespace(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         Image.objects.create(
             drawing_type=drawing_type,
@@ -445,16 +633,21 @@ class TestCreateUploadSessionView:
         )
         payload = _upload_payload(drawing_type, key="duplicate-name")
         payload["component_name"] = " cooling assembly  "
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 409
         assert response.json()["code"] == "duplicate_component_name"
 
     def test_returns_429_when_concurrent_limit_reached(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         # Create MAX_CONCURRENT_UPLOADS active sessions
         for i in range(3):
@@ -470,11 +663,14 @@ class TestCreateUploadSessionView:
 
         # The next one should be rejected
         payload = _upload_payload(drawing_type, key="concurrent-overflow")
-        response = client.post(
-            "/api/admin/uploads",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                "/api/admin/uploads",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 429
         assert response.json()["code"] == "upload_limit_reached"
 
@@ -549,62 +745,85 @@ class TestUploadChunkView:
             idempotency_key=str(uuid.uuid4()),
         )
 
-    def test_accepts_chunk(self, client: Client, drawing_type: DrawingType) -> None:
+    def test_accepts_chunk(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
         session = self._create_session(drawing_type)
         chunk_b64 = base64.b64encode(b"hello!").decode()
-        response = client.put(
-            f"/api/admin/uploads/{session.upload_id}/parts/1",
-            data=json.dumps({"chunk_data": chunk_b64}),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.put(
+                f"/api/admin/uploads/{session.upload_id}/parts/1",
+                data=json.dumps({"chunk_data": chunk_b64}),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 200
         assert response.json()["state"] == "uploading"
 
     def test_returns_409_when_aborted(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         session = self._create_session(drawing_type)
         session.state = "aborted"
         session.save()
         chunk_b64 = base64.b64encode(b"x").decode()
-        response = client.put(
-            f"/api/admin/uploads/{session.upload_id}/parts/1",
-            data=json.dumps({"chunk_data": chunk_b64}),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.put(
+                f"/api/admin/uploads/{session.upload_id}/parts/1",
+                data=json.dumps({"chunk_data": chunk_b64}),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 409
 
     def test_returns_400_for_invalid_base64(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         session = self._create_session(drawing_type)
-        response = client.put(
-            f"/api/admin/uploads/{session.upload_id}/parts/1",
-            data=json.dumps({"chunk_data": "!!!notbase64!!!"}),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.put(
+                f"/api/admin/uploads/{session.upload_id}/parts/1",
+                data=json.dumps({"chunk_data": "!!!notbase64!!!"}),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 400
 
     def test_chunk_retry_updates_without_creating_duplicate(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         from api.models import UploadChunk
 
         session = self._create_session(drawing_type)
         chunk_b64_first = base64.b64encode(b"hello!").decode()
         chunk_b64_second = base64.b64encode(b"world!").decode()
-        # First PUT
-        client.put(
-            f"/api/admin/uploads/{session.upload_id}/parts/1",
-            data=json.dumps({"chunk_data": chunk_b64_first}),
-            content_type="application/json",
-        )
-        # Retry same part_number with different data
-        client.put(
-            f"/api/admin/uploads/{session.upload_id}/parts/1",
-            data=json.dumps({"chunk_data": chunk_b64_second}),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            # First PUT
+            client.put(
+                f"/api/admin/uploads/{session.upload_id}/parts/1",
+                data=json.dumps({"chunk_data": chunk_b64_first}),
+                content_type="application/json",
+                extra=environ,
+            )
+            # Retry same part_number with different data
+            client.put(
+                f"/api/admin/uploads/{session.upload_id}/parts/1",
+                data=json.dumps({"chunk_data": chunk_b64_second}),
+                content_type="application/json",
+                extra=environ,
+            )
         # Must still be exactly one chunk row
         assert UploadChunk.objects.filter(upload=session).count() == 1
         # Data must reflect the latest retry
@@ -612,7 +831,9 @@ class TestUploadChunkView:
         assert bytes(chunk.data) == b"world!"
 
     def test_upload_resume_flow(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         """Upload parts 1 and 2, verify via GET, upload part 3, then complete."""
         svg_part1 = b"<svg "
@@ -630,38 +851,43 @@ class TestUploadChunkView:
             idempotency_key=str(uuid.uuid4()),
         )
         upload_id = session.upload_id
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            # Upload part 1
+            client.put(
+                f"/api/admin/uploads/{upload_id}/parts/1",
+                data=json.dumps({"chunk_data": base64.b64encode(svg_part1).decode()}),
+                content_type="application/json",
+                extra=environ,
+            )
+            # Upload part 2
+            client.put(
+                f"/api/admin/uploads/{upload_id}/parts/2",
+                data=json.dumps({"chunk_data": base64.b64encode(svg_part2).decode()}),
+                content_type="application/json",
+                extra=environ,
+            )
 
-        # Upload part 1
-        client.put(
-            f"/api/admin/uploads/{upload_id}/parts/1",
-            data=json.dumps({"chunk_data": base64.b64encode(svg_part1).decode()}),
-            content_type="application/json",
-        )
-        # Upload part 2
-        client.put(
-            f"/api/admin/uploads/{upload_id}/parts/2",
-            data=json.dumps({"chunk_data": base64.b64encode(svg_part2).decode()}),
-            content_type="application/json",
-        )
+            # GET session to verify received_parts
+            get_resp = client.get(f"/api/admin/uploads/{upload_id}", extra=environ)
+            assert get_resp.status_code == 200
+            assert get_resp.json()["received_parts"] == [1, 2]
 
-        # GET session to verify received_parts
-        get_resp = client.get(f"/api/admin/uploads/{upload_id}")
-        assert get_resp.status_code == 200
-        assert get_resp.json()["received_parts"] == [1, 2]
+            # Upload part 3
+            client.put(
+                f"/api/admin/uploads/{upload_id}/parts/3",
+                data=json.dumps({"chunk_data": base64.b64encode(svg_part3).decode()}),
+                content_type="application/json",
+                extra=environ,
+            )
 
-        # Upload part 3
-        client.put(
-            f"/api/admin/uploads/{upload_id}/parts/3",
-            data=json.dumps({"chunk_data": base64.b64encode(svg_part3).decode()}),
-            content_type="application/json",
-        )
-
-        # Complete
-        resp = client.post(
-            f"/api/admin/uploads/{upload_id}/complete",
-            data=json.dumps({"idempotency_key": session.idempotency_key}),
-            content_type="application/json",
-        )
+            # Complete
+            resp = client.post(
+                f"/api/admin/uploads/{upload_id}/complete",
+                data=json.dumps({"idempotency_key": session.idempotency_key}),
+                content_type="application/json",
+                extra=environ,
+            )
         assert resp.status_code == 201
         assert resp.json()["state"] == "completed"
 
@@ -687,15 +913,20 @@ class TestCompleteUploadView:
         return session
 
     def test_completes_successfully(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         svg = b"<svg/>"
         session = self._create_session_with_chunk(drawing_type, svg)
-        response = client.post(
-            f"/api/admin/uploads/{session.upload_id}/complete",
-            data=json.dumps({"idempotency_key": session.idempotency_key}),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                f"/api/admin/uploads/{session.upload_id}/complete",
+                data=json.dumps({"idempotency_key": session.idempotency_key}),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 201
         data = response.json()
         assert data["state"] == "completed"
@@ -866,7 +1097,11 @@ class TestCompleteUploadView:
 
 @pytest.mark.django_db
 class TestAbortUploadView:
-    def test_aborts_session(self, client: Client, drawing_type: DrawingType) -> None:
+    def test_aborts_session(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
+    ) -> None:
         session = ImageUpload.objects.create(
             drawing_type=drawing_type,
             component_name="X",
@@ -876,7 +1111,11 @@ class TestAbortUploadView:
             idempotency_key=str(uuid.uuid4()),
             state="uploading",
         )
-        response = client.delete(f"/api/admin/uploads/{session.upload_id}")
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.delete(
+                f"/api/admin/uploads/{session.upload_id}", extra=environ
+            )
         assert response.status_code == 204
         session.refresh_from_db()
         assert session.state == "aborted"
@@ -924,7 +1163,9 @@ class TestAbortUploadView:
 @pytest.mark.django_db
 class TestGetUploadSessionView:
     def test_returns_session_with_received_parts(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         session = ImageUpload.objects.create(
             drawing_type=drawing_type,
@@ -940,7 +1181,11 @@ class TestGetUploadSessionView:
         UploadChunk.objects.create(upload=session, part_number=1, data=b"aaa")
         UploadChunk.objects.create(upload=session, part_number=3, data=b"ccc")
 
-        response = client.get(f"/api/admin/uploads/{session.upload_id}")
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.get(
+                f"/api/admin/uploads/{session.upload_id}", extra=environ
+            )
         assert response.status_code == 200
         data = response.json()
         assert data["upload_id"] == str(session.upload_id)
@@ -974,14 +1219,19 @@ class TestAdminUploadImageView:
         }
 
     def test_valid_svg_upload_returns_201(
-        self, client: Client, drawing_type: DrawingType
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        drawing_type: DrawingType,
     ) -> None:
         payload = self._svg_payload(drawing_type)
-        response = client.post(
-            "/api/admin/images",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                "/api/admin/images",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 201
         data = response.json()
         assert "image_id" in data
@@ -1122,7 +1372,11 @@ class TestAdminUploadImageView:
 
 @pytest.mark.django_db
 class TestBulkFittingPositionsView:
-    def test_creates_positions(self, client: Client, image: Image) -> None:
+    def test_creates_positions(
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
+    ) -> None:
         payload = {
             "image_id": str(image.image_id),
             "fitting_positions": [
@@ -1136,11 +1390,14 @@ class TestBulkFittingPositionsView:
                 },
             ],
         }
-        response = client.post(
-            "/api/admin/fitting-positions/bulk",
-            data=json.dumps(payload),
-            content_type="application/json",
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.post(
+                "/api/admin/fitting-positions/bulk",
+                data=json.dumps(payload),
+                content_type="application/json",
+                extra=environ,
+            )
         assert response.status_code == 200
         assert response.json()["created"] == 1
         assert FittingPosition.objects.filter(fitting_position_id="FP-BULK-01").exists()
@@ -1293,7 +1550,9 @@ class TestBulkFittingPositionsView:
 @pytest.mark.django_db
 class TestDeleteFittingPositionView:
     def test_deletes_existing_fitting_position(
-        self, client: Client, image: Image
+        self,
+        auth_client: Callable[[str, list[str]], tuple[Client, dict[str, str], Any]],
+        image: Image,
     ) -> None:
         fitting_position = FittingPosition.objects.create(
             fitting_position_id="FP-DELETE-01",
@@ -1303,9 +1562,12 @@ class TestDeleteFittingPositionView:
             y_coordinate="20.000",
         )
 
-        response = client.delete(
-            f"/api/admin/fitting-positions/{fitting_position.fitting_position_id}"
-        )
+        client, environ, patcher = auth_client("DOMAIN\\adminuser", ["app_admin"])
+        with patcher:
+            response = client.delete(
+                f"/api/admin/fitting-positions/{fitting_position.fitting_position_id}",
+                extra=environ,
+            )
 
         assert response.status_code == 204
         assert not FittingPosition.objects.filter(
