@@ -112,6 +112,7 @@ The API will be available at `http://127.0.0.1:8000`.
 | `uv run python manage.py seed_test_data` | Seed a drawing type, image, and fitting position |
 | `uv run python manage.py setup_mock_asset_db` | Seed the mock asset database |
 | `uv run pytest` | Run tests |
+| `uv run pytest --cov` | Run tests with coverage |
 | `uv run mypy .` | Type check |
 | `uv run ruff check --fix .` | Lint and auto-fix |
 | `uv run ruff format .` | Format code |
