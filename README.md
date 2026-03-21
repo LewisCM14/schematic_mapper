@@ -166,6 +166,28 @@ npm run dev
 
 Open `http://localhost:5173` in Microsoft Edge. The frontend proxies all `/api` requests to the Django backend on port 8000.
 
+
+## Simulating Different User Roles Locally
+
+To test the application as different user types (admin or viewer) during local development, set the following environment variables in `backend/.env`:
+
+```
+# For admin access:
+AUTH_MODE=dev
+DEV_USER_IDENTITY=dev_admin
+DEV_USER_ROLE=admin
+
+# For viewer (non-admin) access:
+AUTH_MODE=dev
+DEV_USER_IDENTITY=dev_user
+DEV_USER_ROLE=viewer
+```
+
+- `DEV_USER_ROLE` must be either `admin` or `viewer` (not `user`).
+- Restart the backend server after changing these values.
+- This allows you to test all authentication and authorization logic locally, including admin-only and viewer-only features, without IIS or Active Directory.
+
+---
 ## UAT Notes
 
 - Open the admin upload workflow from the `Open Admin Upload` button on the main image-selection screen, or visit `http://localhost:5173/admin` directly.

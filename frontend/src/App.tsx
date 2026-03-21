@@ -25,12 +25,15 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { lazy, Suspense } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./context/AuthProvider";
 
 const ImageSelectionPage = lazy(() => import("./pages/ImageSelectionPage"));
 const ImageViewerPage = lazy(() => import("./pages/ImageViewerPage"));
 const AdminUploadMappingPage = lazy(
 	() => import("./pages/AdminUploadMappingPage"),
 );
+
+import { ProtectedRoute } from "./routes/ProtectedRoute";
 
 /**
  * Fallback UI for error boundaries.
@@ -76,34 +79,38 @@ export function PageLoader() {
  */
 function App() {
 	return (
-		<Suspense fallback={<PageLoader />}>
-			<Routes>
-				<Route
-					path="/"
-					element={
-						<ErrorBoundary FallbackComponent={ErrorFallback}>
-							<ImageSelectionPage />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/viewer/:imageId"
-					element={
-						<ErrorBoundary FallbackComponent={ErrorFallback}>
-							<ImageViewerPage />
-						</ErrorBoundary>
-					}
-				/>
-				<Route
-					path="/admin"
-					element={
-						<ErrorBoundary FallbackComponent={ErrorFallback}>
-							<AdminUploadMappingPage />
-						</ErrorBoundary>
-					}
-				/>
-			</Routes>
-		</Suspense>
+		<AuthProvider>
+			<Suspense fallback={<PageLoader />}>
+				<Routes>
+					<Route
+						path="/"
+						element={
+							<ErrorBoundary FallbackComponent={ErrorFallback}>
+								<ImageSelectionPage />
+							</ErrorBoundary>
+						}
+					/>
+					<Route
+						path="/viewer/:imageId"
+						element={
+							<ErrorBoundary FallbackComponent={ErrorFallback}>
+								<ImageViewerPage />
+							</ErrorBoundary>
+						}
+					/>
+					<Route
+						path="/admin"
+						element={
+							<ErrorBoundary FallbackComponent={ErrorFallback}>
+								<ProtectedRoute requiredRole="admin">
+									<AdminUploadMappingPage />
+								</ProtectedRoute>
+							</ErrorBoundary>
+						}
+					/>
+				</Routes>
+			</Suspense>
+		</AuthProvider>
 	);
 }
 

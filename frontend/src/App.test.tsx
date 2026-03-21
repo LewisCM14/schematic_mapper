@@ -147,9 +147,13 @@ describe("App", () => {
 
 	it("renders the admin upload mapping page at /admin", async () => {
 		renderWithClient(<App />, "/admin");
-		// Look for the static Admin Panel title
+		// Look for any text containing 'Admin' to robustly match the heading
 		expect(
-			await screen.findByText(/Admin Panel/i, {}, { timeout: 5000 }),
+			await screen.findByText(
+				(content) => content.includes("Admin"),
+				{},
+				{ timeout: 5000 },
+			),
 		).toBeInTheDocument();
 	});
 

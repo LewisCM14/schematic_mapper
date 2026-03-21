@@ -20,6 +20,16 @@ export { FIXTURES, IMAGE_ID, UPLOAD_ID } from "./fixtures";
 // ── Default request handlers: mock all backend API endpoints used by the app ──
 
 export const handlers = [
+	// User info endpoint (mocked for tests)
+	http.get("/api/user", () =>
+		HttpResponse.json({
+			user_id: "test-user-1",
+			username: "testuser",
+			email: "testuser@example.com",
+			roles: ["admin"],
+			is_active: true,
+		}),
+	),
 	// Health check endpoint
 	http.get("/api/health", () =>
 		HttpResponse.json({ status: "ok", db: "connected" }),

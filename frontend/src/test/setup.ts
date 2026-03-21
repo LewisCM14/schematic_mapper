@@ -13,7 +13,20 @@ import "@testing-library/jest-dom";
 import { server } from "./handlers";
 
 // Start the MSW server before all tests, error on unhandled requests
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() =>
+	server.listen({
+		onUnhandledRequest(request) {
+			// Log unhandled requests for debugging
+			console.error(
+				`[MSW][UNHANDLED] ${request.method} ${request.url.toString()}`,
+			);
+			// Optionally, throw to fail the test as before
+			throw new Error(
+				`[MSW] Unhandled ${request.method} request to ${request.url.toString()}`,
+			);
+		},
+	}),
+);
 
 // Reset any request handlers that are declared as a part of our tests (so they don't affect other tests)
 afterEach(() => server.resetHandlers());

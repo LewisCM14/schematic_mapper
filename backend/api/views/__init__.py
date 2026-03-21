@@ -16,6 +16,7 @@ from api.views.images import (
     list_images,
 )
 from api.views.search import search_view
+from api.views.user import user_info
 
 __all__ = [
     "admin_upload_image",
@@ -32,4 +33,5 @@ __all__ = [
     "search_view",
     "upload_chunk",
     "upload_session_detail",
+    "user_info",
 ]

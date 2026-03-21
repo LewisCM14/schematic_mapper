@@ -21,6 +21,7 @@ from .views import (
     search_view,  # Search endpoint
     upload_chunk,  # Admin: upload a chunk of an image
     upload_session_detail,  # Admin: get upload session details
+    user_info,  # User info endpoint
 )
 
 # Public and admin API endpoints
@@ -59,4 +60,6 @@ urlpatterns = [
         "admin/fitting-positions/<str:fitting_position_id>",
         delete_fitting_position,
     ),
+    # User info endpoint
+    path("user", user_info),
 ]

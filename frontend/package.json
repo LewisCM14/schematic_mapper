@@ -10,8 +10,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage --environment jsdom",
-		"lint": "biome check src/",
-		"format": "biome check --write src/"
+		"lint": "biome lint --write ./src",
+		"format": "biome format --write ./src"
 	},
 	"dependencies": {
 		"@emotion/react": "^11.14.0",

@@ -935,6 +935,40 @@ Reuse notes:
 - Reuse Image Viewer map canvas, marker behavior, and LHS panel pattern.
 - Add admin-only controls for upload state, mapping validation, and save/publish.
 
+
+#### Authentication & Authorization Flow (Frontend)
+
+**Overview:**
+The frontend (React application) does not implement its own authentication or token management. Instead, it relies on the backend to determine the current user's identity and role, which are derived from Active Directory (AD) group membership via IIS/LDAP integration.
+
+**Flow:**
+
+1. **User Identity and Role Fetch**
+    - On application load, the frontend makes a request to a backend endpoint (e.g., `/api/health` or a dedicated `/api/user`) to retrieve the current user's identity and role.
+    - The backend determines the user’s role (`admin` or `viewer`) based on AD group membership and returns this information in the response.
+
+2. **Role Context in Frontend**
+    - The frontend stores the user’s role in a React context/provider.
+    - This context is made available throughout the application, allowing any component to access the current user’s role.
+
+3. **UI Control Based on Role**
+    - UI elements and navigation options are conditionally rendered based on the user’s role:
+      - **Admin users** (members of the `app_admin` AD group) see admin features such as image upload and mapping workflows.
+      - **Viewer users** (members of the `app_viewer` AD group) see only standard viewing features.
+    - Attempting to access unauthorized features (e.g., admin routes as a viewer) results in a redirect or an appropriate error message.
+
+4. **Handling Unauthorized/Unauthenticated States**
+    - If the backend indicates the user is not authenticated or not in an allowed group, the frontend displays an access denied message and hides all application features.
+    - No sensitive UI elements are rendered for unauthorized users.
+
+5. **Development Mode**
+    - In local development mode (`AUTH_MODE=dev`), the backend injects a mock user identity and role, which the frontend consumes in the same way as in production.
+
+**Security Note:**
+All authorization decisions are enforced on the backend. The frontend’s role-based UI controls are for user experience only and do not provide security guarantees.
+
+---
+
 #### Components
 *Components are organized following the Atomic Design pattern*
 

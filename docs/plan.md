@@ -120,23 +120,61 @@ class LDAPAuthorizationMiddleware:
   # Looks up AD groups and attaches user_role
 ```
 
-##### Client (React/Vite)
+
+##### Client (React/Vite) & Frontend Authentication
 
 Create a simple landing page.
 
-Fetch `/api/health`.
+Fetch `/api/health` and display the returned status.
 
-Display the returned status.
+**Implement robust, role-based authentication and authorization in the frontend:**
+
+1. **Backend User Endpoint**
+  - Implement `GET /api/user` endpoint in Django.
+  - Returns the current user's identity and role (from middleware).
+  - Returns 401/403 if not authenticated or not in an allowed group.
+  - Fully covered by backend tests (pytest), type-checked (mypy), and linted (ruff).
+
+2. **Frontend User Fetch**
+  - On application load, fetch `/api/user` to get the current user's identity and role.
+  - If unauthorized or network error, display an access denied message and hide all features.
+  - Add integration tests (Vitest) to verify correct fetch and error handling.
+
+3. **Role Context Provider**
+  - Create a React context (e.g., `AuthProvider`) to store user identity and role.
+  - Provide this context at the top level (in `App.tsx`).
+  - Expose a hook (e.g., `useAuth()`) for components to access the current user's role and identity.
+  - Add unit tests for the context/provider logic.
+
+4. **Conditional UI Rendering**
+  - Update navigation, routes, and UI components to check the user's role from context.
+  - Only render admin-only features (e.g., admin upload, mapping workflow) if `user_role === "admin"`.
+  - Hide or disable admin controls for viewers.
+  - Redirect unauthorized users from admin routes to the main screen or show an error message.
+  - Add tests to verify that admin features are not visible to viewers.
+
+5. **Development Mode Support**
+  - In local development mode (`AUTH_MODE=dev`), the backend injects a mock user identity and role.
+  - The frontend consumes these values in the same way as in production.
+  - Add tests to verify dev mode behavior.
 
 ##### Testing
 
 Add a backend `pytest` verifying `/api/health`.
 
-Add a frontend `vitest` verifying the health endpoint renders successfully.
+
+Add a frontend `vitest` verifying:
+  - the health endpoint renders successfully
+  - user role fetch and error handling
+  - role context/provider logic
+  - conditional UI rendering for admin/viewer
+  - dev mode behavior
+
 
 Add backend tests for authentication and authorization middleware:
-- Simulate users and groups using environment variables and patching in dev mode.
-- Patch AD group lookup and set `REMOTE_USER` in test client for enterprise mode.
+  - Simulate users and groups using environment variables and patching in dev mode.
+  - Patch AD group lookup and set `REMOTE_USER` in test client for enterprise mode.
+  - Test `/api/user` endpoint for all role and error cases.
 
 **Example test:**
 ```python
