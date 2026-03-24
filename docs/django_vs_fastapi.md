@@ -101,17 +101,44 @@ The analysis is based on your project’s requirements, implementation plan, and
 
 ---
 
+
 ## 6. Performance & Modern Features
 
 **Django**
-- Synchronous by default, but supports async views and background tasks (since Django 3.1+).
-- More than fast enough for the Schematic Mapper’s requirements (database and I/O bound, not CPU bound).
+- Synchronous by default, but supports async views and background tasks (since Django 3.1+). Not all ORM/database operations are fully async as of Django 5.0.
+- For most business applications (CRUD, integration, moderate data volumes), Django is more than fast enough. Real-world: Instagram, Pinterest, and Disqus run Django at massive scale, but typically for web apps, not ultra-high-throughput APIs.
+- For returning datasets up to ~10,000–20,000 records (a few MBs), Django REST Framework (DRF) with pagination or streaming responses performs well. For larger payloads (100,000+ records or 10MB+ per response), Django can be tuned using StreamingHttpResponse, async views, and efficient querysets, but is not as efficient as FastAPI for concurrent, large-payload APIs.
+- Example: For telemetry or analytics APIs returning 500,000+ rows (e.g., 50MB+ JSON), Django can serve the data, but response times and memory usage will be higher than FastAPI unless you use streaming and chunked responses. See [Django StreamingHttpResponse docs](https://docs.djangoproject.com/en/5.0/ref/request-response/#streaminghttpresponse).
+- For real-time or WebSocket workloads, Django Channels is required, adding complexity.
 
 **FastAPI**
-- Fully async, high performance for API-only workloads.
-- Marginal benefit for this project, as most endpoints are CRUD and integration-focused.
+- Fully async, high performance for API-only workloads. Built on Starlette (ASGI), enabling true async request handling and efficient concurrency.
+- In independent benchmarks ([Techempower](https://www.techempower.com/benchmarks/#section=data-r21&hw=ph&test=plaintext)), FastAPI can serve tens of thousands of requests per second for simple endpoints.
+- For APIs returning large datasets (e.g., 100,000+ records or 10MB+ per response), FastAPI’s async model and native support for streaming responses (using async generators) allow it to handle high concurrency and large payloads with lower memory usage and faster response times than Django.
+- Real-world: Microsoft, Uber, and Netflix use FastAPI for high-throughput APIs, including telemetry and analytics endpoints that return hundreds of thousands to millions of records per request ([FastAPI Users](https://fastapi.tiangolo.com/#who-is-using-fastapi)).
+- For GraphQL, Strawberry and Ariadne provide async GraphQL endpoints that can efficiently stream large result sets.
 
-**Advantage:** FastAPI (for high-concurrency APIs), but not a deciding factor here.
+**What is a "large dataset"?**
+- In this context, a "large dataset" means:
+	- 100,000+ records in a single API response (e.g., telemetry, analytics, or time series data)
+	- Payloads of 10MB or more per response (JSON, CSV, or binary)
+	- Use cases where clients request all data points for a device or time window, e.g., 800,000 telemetry points
+
+**Architecting Django for Optimum Performance:**
+- Use async views for endpoints that benefit from concurrency ([Django async docs](https://docs.djangoproject.com/en/5.0/topics/async/)).
+- Use StreamingHttpResponse for large payloads to avoid loading all data into memory.
+- Optimize database queries (select_related, prefetch_related, indexes) and avoid N+1 queries.
+- For real-time or WebSocket APIs, use Django Channels (ASGI), but this adds deployment complexity.
+- For the most demanding endpoints (e.g., streaming 500,000+ records), consider a hybrid approach: use Django for core business logic and FastAPI for async/streaming microservices.
+
+**References:**
+- [Django async support](https://docs.djangoproject.com/en/5.0/topics/async/)
+- [Streaming large files in Django](https://docs.djangoproject.com/en/5.0/ref/request-response/#streaminghttpresponse)
+- [FastAPI Benchmarks](https://github.com/luizalabs/python-web-frameworks-benchmark)
+- [TestDriven.io: Django vs FastAPI](https://testdriven.io/blog/django-vs-fastapi/)
+- [Strawberry GraphQL async support](https://strawberry.rocks/docs/guides/async)
+
+**Advantage:** FastAPI (for APIs returning 100,000+ records or 10MB+ per response, or requiring high concurrency/real-time features). For typical business APIs, Django is sufficient and easier to maintain.
 
 ---
 
